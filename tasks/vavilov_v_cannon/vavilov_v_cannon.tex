@@ -1,0 +1,1030 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{tikz}
+\usepackage{multirow}
+\usepackage[russian]{babel}
+\usepackage[T2A]{fontenc}
+\usepackage{booktabs}
+\setlength{\parindent}{1em}
+
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  columns=fullflexible,
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=true,
+  postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
+  numbers=left,
+  numberstyle=\tiny,
+  language=C++,
+  keywordstyle=\color{blue},
+  commentstyle=\color{green!50!black},
+  stringstyle=\color{red},
+  tabsize=2,
+  columns=fullflexible,
+  keepspaces=true
+}
+
+\begin{document}
+\begin{titlepage}
+\centering
+{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ\\
+РОССИЙСКОЙ ФЕДЕРАЦИИ}
+
+\vspace{1em}
+
+Федеральное государственное автономное образовательное учреждение высшего образования\\
+\textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»}\\
+\textbf{(ННГУ)}
+
+\vspace{2em}
+
+\textbf{Институт информационных технологий, математики и механики}
+
+\vspace{1em}
+
+\textbf{Кафедра высокопроизводительных вычислений и системного программирования}
+
+\vspace{2em}
+
+Направление подготовки: "Прикладная математика и информатика"\\
+Профиль подготовки: "общий профиль" \\
+
+\vspace{4em}
+
+
+\textbf{\Large ОТЧЕТ}\\
+по третьей лабораторной работе:\\
+\vspace{1em}
+\textbf{«Умножение плотных матриц. Элементы типа double. Блочная схема, алгоритм Кэннона.»}
+
+\begin{flushright}
+\textbf{Выполнил}:\\[5pt]
+студент группы {3822Б1ПМоп3} \\[1em]
+{Вавилов Виталий Вадимович}
+\end{flushright}
+
+\vspace{1em}
+
+\begin{flushright}
+
+\noindent\textbf{Проверил:} \\[5pt]
+к. т. н., доцент кафедры ВВСП \\[5pt]
+{Сысоев Александр Владимирович}
+\end{flushright}
+
+\vspace{1em}
+
+\vfill
+\textbf{Нижний Новгород}\\
+2025
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+Алгоритм Кэннона играет важную роль в вычислительной математике и теории параллельных вычислений, обеспечивая эффективное умножение плотных матриц на многопроцессорных системах. Он оптимально использует ресурсы кластера или суперкомпьютера за счёт минимизации обмена данными между процессорами и равномерного распределения вычислительной нагрузки. В отличие от стандартного алгоритма матричного умножения, который требует значительных затрат памяти и времени при работе с большими матрицами, алгоритм Кэннона позволяет значительно ускорить этот процесс за счёт блочной обработки данных и циклической перестановки элементов.
+
+Благодаря своей эффективности и хорошей масштабируемости алгоритм находит применение в различных областях:
+
+\begin{enumerate}
+    \item \textit{Высокопроизводительные вычисления (HPC):}
+       оделирование физических процессов, численные методы решения уравнений в частных производных, квантовая химия.
+    \item \textit{Машинное обучение и искусственный интеллект:}
+       обработка больших массивов данных, вычисление градиентов в нейросетях, операции линейной алгебры.
+    \item\textit{Компьютерная графика и обработка изображений:}
+       рендеринг, фильтрация изображений, анимация.
+    \item\textit{Финансовая аналитика:}
+       симуляции рисков, прогнозирование рыночных трендов, модели портфельного инвестирования.
+     \item\textit{Криптография и безопасность:}
+       обработка больших матриц в алгоритмах шифрования и кодирования информации.
+\end{enumerate}
+
+Алгоритм Кэннона особенно полезен в системах, где требуется балансировка вычислительных ресурсов и минимизация накладных расходов на передачу данных между узлами. В данной работе особое внимание будет уделено как последовательной реализации алгоритма, так и его гибридным версиям с использованием MPI + OpenMP, OpenMP и Intel TBB, std::thread позволяющим эффективно решать задачи на современных многопроцессорных архитектурах.
+
+\section{Постановка задачи и цель работы}
+Даны две квадратные матрицы $A$ и $B$ размера $N \times N$. Необходимо вычислить их произведение $C = A \times B$ с использованием алгоритма Кэннона. Цель работы заключается в разработке и сравнении пяти реализаций:
+\begin{itemize}
+    \item Последовательная версия (Seq),
+    \item Параллельная версия с OpenMP,
+    \item Параллельная версия с TBB,
+    \item Параллельная версия с STL,
+    \item Параллельная версия с MPI + OpenMP.
+\end{itemize}
+Каждая реализация должна быть протестирована на корректность и производительность для различных размеров матриц и числа блоков. Очевидно, что исхрдные матрицы могут быть и прямоугольными, но тогда придется для корректной работы алгоритма дополнять их нулями до квадратных матриц.
+
+\section{Описание последовательной версии алгоритма Кэннона}
+
+Алгоритм включает следующие этапы:
+
+\begin{enumerate}
+    \item \textbf{Разбиение матриц на блоки.} 
+    Исходные матрицы \( A \) и \( B \) разбиваются на \( P \) блоков размера \( \frac{N}{\sqrt{P}} \times \frac{N}{\sqrt{P}} \). При \( P = N \) размер каждого блока составляет \( \sqrt{N} \times \sqrt{N} \).
+
+    \item \textbf{Начальные циклические сдвиги.}
+    \begin{itemize}
+        \item Для каждой \( i \)-й строки блоков матрицы \( A \) (\( i = 0, \dots, \sqrt{P} - 1 \)) выполняется циклический сдвиг блоков на \( i \) позиций влево.
+        \item Для каждого \( j \)-го столбца блоков матрицы \( B \) (\( j = 0, \dots, \sqrt{P} - 1 \)) выполняется циклический сдвиг блоков на \( j \) позиций вверх.
+    \end{itemize}
+    Эти сдвиги обеспечивают начальное выравнивание блоков для последующего умножения.
+
+    \item \textbf{Основной цикл алгоритма.} 
+    Запускается цикл из \( \sqrt{P} \) итераций, на каждой из которых выполняются следующие действия:
+    \begin{itemize}
+        \item Перемножаются блоки \( (i, j) \) матриц \( A \) и \( B \), а результат прибавляется к соответствующему блоку матрицы \( C_{ij} \), то есть \( C_{ij} \gets C_{ij} + A_{ij} \cdot B_{ij} \).
+        \item Для каждой \( i \)-й строки блоков матрицы \( A \) (\( i = 0, \dots, \sqrt{P} - 1 \)) выполняется циклический сдвиг блоков на 1 позицию влево.
+        \item Для каждого \( j \)-го столбца блоков матрицы \( B \) (\( j = 0, \dots, \sqrt{P} - 1 \)) выполняется циклический сдвиг блоков на 1 позицию вверх.
+    \end{itemize}
+\end{enumerate}
+
+\section{Описание OpenMP версии алгоритма}
+Параллелизация достигается за счет директив OpenMP, в частности \texttt{\#pragma omp parallel for}, которые автоматически распределяют итерации циклов между доступными потоками. Это обеспечивает простоту реализации и эффективное использование многоядерных процессоров.
+
+\subsection{Этапы работы алгоритма}
+
+\begin{enumerate}
+    \item \textbf{Начальные циклические сдвиги.}
+    Для подготовки данных к умножению выполняются начальные циклические сдвиги блоков:
+    \begin{itemize}
+        \item Для каждой \( i \)-й строки блоков матрицы \( A \) (\( i = 0, \dots, \text{num\_blocks} - 1 \)) блоки сдвигаются на \( i \) позиций влево.
+        \item Для каждого \( j \)-го столбца блоков матрицы \( B \) (\( j = 0, \dots, \text{num\_blocks} - 1 \)) блоки сдвигаются на \( j \) позиций вверх.
+        \item Параллелизация достигается с помощью директивы \texttt{\#pragma omp parallel for}, которая распределяет итерации внешнего цикла по индексу \( \text{bi} \) (строки блоков) между потоками. Это позволяет одновременно обрабатывать разные строки блоков.
+        \item Для предотвращения конфликтов доступа создаются временные копии матриц \( \text{a\_tmp} \) и \( \text{b\_tmp} \).
+    \end{itemize}
+
+    \item \textbf{Основной цикл вычислений.}
+    Основной цикл состоит из \( \text{num\_blocks} \) итераций, на каждой из которых выполняются:
+    \begin{itemize}
+        \item \textbf{Умножение блоков.}
+        \begin{itemize}
+            \item Для каждого блока \( (i, j) \) вычисляется произведение соответствующих блоков матриц \( A \) и \( B \), а результат прибавляется к блоку \( C_{ij} \): \( C_{ij} \gets C_{ij} + \sum_k A_{ik} \cdot B_{kj} \).
+            \item Параллелизация реализуется с помощью \texttt{\#pragma omp parallel for}, которая распределяет итерации внешнего цикла по индексу \( \text{bi} \) между потоками. Это обеспечивает одновременное вычисление разных блоков результирующей матрицы.
+            \item Вычисления выполняются непосредственно в глобальной матрице \( \text{C\_} \), без использования локальных буферов, так как OpenMP автоматически управляет доступом к данным.
+        \end{itemize}
+        \item \textbf{Циклические сдвиги блоков.}
+        \begin{itemize}
+            \item Каждая \( i \)-я строка блоков матрицы \( A \) сдвигается на одну позицию влево.
+            \item Каждый \( j \)-й столбец блоков матрицы \( B \) сдвигается на одну позицию вверх.
+            \item Сдвиги выполняются параллельно с использованием \texttt{\#pragma omp parallel for}, аналогично \texttt{InitialShift}, распределяя строки блоков между потоками.
+            \item Временные копии \( \text{a\_tmp} \) и \( \text{b\_tmp} \) используются для предотвращения конфликтов при записи.
+        \end{itemize}
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Особенности параллелизации}
+Использование OpenMP обеспечивает следующие особенности:
+\begin{itemize}
+    \item \textbf{Простота параллелизации:} Директива \texttt{\#pragma omp parallel for} позволяет легко распределять итерации циклов между потоками, минимизируя необходимость ручного управления потоками.
+    \item \textbf{Автоматическое управление потоками:} OpenMP автоматически определяет количество потоков на основе системных ресурсов (или настроек пользователя) и распределяет нагрузку.
+    \item \textbf{Прямой доступ к данным:} В отличие от STL-версии, где используются локальные буферы, OpenMP-версия работает непосредственно с глобальной матрицей \( \text{C\_} \), полагаясь на встроенные механизмы синхронизации OpenMP.
+\end{itemize}
+
+\subsection{Преимущества реализации}
+\begin{itemize}
+    \item \textbf{Простота кода:} Использование директив OpenMP делает код более компактным и читаемым по сравнению с ручным управлением потоками в STL-версии.
+    \item \textbf{Эффективность:} OpenMP оптимизирует распределение задач между потоками, минимизируя накладные расходы на управление.
+    \item \textbf {Масштабируемость:} Реализация автоматически адаптируется к числу доступных ядер процессора.
+\end{itemize}
+
+\section{Описание TBB версии алгоритма}
+TBB предоставляет высокоуровневые инструменты для параллельного выполнения задач, таких как \texttt{parallel\_for} и \texttt{task\_arena}.
+
+\subsection{Этапы работы алгоритма}
+
+\begin{enumerate}
+    \item \textbf{Начальные циклические сдвиги.}
+    Для подготовки данных к умножению выполняются начальные циклические сдвиги блоков:
+    \begin{itemize}
+        \item Для каждой \( i \)-й строки блоков матрицы \( A \) (\( i = 0, \dots, \text{num\_blocks} - 1 \)) блоки сдвигаются на \( i \) позиций влево.
+        \item Для каждого \( j \)-го столбца блоков матрицы \( B \) (\( j = 0, \dots, \text{num\_blocks} - 1 \)) блоки сдвигаются на \( j \) позиций вверх.
+        \item Сдвиги выполняются параллельно с использованием \texttt{tbb::parallel\_for} и двумерного диапазона \texttt{blocked\_range2d}, что позволяет распределять обработку блоков между потоками.
+    \end{itemize}
+
+    \item \textbf{Основной цикл вычислений.}
+    Вычисления выполняются в \texttt{task\_arena}, которая управляет пулом потоков. Цикл состоит из \( \text{num\_blocks} \) итераций, на каждой из которых:
+    \begin{itemize}
+        \item \textbf{Умножение блоков.} Для каждого блока \( (i, j) \):
+        \begin{itemize}
+            \item Копируются данные блоков \( A \) и \( B \) в локальные векторы.
+            \item Выполняется умножение блоков, где элементы результирующего блока \( C_{ij} \) обновляются: \( C_{ij} \gets C_{ij} + A_{ij} \cdot B_{ij} \).
+            \item Для ускорения вычислений используется развертывание цикла (unrolling) на четыре итерации по индексу \( k \), что минимизирует накладные расходы.
+            \item Параллелизация достигается с помощью \texttt{oneapi::tbb::parallel\_for} с автоматическим разделением задач (\texttt{auto\_partitioner}).
+        \end{itemize}
+        \item \textbf{Циклические сдвиги блоков.} После умножения:
+        \begin{itemize}
+            \item Каждая \( i \)-я строка блоков матрицы \( A \) сдвигается на одну позицию влево.
+            \item Каждый \( j \)-й столбец блоков матрицы \( B \) сдвигается на одну позицию вверх.
+            \item Сдвиги выполняются параллельно с использованием \texttt{tbb::parallel\_for}.
+        \end{itemize}
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Особенности параллелизации}
+Использование TBB позволяет эффективно распределять задачи между потоками:
+\begin{itemize}
+    \item \texttt{tbb::parallel\_for} с \texttt{blocked\_range2d} обеспечивает параллельную обработку блоков матриц, минимизируя конфликты доступа к данным.
+    \item \texttt{task\_arena} управляет количеством потоков, что позволяет адаптировать выполнение к доступным аппаратным ресурсам.
+    \item Автоматическое разделение задач (\texttt{auto\_partitioner}) оптимизирует нагрузку на потоки, учитывая их текущую занятость.
+\end{itemize}
+
+\subsection{Преимущества реализации}
+\begin{itemize}
+    \item \textbf{Эффективность:} Параллельное выполнение сдвигов и умножений блоков сокращает время вычислений.
+    \item \textbf{Масштабируемость:} TBB автоматически адаптируется к числу доступных ядер процессора.
+    \item \textbf{Оптимизация:} Развертывание цикла в \texttt{ComputeBlock} уменьшает накладные расходы на итерации.
+\end{itemize}
+
+\section{Описание STL версии алгоритма}
+Параллелизация достигается за счет использования \texttt{std::thread}, где каждый поток обрабатывает подмножество блоков. Количество потоков определяется как минимум между числом доступных процессорных ядер и числом блоков.
+
+\subsection{Этапы работы алгоритма}
+
+\begin{enumerate}
+    \item \textbf{Начальные циклические сдвиги.}
+    Для подготовки данных к умножению выполняются начальные циклические сдвиги блоков:
+    \begin{itemize}
+        \item Для каждой \( i \)-й строки блоков матрицы \( A \) (\( i = 0, \dots, \text{num\_blocks} - 1 \)) блоки сдвигаются на \( i \) позиций влево.
+        \item Для каждого \( j \)-го столбца блоков матрицы \( B \) (\( j = 0, \dots, \text{num\_blocks} - 1 \)) блоки сдвигаются на \( j \) позиций вверх.
+        \item Параллелизация достигается путем распределения строк блоков между потоками (\texttt{std::thread}). Количество потоков (\texttt{num\_threads}) ограничено числом доступных ядер (\texttt{ppc::util::GetPPCNumThreads()}) или числом блоков. Каждая нить обрабатывает диапазон строк, вычисляемый как \( \lceil \text{num\_blocks} / \text{num\_threads} \rceil \).
+        \item Для синхронизации потоки объединяются (\texttt{thread.join()}) после завершения сдвигов.
+    \end{itemize}
+
+    \item \textbf{Основной цикл вычислений.}
+    Основной цикл состоит из \( \text{num\_blocks} \) итераций, на каждой из которых выполняются:
+    \begin{itemize}
+        \item \textbf{Умножение блоков.}
+        \begin{itemize}
+            \item Для каждого потока создается локальный вектор \( \text{local\_c} \) для хранения промежуточных результатов умножения блоков.
+            \item Каждый поток обрабатывает диапазон строк (\texttt{bi\_range}), вычисляя произведение блоков \( A \) и \( B \). Для каждого элемента блока \( C_{ij} \) выполняется умножение: \( C_{ij} \gets C_{ij} + \sum_k A_{ik} \cdot B_{kj} \).
+            \item Параллелизация реализуется через \texttt{std::thread}, где каждый поток обрабатывает подмножество строк матрицы. Диапазон строк для потока определяется как \( \text{bi\_range} = \text{blocks\_per\_thread} \cdot \text{block\_size} \).
+            \item После завершения вычислений результаты из локальных векторов объединяются в глобальную матрицу \( \text{C\_} \).
+        \end{itemize}
+        \item \textbf{Циклические сдвиги блоков.}
+        \begin{itemize}
+            \item Каждая \( i \)-я строка блоков матрицы \( A \) сдвигается на одну позицию влево.
+            \item Каждый \( j \)-й столбец блоков матрицы \( B \) сдвигается на одну позицию вверх.
+            \item Сдвиги выполняются параллельно с использованием \texttt{std::thread} с распределением строк блоков между потоками.
+        \end{itemize}
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Особенности параллелизации}
+Использование STL и \texttt{std::thread} обеспечивает следующие особенности:
+\begin{itemize}
+    \item \textbf{Ручное управление потоками:} В отличие от TBB, где управление потоками автоматизировано, STL-версия явно создает и синхронизирует потоки с помощью \texttt{std::thread} и \texttt{thread.join()}.
+    \item \textbf{Распределение задач:} Диапазоны строк блоков распределяются между потоками вручную, что позволяет контролировать нагрузку, но требует дополнительных усилий по синхронизации.
+    \item \textbf{Локальные результаты:} Для предотвращения конфликтов доступа к данным каждый поток использует локальный вектор для хранения промежуточных результатов, которые затем объединяются в глобальную матрицу \( \text{C\_} \).
+\end{itemize}
+
+\subsection{Преимущества реализации}
+\begin{itemize}
+    \item \textbf{Простота:} Использование STL делает код независимым от внешних библиотек, таких как TBB, что упрощает переносимость.
+    \item \textbf{Гибкость:} Ручное управление потоками позволяет точно настраивать распределение задач.
+    \item \textbf{Эффективность:} Параллельное выполнение сдвигов и умножений блоков сокращает время вычислений на многоядерных системах.
+\end{itemize}
+
+\section{Описание гибридной MPI+OpenMP версии алгоритма}
+Реализация включает этапы предварительной обработки, валидации, начальных сдвигов, циклических вычислений и сдвигов блоков, а также финальной обработки результатов.
+
+Алгоритм Кэннона разбивает матрицы \( A \) и \( B \) на блоки и использует циклические сдвиги для распределения данных между процессами MPI. Каждый процесс MPI обрабатывает свой блок данных, а OpenMP применяется для параллельного выполнения операций внутри каждого процесса, таких как копирование блоков и умножение матриц. Гибридный подход позволяет эффективно использовать ресурсы кластерных систем, комбинируя распределенные вычисления между узлами и многопоточность внутри узлов.
+
+\subsection{Этапы работы алгоритма}
+
+\begin{enumerate}
+    \item \textbf{Подготовка данных для распределения.}
+    На процессе с рангом 0 подготавливаются данные для распределения:
+    \begin{itemize}
+        \item Вычисляется оптимальный размер сетки процессов (\texttt{FindOptimalGridSize}) как наибольший делитель \( \sqrt{\text{size}} \), где \( \text{size} \) — общее количество процессов MPI, а \( N \) делится нацело на размер сетки.
+        \item Матрицы \( A \) и \( B \) разбиваются на блоки размером \( \text{block\_size} \times \text{block\_size} \), которые распределяются между активными процессами (\( \text{active\_procs} = \text{num\_blocks} \times \text{num\_blocks} \)).
+        \item Функция \texttt{TakeBlock} извлекает блок из матрицы, используя OpenMP (\texttt{\#pragma omp parallel for}) для параллельного копирования элементов блока в буфер.
+        \item Данные для матриц \( A \) и \( B \) сохраняются в векторы \( \text{scatter\_a} \) и \( \text{scatter\_b} \) для последующего распределения.
+    \end{itemize}
+    Затем данные распределяются между процессами с помощью \texttt{mpi::scatter}.
+
+    \item \textbf{Начальные циклические сдвиги.}
+    Каждый процесс MPI обрабатывает локальные блоки \( \text{local\_a} \) и \( \text{local\_b} \):
+    \begin{itemize}
+        \item Процесс с рангом \( \text{rank} \) находится в сетке \( \text{num\_blocks} \times \text{num\_blocks} \), где его позиция определяется как \( \text{row} = \text{rank} / \text{num\_blocks} \), \( \text{col} = \text{rank} \mod \text{num\_blocks} \).
+        \item Для матрицы \( A \): блоки в строке \( \text{row} \) сдвигаются на \( \text{row} \) позиций влево с использованием \texttt{world.send} и \texttt{world.recv}.
+        \item Для матрицы \( B \): блоки в столбце \( \text{col} \) сдвигаются на \( \text{col} \) позиций вверх аналогичным образом.
+        \item Передача данных между процессами осуществляется через MPI, без применения OpenMP на этом этапе.
+    \end{itemize}
+
+    \item \textbf{Основной цикл вычислений.}
+    Основной цикл состоит из \( \text{num\_blocks} \) итераций, на каждой из которых выполняются:
+    \begin{itemize}
+        \item \textbf{Умножение блоков.}
+        \begin{itemize}
+            \item Каждый процесс вычисляет произведение своих локальных блоков \( \text{local\_a} \) и \( \text{local\_b} \), добавляя результат к локальному блоку \( \text{local\_c} \): \( \text{local\_c}_{ij} \gets \text{local\_c}_{ij} + \sum_k \text{local\_a}_{ik} \cdot \text{local\_b}_{kj} \).
+            \item Параллелизация внутри процесса достигается с помощью \texttt{\#pragma omp parallel for}, которая распределяет итерации по индексу \( i \) (строки блока) между потоками.
+        \end{itemize}
+        \item \textbf{Циклические сдвиги блоков.}
+        \begin{itemize}
+            \item Локальный блок \( \text{local\_a} \) сдвигается на одну позицию влево (между процессами в строке сетки).
+            \item Локальный блок \( \text{local\_b} \) сдвигается на одну позицию вверх (между процессами в столбце сетки).
+            \item Сдвиги выполняются с использованием \texttt{world.send} и \texttt{world.recv}, аналогично \texttt{InitialShift}.
+        \end{itemize}
+        \item Цикл повторяется \( \text{num\_blocks} - 1 \) раз после первого умножения, чтобы завершить вычисления.
+    \end{itemize}
+    \item \textbf{Сбор результатов.}
+    \begin{itemize}
+        \item Локальные блоки \( \text{local\_c} \) от всех процессов собираются на процессе с рангом 0 с помощью \texttt{mpi::gather} в буфер \( \text{tmp\_c} \).
+        \item На процессе с рангом 0 блоки объединяются в глобальную матрицу \( \text{C\_} \) с использованием \texttt{GatherResults}, где OpenMP (\texttt{\#pragma omp parallel for}) параллелизует копирование элементов из блоков в результирующую матрицу.
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Особенности параллелизации}
+Гибридный подход MPI+OpenMP обеспечивает:
+\begin{itemize}
+    \item \textbf{Распределенные вычисления (MPI):} Каждый процесс MPI обрабатывает свой блок данных, а коммуникации (сдвиги) выполняются через \texttt{world.send} и \texttt{world.recv}, что позволяет масштабировать алгоритм на кластеры.
+    \item \textbf{Многопоточность внутри узлов (OpenMP):} Директива \texttt{\#pragma omp parallel for} используется для параллельного копирования блоков, умножения блоков и сборки результатов, оптимизируя использование ресурсов каждого узла.
+    \item \textbf{Оптимизация числа процессов:} Функция \texttt{FindOptimalGridSize} выбирает размер сетки процессов, обеспечивая делимость \( N \) на \( \text{num\_blocks} \), и исключает лишние процессы, создавая подкоммуникатор (\texttt{active\_world}).
+\end{itemize}
+
+\subsection{Преимущества реализации}
+\begin{itemize}
+    \item \textbf{Масштабируемость:} Комбинация MPI и OpenMP позволяет эффективно использовать как кластерные системы (межузловая параллелизация), так и многоядерные процессоры внутри узлов.
+    \item \textbf{Простота OpenMP:} Директивы OpenMP упрощают параллелизацию внутри процессов, минимизируя ручное управление потоками.
+    \item \textbf{Гибкость MPI:} Распределение блоков между процессами позволяет адаптироваться к различным размерам кластера.
+\end{itemize}
+
+\section{Результаты экспериментов}
+
+Эксперименты проводились с использованием тестов из файлов \texttt{main\_func.cpp} и \texttt{main\_perf.cpp}, основанных на фреймворке Google Test. Целью экспериментов было исследование корректности и производительности различных реализаций алгоритма Кэннона для перемножения квадратных матриц размером $900 \times 900$ при числе блоков, равном 30. В случае параллельных реализаций использовались 2 потока и 2 процесса. Были рассмотрены следующие варианты реализации:
+\begin{itemize}
+    \item Последовательная реализация (Seq)
+    \item OpenMP
+    \item Intel TBB
+    \item STL (на std::thread)
+    \item Гибридная MPI+OpenMP
+\end{itemize}
+
+\subsection{Корректность}
+
+Функциональные тесты (\texttt{main\_func.cpp}) были направлены на проверку точности и устойчивости реализованных алгоритмов. Тестирование охватывало следующие случаи:
+\begin{itemize}
+    \item Умножение случайных матриц размером $16 \times 16$ с допустимой погрешностью $10^{-6}$;
+    \item Сравнение с эталонным умножением для фиксированных матриц различных размерностей (точное совпадение);
+    \item Умножение единичных и нулевых матриц;
+    \item Обработка случая, когда размер матрицы $N$ не делится на число блоков \texttt{num\_blocks} — проверка корректной валидации входных данных.
+\end{itemize}
+Все версии успешно прошли тесты, продемонстрировав корректность реализации и идентичность результатов по сравнению с эталонной реализацией.
+
+\subsection{Производительность}
+
+Производительные тесты (\texttt{main\_perf.cpp}) были направлены на оценку времени выполнения ключевых компонентов алгоритма — \texttt{pipeline} и \texttt{task\_run}. Ниже приведена таблица с результатами тестирования:
+
+\begin{table}[h]
+\centering
+\caption{Время выполнения (в секундах) для различных реализаций алгоритма Кэннона}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Реализация} & \textbf{Тест pipeline (с)} & \textbf{Тест task\_run (с)} \\
+\midrule
+Последовательная (Seq) & 5.7667898850 & 5.7990913300 \\
+MPI+OpenMP & 5.6226541210 & 5.6610658560 \\
+OpenMP & 2.2715725740 & 2.2350693680 \\
+Intel TBB & 2.8217405990 & 2.7248846890 \\
+STL & 3.0950532190 & 2.8553722830 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Анализ результатов}
+На основе полученных данных можно сделать следующие выводы:
+\begin{itemize}
+    \item \textbf{OpenMP} продемонстрировала наилучшие результаты, обеспечив минимальное время выполнения за счёт эффективного использования потокового параллелизма.
+    \item \textbf{Intel TBB} эффективно распределяет задачи между потоками, но немного уступает OpenMP, возможно, из-за накладных расходов на управление задачами.
+    \item \textbf{STL}-реализация уступает OpenMP и TBB. Это может быть связано с меньшей оптимизацией под конкретные аппаратные платформы.
+    \item \textbf{Последовательная версия} закономерно показала наихудшую производительность, не используя преимущества параллельной обработки.
+    \item \textbf{MPI+OpenMP} демонстрирует производительность, близкую к последовательной версии. Это может быть связано с высокими накладными расходами на коммуникацию между процессами в MPI, которые перевешивают преимущества параллелизма при использовании всего 2 процессов и двух потоков. При увелечении числа процессов рузультат становится гораздо лучше(использование четырех процессов ускоряет работу примерно в 2 раза).
+\end{itemize}
+
+\subsection{Сравнение ускорения}
+
+Для оценки эффективности параллельных подходов вычислим ускорение ($S$) относительно последовательной реализации на примере теста \texttt{pipeline}:
+
+\begin{itemize}
+    \item OpenMP: $S = \frac{5.7667898850}{2.2715725740} \approx 2.538677369$
+    \item Intel TBB: $S = \frac{5.7667898850}{2.8217405990} \approx 2.043699512$
+    \item STL: $S = \frac{5.7667898850}{3.0950532190} \approx 1.863228021$
+    \item MPI+OpenMP: $S = \frac{5.7667898850}{5.6226541210} \approx 1.025634827$
+\end{itemize}
+
+Параллельные реализации OpenMP, TBB и STL обеспечили ускорение, близкое к теоретически возможному для двух потоков, что подтверждает их масштабируемость и эффективность. Реализация MPI+OpenMP, напротив, показала снижение производительности, что подчёркивает необходимость большего числа процессов для более быстрой работы.
+
+\subsection{Общие выводы}
+
+Параллельные реализации алгоритма Кэннона значительно превосходят по производительности последовательный вариант, особенно при увеличении размера матрицы. Среди всех вариантов реализация на основе OpenMP является наиболее эффективной в текущей конфигурации, обеспечивая лучшее соотношение скорости и простоты реализации. Реализация с Intel TBB также показала хорошие результаты, уступая OpenMP лишь незначительно, при этом предлагая расширенные возможности для динамического управления задачами. STL-подход может быть интересен при специфических требованиях, но уступает по эффективности. Реализация MPI+OpenMP требует дальнейшей оптимизации для эффективной работы с малым числом процессов.
+
+
+\section{Заключение}
+В ходе работы была проведена реализация и сравнительный анализ пяти вариантов алгоритма Кэннона для умножения квадратных матриц: последовательного, а также параллельных с использованием OpenMP, Intel TBB, STL (на std::thread) и гибридного подхода MPI+OpenMP. Все реализации успешно прошли функциональные тесты, подтвердив корректность получаемых результатов.
+
+Проведенные эксперименты подтвердили высокую эффективность параллельных реализаций алгоритма Кэннона для умножения матриц. Все версии показали корректные результаты, а OpenMP выделяется как оптимальный выбор для данной конфигурации благодаря максимальному ускорению и простоте использования. Полученные данные подчеркивают перспективность применения параллельных технологий в высокопроизводительных вычислениях.
+
+\section{Список литературы}
+\begin{enumerate}
+    \item OpenMP Architecture Review Board. "OpenMP Application Programming Interface." (2021).
+    \item Quinn M.J. Parallel Programming in C with MPI and OpenMP. – New York, NY: McGraw-Hill, 2004.
+    \item Гергель В.П. Теория и практика параллельных вычислений. М.: Интернет-Университет Информационных технологий; БИНОМ. Лаборатория знаний, 2007.
+    \item Intel. "Threading Building Blocks Documentation." (2023).
+    \item ISO/IEC 14882:2017. "Programming languages — C++."
+    \item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks}. — Нижний Новгород, 2007.
+\end{enumerate}
+
+\section{Приложение}
+Ниже приведены исходные коды реализаций.
+
+\subsection{Seq}
+\begin{lstlisting}[language=C++]
+
+void vavilov_v_cannon_seq::CannonSequential::InitialShift() {
+  std::vector<double> a_tmp = A_;
+  std::vector<double> b_tmp = B_;
+
+  for (unsigned int bi = 0; bi < num_blocks_; ++bi) {
+    for (unsigned int bj = 0; bj < num_blocks_; ++bj) {
+      unsigned int src_row = (bi + bj) % num_blocks_;
+      unsigned int src_col = (bj + bi) % num_blocks_;
+      for (unsigned int i = 0; i < block_size_; ++i) {
+        for (unsigned int j = 0; j < block_size_; ++j) {
+          B_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+              b_tmp[(((src_row * block_size_) + i) * N_) + ((bj * block_size_) + j)];
+          A_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+              a_tmp[(((bi * block_size_) + i) * N_) + ((src_col * block_size_) + j)];
+        }
+      }
+    }
+  }
+}
+
+void vavilov_v_cannon_seq::CannonSequential::BlockMultiply() {
+  for (unsigned int bi = 0; bi < N_; bi += block_size_) {
+    for (unsigned int bj = 0; bj < N_; bj += block_size_) {
+      for (unsigned int i = bi; i < bi + block_size_; i++) {
+        for (unsigned int j = bj; j < bj + block_size_; j++) {
+          double temp = 0.0;
+          for (unsigned int k = 0; k < block_size_; k++) {
+            unsigned int row_a = bi + (i - bi);
+            unsigned int col_a = bj + k;
+            unsigned int row_b = bi + k;
+            unsigned int col_b = bj + (j - bj);
+
+            temp += A_[(row_a * N_) + col_a] * B_[(row_b * N_) + col_b];
+          }
+
+          C_[(i * N_) + j] += temp;
+        }
+      }
+    }
+  }
+}
+
+void vavilov_v_cannon_seq::CannonSequential::ShiftBlocks() {
+  std::vector<double> a_tmp = A_;
+  std::vector<double> b_tmp = B_;
+
+  for (unsigned int bi = 0; bi < num_blocks_; ++bi) {
+    for (unsigned int bj = 0; bj < num_blocks_; ++bj) {
+      unsigned int src_row = (bi + 1) % num_blocks_;
+      unsigned int src_col = (bj + 1) % num_blocks_;
+      for (unsigned int i = 0; i < block_size_; ++i) {
+        for (unsigned int j = 0; j < block_size_; ++j) {
+          B_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+              b_tmp[(((src_row * block_size_) + i) * N_) + ((bj * block_size_) + j)];
+          A_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+              a_tmp[(((bi * block_size_) + i) * N_) + ((src_col * block_size_) + j)];
+        }
+      }
+    }
+  }
+}
+
+bool vavilov_v_cannon_seq::CannonSequential::RunImpl() {
+  InitialShift();
+  for (unsigned int iter = 0; iter < num_blocks_; ++iter) {
+    BlockMultiply();
+    ShiftBlocks();
+  }
+  return true;
+}
+
+\end{lstlisting}
+
+
+
+
+\subsection{OpenMP}
+\begin{lstlisting}[language=C++]
+void vavilov_v_cannon_omp::CannonOMP::InitialShift() {
+  std::vector<double> a_tmp = A_;
+  std::vector<double> b_tmp = B_;
+
+#pragma omp parallel for
+  for (int bi = 0; bi < num_blocks_; ++bi) {
+    for (int bj = 0; bj < num_blocks_; ++bj) {
+      int src_row = (bi + bj) % num_blocks_;
+      int src_col = (bj + bi) % num_blocks_;
+      for (int i = 0; i < block_size_; ++i) {
+        for (int j = 0; j < block_size_; ++j) {
+          B_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+              b_tmp[(((src_row * block_size_) + i) * N_) + ((bj * block_size_) + j)];
+          A_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+              a_tmp[(((bi * block_size_) + i) * N_) + ((src_col * block_size_) + j)];
+        }
+      }
+    }
+  }
+}
+void vavilov_v_cannon_omp::CannonOMP::BlockMultiply() {
+#pragma omp parallel for
+  for (int bi = 0; bi < num_blocks_; ++bi) {
+    for (int bj = 0; bj < num_blocks_; ++bj) {
+      for (int i = 0; i < block_size_; ++i) {
+        for (int j = 0; j < block_size_; ++j) {
+          double temp = 0.0;
+          for (int k = 0; k < block_size_; ++k) {
+            int row = (bi * block_size_) + i;
+            int col = (bj * block_size_) + j;
+            int k_idx = (bj * block_size_) + k;
+            int k_row = (bi * block_size_) + k;
+            temp += A_[(row * N_) + k_idx] * B_[(k_row * N_) + col];
+          }
+          C_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] += temp;
+        }
+      }
+    }
+  }
+}
+
+void vavilov_v_cannon_omp::CannonOMP::ShiftBlocks() {
+  std::vector<double> a_tmp = A_;
+  std::vector<double> b_tmp = B_;
+
+#pragma omp parallel for
+  for (int bi = 0; bi < num_blocks_; ++bi) {
+    for (int bj = 0; bj < num_blocks_; ++bj) {
+      int src_row = (bi + 1) % num_blocks_;
+      int src_col = (bj + 1) % num_blocks_;
+      for (int i = 0; i < block_size_; ++i) {
+        for (int j = 0; j < block_size_; ++j) {
+          B_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+              b_tmp[(((src_row * block_size_) + i) * N_) + ((bj * block_size_) + j)];
+          A_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+              a_tmp[(((bi * block_size_) + i) * N_) + ((src_col * block_size_) + j)];
+        }
+      }
+    }
+  }
+}
+
+bool vavilov_v_cannon_omp::CannonOMP::RunImpl() {
+  InitialShift();
+  for (int iter = 0; iter < num_blocks_; ++iter) {
+    BlockMultiply();
+    ShiftBlocks();
+  }
+  return true;
+}
+
+\end{lstlisting}
+
+\subsection{TBB}
+\begin{lstlisting}[language=C++]
+
+void vavilov_v_cannon_tbb::CannonTBB::InitialShift() {
+  std::vector<double> a_tmp = A_;
+  std::vector<double> b_tmp = B_;
+  tbb::parallel_for(tbb::blocked_range2d<int>(0, num_blocks_, 0, num_blocks_), [&](const tbb::blocked_range2d<int>& r) {
+    for (int bi = r.rows().begin(); bi != r.rows().end(); ++bi) {
+      for (int bj = r.cols().begin(); bj != r.cols().end(); ++bj) {
+        int src_row = (bi + bj) % num_blocks_;
+        int src_col = (bj + bi) % num_blocks_;
+        for (int i = 0; i < block_size_; ++i) {
+          for (int j = 0; j < block_size_; ++j) {
+            B_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+                b_tmp[(((src_row * block_size_) + i) * N_) + ((bj * block_size_) + j)];
+            A_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+                a_tmp[(((bi * block_size_) + i) * N_) + ((src_col * block_size_) + j)];
+          }
+        }
+      }
+    }
+  });
+}
+
+void vavilov_v_cannon_tbb::CannonTBB::CopyBlocksToLocal(std::vector<double>& a_block, std::vector<double>& b_block, int base_row, int base_col) {
+  for (int i = 0; i < block_size_ && base_row + i < N_; ++i) {
+    for (int k = 0; k < block_size_ && base_col + k < N_; ++k) {
+      a_block[(i * block_size_) + k] = A_[((base_row + i) * N_) + (base_col + k)];
+      b_block[(k * block_size_) + i] = B_[((base_row + k) * N_) + (base_col + i)];
+    }
+  }
+}
+
+void vavilov_v_cannon_tbb::CannonTBB::ComputeBlock(const std::vector<double>& a_block, const std::vector<double>& b_block, int base_row, int base_col) {
+  for (int i = 0; i < block_size_ && base_row + i < N_; ++i) {
+    int row = base_row + i;
+    for (int j = 0; j < block_size_ && base_col + j < N_; ++j) {
+      int col = base_col + j;
+      double temp = 0.0;
+      int k = 0;
+
+      for (; k <= block_size_ - 4; k += 4) {
+        temp += a_block[(i * block_size_) + k] * b_block[(k * block_size_) + j] +
+                a_block[(i * block_size_) + k + 1] * b_block[((k + 1) * block_size_) + j] +
+                a_block[(i * block_size_) + k + 2] * b_block[((k + 2) * block_size_) + j] +
+                a_block[(i * block_size_) + k + 3] * b_block[((k + 3) * block_size_) + j];
+      }
+
+      for (; k < block_size_ && base_row + k < N_; ++k) {
+        temp += a_block[(i * block_size_) + k] * b_block[(k * block_size_) + j];
+      }
+
+      C_[(row * N_) + col] += temp;
+    }
+  }
+}
+
+void vavilov_v_cannon_tbb::CannonTBB::BlockMultiply() {
+  oneapi::tbb::parallel_for(
+      oneapi::tbb::blocked_range2d<int>(0, num_blocks_, 0, num_blocks_),
+      [&](const oneapi::tbb::blocked_range2d<int>& r) {
+        std::vector<double> a_block(block_size_ * block_size_);
+        std::vector<double> b_block(block_size_ * block_size_);
+
+        for (int bi = r.rows().begin(); bi != r.rows().end(); ++bi) {
+          for (int bj = r.cols().begin(); bj != r.cols().end(); ++bj) {
+            int base_row = bi * block_size_;
+            int base_col = bj * block_size_;
+
+            CopyBlocksToLocal(a_block, b_block, base_row, base_col);
+            ComputeBlock(a_block, b_block, base_row, base_col);
+          }
+        }
+      },
+      oneapi::tbb::auto_partitioner());
+}
+
+void vavilov_v_cannon_tbb::CannonTBB::ShiftBlocks() {
+  std::vector<double> a_tmp = A_;
+  std::vector<double> b_tmp = B_;
+  tbb::parallel_for(tbb::blocked_range2d<int>(0, num_blocks_, 0, num_blocks_), [&](const tbb::blocked_range2d<int>& r) {
+    for (int bi = r.rows().begin(); bi != r.rows().end(); ++bi) {
+      for (int bj = r.cols().begin(); bj != r.cols().end(); ++bj) {
+        int src_row = (bi + 1) % num_blocks_;
+        int src_col = (bj + 1) % num_blocks_;
+        for (int i = 0; i < block_size_; ++i) {
+          for (int j = 0; j < block_size_; ++j) {
+            B_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+                b_tmp[(((src_row * block_size_) + i) * N_) + ((bj * block_size_) + j)];
+            A_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+                a_tmp[(((bi * block_size_) + i) * N_) + ((src_col * block_size_) + j)];
+          }
+        }
+      }
+    }
+  });
+}
+
+bool vavilov_v_cannon_tbb::CannonTBB::RunImpl() {
+  oneapi::tbb::task_arena arena(ppc::util::GetPPCNumThreads());
+  arena.execute([&]() {
+    InitialShift();
+    for (int iter = 0; iter < num_blocks_; ++iter) {
+      BlockMultiply();
+      ShiftBlocks();
+    }
+  });
+  return true;
+}
+
+\end{lstlisting}
+
+\subsection{STL}
+\begin{lstlisting}[language=C++]
+
+void vavilov_v_cannon_stl::CannonSTL::InitialShift(int num_threads, int blocks_per_thread) {
+  std::vector<double> a_tmp = A_;
+  std::vector<double> b_tmp = B_;
+  std::vector<std::thread> threads;
+
+  auto shift_work = [&](int bi_start, int bi_end) {
+    for (int bi = bi_start; bi < bi_end; ++bi) {
+      for (int bj = 0; bj < num_blocks_; ++bj) {
+        int src_row = (bi + bj) % num_blocks_;
+        int src_col = (bj + bi) % num_blocks_;
+        for (int i = 0; i < block_size_; ++i) {
+          for (int j = 0; j < block_size_; ++j) {
+            B_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+                b_tmp[(((src_row * block_size_) + i) * N_) + ((bj * block_size_) + j)];
+            A_[((bi * block_size_ + i) * N_) + ((bj * block_size_) + j)] =
+                a_tmp[(((bi * block_size_) + i) * N_) + ((src_col * block_size_) + j)];
+          }
+        }
+      }
+    }
+  };
+
+  for (int t = 0; t < num_threads; ++t) {
+    int start = t * blocks_per_thread;
+    int end = std::min(start + blocks_per_thread, num_blocks_);
+    if (start < end) {
+      threads.emplace_back(shift_work, start, end);
+    }
+  }
+  for (auto &thread : threads) {
+    thread.join();
+  }
+}
+
+void vavilov_v_cannon_stl::CannonSTL::ProcessSingleBlock(int bi, int bj, int bi_start, std::vector<double> &local) {
+  for (int i = bi; i < bi + block_size_; i++) {
+    for (int j = bj; j < bj + block_size_; j++) {
+      double temp = 0.0;
+      for (int k = 0; k < block_size_; k++) {
+        const int row_a = bi + (i - bi);
+        const int col_a = bj + k;
+        const int row_b = bi + k;
+        const int col_b = bj + (j - bj);
+        temp += A_[(row_a * N_) + col_a] * B_[(row_b * N_) + col_b];
+      }
+      local[((i - bi_start) * N_) + j] += temp;
+    }
+  }
+}
+
+void vavilov_v_cannon_stl::CannonSTL::MergeResults(int num_threads, int bi_range, const std::vector<std::vector<double>> &local_c) {
+  for (int t = 0; t < num_threads; ++t) {
+    const int bi_start = t * bi_range;
+    const int bi_end = std::min(bi_start + bi_range, N_);
+    if (bi_start < N_) {
+      const std::vector<double> &local = local_c[t];
+      for (int i = bi_start; i < bi_end; ++i) {
+        for (int j = 0; j < N_; ++j) {
+          C_[(i * N_) + j] += local[((i - bi_start) * N_) + j];
+        }
+      }
+    }
+  }
+}
+
+void vavilov_v_cannon_stl::CannonSTL::BlockMultiply(int num_threads, int blocks_per_thread) {
+  std::vector<std::vector<double>> local_c(num_threads);
+  const int bi_range = blocks_per_thread * block_size_;
+  std::vector<std::thread> threads;
+
+  auto process_block_range = [&](int bi_start, int bi_end, int thread_id) {
+    std::vector<double> &local = local_c[thread_id];
+    local.resize((bi_end - bi_start) * N_, 0.0);
+
+    for (int bi = bi_start; bi < bi_end; bi += block_size_) {
+      for (int bj = 0; bj < N_; bj += block_size_) {
+        ProcessSingleBlock(bi, bj, bi_start, local);
+      }
+    }
+  };
+
+  for (int t = 0; t < num_threads; ++t) {
+    const int bi_start = t * bi_range;
+    const int bi_end = std::min(bi_start + bi_range, N_);
+    if (bi_start < N_) {
+      threads.emplace_back(process_block_range, bi_start, bi_end, t);
+    }
+  }
+  for (auto &thread : threads) {
+    thread.join();
+  }
+
+  MergeResults(num_threads, bi_range, local_c);
+}
+
+void vavilov_v_cannon_stl::CannonSTL::ShiftBlocks(int num_threads, int blocks_per_thread) {
+  std::vector<double> a_tmp = A_;
+  std::vector<double> b_tmp = B_;
+  std::vector<std::thread> threads;
+
+  auto shift_work = [&](int bi_start, int bi_end) {
+    for (int bi = bi_start; bi < bi_end; ++bi) {
+      for (int bj = 0; bj < num_blocks_; ++bj) {
+        int src_row = (bi + 1) % num_blocks_;
+        int src_col = (bj + 1) % num_blocks_;
+        for (int i = 0; i < block_size_; ++i) {
+          for (int j = 0; j < block_size_; ++j) {
+            B_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+                b_tmp[(((src_row * block_size_) + i) * N_) + ((bj * block_size_) + j)];
+            A_[(((bi * block_size_) + i) * N_) + ((bj * block_size_) + j)] =
+                a_tmp[(((bi * block_size_) + i) * N_) + ((src_col * block_size_) + j)];
+          }
+        }
+      }
+    }
+  };
+
+  for (int t = 0; t < num_threads; ++t) {
+    int start = t * blocks_per_thread;
+    int end = std::min(start + blocks_per_thread, num_blocks_);
+    if (start < end) {
+      threads.emplace_back(shift_work, start, end);
+    }
+  }
+  for (auto &thread : threads) {
+    thread.join();
+  }
+}
+
+bool vavilov_v_cannon_stl::CannonSTL::RunImpl() {
+  int num_threads = std::min(ppc::util::GetPPCNumThreads(), num_blocks_);
+  int blocks_per_thread = (num_blocks_ + num_threads - 1) / num_threads;
+  InitialShift(num_threads, blocks_per_thread);
+  for (int iter = 0; iter < num_blocks_; ++iter) {
+    BlockMultiply(num_threads, blocks_per_thread);
+    ShiftBlocks(num_threads, blocks_per_thread);
+  }
+  return true;
+}
+
+\end{lstlisting}
+
+\subsection{MPI + OMP}
+\begin{lstlisting}[language=C++]
+int vavilov_v_cannon_all::CannonALL::FindOptimalGridSize(int size, int n) {
+  int grid = std::floor(std::sqrt(size));
+  while (grid > 0) {
+    if (n % grid == 0) {
+      break;
+    }
+    --grid;
+  }
+  return grid > 0 ? grid : 1;
+}
+
+void vavilov_v_cannon_all::CannonALL::TakeBlock(const std::vector<double>& matrix, double* block, int n, int k,
+                                                int block_row, int block_col) {
+#pragma omp parallel for
+  for (int i = 0; i < k; ++i) {
+    for (int j = 0; j < k; ++j) {
+      block[(i * k) + j] = matrix[(((block_row * k) + i) * n) + ((block_col * k) + j)];
+    }
+  }
+}
+
+void vavilov_v_cannon_all::CannonALL::InitialShift(std::vector<double>& local_a, std::vector<double>& local_b) {
+  int rank = world_.rank();
+  int grid_size = num_blocks_;
+  int row = rank / grid_size;
+  int col = rank % grid_size;
+
+  int send_rank_a = (row * grid_size) + ((col + grid_size - 1) % grid_size);
+  int recv_rank_a = (row * grid_size) + ((col + 1) % grid_size);
+
+  int send_rank_b = col + (grid_size * ((row + grid_size - 1) % grid_size));
+  int recv_rank_b = col + (grid_size * ((row + 1) % grid_size));
+
+  std::vector<double> tmp_a(block_size_ * block_size_);
+  std::vector<double> tmp_b(block_size_ * block_size_);
+  for (int i = 0; i < row; ++i) {
+    world_.send(send_rank_a, 0, local_a.data(), block_size_ * block_size_);
+    world_.recv(recv_rank_a, 0, tmp_a.data(), block_size_ * block_size_);
+    std::swap(local_a, tmp_a);
+  }
+
+  for (int i = 0; i < col; ++i) {
+    world_.send(send_rank_b, 1, local_b.data(), block_size_ * block_size_);
+    world_.recv(recv_rank_b, 1, tmp_b.data(), block_size_ * block_size_);
+    std::swap(local_b, tmp_b);
+  }
+}
+
+void vavilov_v_cannon_all::CannonALL::ShiftBlocks(std::vector<double>& local_a, std::vector<double>& local_b) {
+  int rank = world_.rank();
+  int grid_size = num_blocks_;
+  int row = rank / grid_size;
+  int col = rank % grid_size;
+
+  int send_rank_a = (row * grid_size) + ((col + grid_size - 1) % grid_size);
+  int recv_rank_a = (row * grid_size) + ((col + 1) % grid_size);
+
+  int send_rank_b = col + (grid_size * ((row + grid_size - 1) % grid_size));
+  int recv_rank_b = col + (grid_size * ((row + 1) % grid_size));
+
+  std::vector<double> tmp_a(block_size_ * block_size_);
+  std::vector<double> tmp_b(block_size_ * block_size_);
+
+  world_.send(send_rank_a, 2, local_a.data(), block_size_ * block_size_);
+  world_.recv(recv_rank_a, 2, tmp_a.data(), block_size_ * block_size_);
+  std::swap(local_a, tmp_a);
+
+  world_.send(send_rank_b, 3, local_b.data(), block_size_ * block_size_);
+  world_.recv(recv_rank_b, 3, tmp_b.data(), block_size_ * block_size_);
+  std::swap(local_b, tmp_b);
+}
+
+void vavilov_v_cannon_all::CannonALL::BlockMultiply(const std::vector<double>& local_a, const std::vector<double>& local_b, std::vector<double>& local_c) {
+#pragma omp parallel for
+  for (int i = 0; i < block_size_; ++i) {
+    for (int j = 0; j < block_size_; ++j) {
+      double temp = 0.0;
+      for (int k = 0; k < block_size_; ++k) {
+        temp += local_a[(i * block_size_) + k] * local_b[(k * block_size_) + j];
+      }
+      local_c[(i * block_size_) + j] += temp;
+    }
+  }
+}
+
+void vavilov_v_cannon_all::CannonALL::GatherResults(std::vector<double>& tmp_c, int block_size_sq) {
+#pragma omp parallel for
+  for (int block_row = 0; block_row < num_blocks_; ++block_row) {
+    for (int block_col = 0; block_col < num_blocks_; ++block_col) {
+      int block_rank = (block_row * num_blocks_) + block_col;
+      int block_index = block_rank * block_size_sq;
+      for (int i = 0; i < block_size_; ++i) {
+        for (int j = 0; j < block_size_; ++j) {
+          int global_row = (block_row * block_size_) + i;
+          int global_col = (block_col * block_size_) + j;
+          C_[(global_row * N_) + global_col] = tmp_c[block_index + (i * block_size_) + j];
+        }
+      }
+    }
+  }
+}
+
+void vavilov_v_cannon_all::CannonALL::PrepareScatterData(std::vector<double>& scatter_a, std::vector<double>& scatter_b, int active_procs, int block_size_sq) {
+  scatter_a.resize(active_procs * block_size_sq);
+  scatter_b.resize(active_procs * block_size_sq);
+  int index = 0;
+  for (int block_row = 0; block_row < num_blocks_; ++block_row) {
+    for (int block_col = 0; block_col < num_blocks_; ++block_col) {
+      TakeBlock(A_, scatter_a.data() + index, N_, block_size_, block_row, block_col);
+      TakeBlock(B_, scatter_b.data() + index, N_, block_size_, block_row, block_col);
+      index += block_size_sq;
+    }
+  }
+}
+
+bool vavilov_v_cannon_all::CannonALL::RunImpl() {
+  int rank = world_.rank();
+  int size = world_.size();
+
+  mpi::broadcast(world_, N_, 0);
+
+  num_blocks_ = FindOptimalGridSize(size, N_);
+  block_size_ = N_ / num_blocks_;
+  int block_size_sq = block_size_ * block_size_;
+
+  int active_procs = num_blocks_ * num_blocks_;
+  mpi::communicator active_world = world_.split(rank < active_procs ? 0 : MPI_UNDEFINED);
+  if (rank >= active_procs) {
+    return true;
+  }
+
+  rank = active_world.rank();
+
+  std::vector<double> local_a(block_size_sq);
+  std::vector<double> local_b(block_size_sq);
+  std::vector<double> local_c(block_size_sq, 0);
+
+  std::vector<double> scatter_a;
+  std::vector<double> scatter_b;
+  if (rank == 0) {
+    PrepareScatterData(scatter_a, scatter_b, active_procs, block_size_sq);
+  }
+
+  mpi::scatter(active_world, scatter_a.data(), local_a.data(), block_size_sq, 0);
+  mpi::scatter(active_world, scatter_b.data(), local_b.data(), block_size_sq, 0);
+
+  InitialShift(local_a, local_b);
+
+  BlockMultiply(local_a, local_b, local_c);
+  for (int iter = 0; iter < num_blocks_ - 1; ++iter) {
+    ShiftBlocks(local_a, local_b);
+    BlockMultiply(local_a, local_b, local_c);
+  }
+
+  std::vector<double> tmp_c;
+  if (rank == 0) {
+    tmp_c.resize(active_procs * block_size_sq);
+  }
+  mpi::gather(active_world, local_c.data(), block_size_sq, tmp_c.data(), 0);
+  if (rank == 0) {
+    GatherResults(tmp_c, block_size_sq);
+  }
+
+  return true;
+}
+\end{lstlisting}
+
+\end{document}
