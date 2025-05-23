@@ -1,0 +1,600 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{geometry}
+\usepackage{multirow}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{tocloft}
+\usepackage{xcolor} 
+\usepackage{listings}
+\usepackage{float}
+
+\geometry{a4paper, left=25mm, right=15mm, top=20mm, bottom=20mm}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=black,
+    pdftitle={Отчет по проекту},
+    pdfauthor={Соцков Андрей},
+    pdfsubject={Сортировка Шелла с простым слиянием.}
+}
+
+\lstset{
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{blue},
+  commentstyle=\itshape\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=8pt,
+  backgroundcolor=\color{gray!10},
+  showspaces=false,
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  captionpos=b
+}
+
+\renewcommand{\cftsecaftersnum}{.}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\titleformat{\section}{\large\bfseries}{\thesection.}{1em}{}
+
+\begin{document}
+\begin{titlepage}
+    \centering
+    \large
+    Министерство науки и высшего образования Российской Федерации\\[0.5cm]
+    Федеральное государственное автономное образовательное учреждение высшего образования\\[0.5cm]
+    \textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»}\\
+    (ННГУ)\\[1cm]
+    Институт информационных технологий, математики и механики\\[0.5cm]
+    Направление подготовки: \textbf{«Программная инженерия»}\\[2cm]
+
+    \vfill
+    {\LARGE \textbf{ОТЧЕТ}}\\[0.5cm]
+    {\Large по задаче}\\[0.5cm]
+    {\LARGE \textbf{«Сортировка Шелла с простым слиянием»}}\\[0.5cm]
+    {\Large \textbf{Вариант №15}}\\[2.5cm]
+
+    \hfill\parbox{0.5\textwidth}{
+        \textbf{Выполнил:} \\
+        студент группы 3822Б1ПР3 \\
+        \textbf{Соцков Андрей}
+    }\\[0.5cm]
+
+    \hfill\parbox{0.5\textwidth}{
+        \textbf{Преподаватели:} \\
+        Нестеров А.Ю.
+        Оболенский А.А.
+        
+    }\\[2cm]
+
+    Нижний Новгород\\
+    2025
+\end{titlepage}
+
+
+\thispagestyle{empty}
+\clearpage
+\pagenumbering{arabic} 
+\setcounter{page}{2} 
+\tableofcontents
+\clearpage
+\setcounter{page}{3} 
+\section{Введение}
+
+\hspace*{1.25em}Сортировка массивов — одна из наиболее часто встречающихся задач в программировании, лежащая в основе широкого круга прикладных и научных задач: от базовой обработки данных до алгоритмов машинного обучения и информационного поиска. Эффективная реализация алгоритмов сортировки позволяет существенно сократить время выполнения программ и повысить их производительность.
+
+Алгоритм сортировки Шелла, предложенный Дональдом Шеллом в 1959 году, является усовершенствованием метода сортировки вставками. Его основная идея заключается в предварительном упорядочивании элементов массива с использованием убывающей последовательности шагов (gap), что позволяет эффективно перемещать элементы массива на большие расстояния и уменьшить общее число перестановок. Такой подход особенно эффективен на неслучайных или частично отсортированных данных.
+
+В данной работе используется модифицированный вариант классического алгоритма Шелла, дополненный этапом простого слияния отсортированных блоков. Такой подход не только улучшает структуру и читаемость кода, но и открывает широкие возможности для реализации параллельных вычислений.
+
+Современные вычислительные архитектуры предоставляют множество средств для распараллеливания вычислений: многоядерные процессоры, кластеры и многопроцессорные системы. В этой работе рассматриваются возможности распараллеливания алгоритма сортировки Шелла с применением таких технологий, как OpenMP, Intel TBB, стандартная библиотека потоков C++ и гибридная модель MPI + std::thread.
+
+Целью данной работы является сравнительный анализ производительности этих подходов и выявление наиболее эффективных решений для многопоточной обработки больших массивов данных.
+
+\section{Постановка задачи}
+
+\hspace*{1.25em}Цель практической работы — разработка и исследование различных реализаций алгоритма сортировки Шелла с последующим простым слиянием отсортированных блоков.
+
+Для достижения поставленной цели необходимо выполнить следующие задачи:
+
+\begin{itemize}
+\item Реализовать базовый (последовательный) вариант алгоритма Shell Sort с поэтапным слиянием;
+\item Разработать параллельные версии с использованием следующих технологий:
+\begin{itemize}
+\item OpenMP — стандарт параллельного программирования для многопроцессорных систем с общей памятью;
+\item Intel TBB (oneAPI Threading Building Blocks) — библиотека потокового параллелизма с автоматическим управлением задачами;
+\item std::thread — средства ручного управления потоками из стандартной библиотеки C++;
+\item MPI + std::thread — гибридный подход, сочетающий распределённые вычисления и многопоточность.
+\end{itemize}
+\item Провести тестирование и верификацию корректности всех реализаций алгоритма;
+\item Сравнить производительность последовательной и параллельных версий по времени выполнения и масштабируемости.
+\end{itemize}
+
+Ожидаемым результатом является выявление преимуществ и ограничений различных подходов к параллельной реализации сортировки Шелла, а также определение оптимальной стратегии для работы с большими объемами данных.
+
+\section{Описание алгоритма}
+
+Алгоритм сортировки Шелла представляет собой модификацию сортировки вставками с переменным шагом. Основная идея заключается в том, чтобы сначала отсортировать элементы, находящиеся на большом расстоянии друг от друга, а затем постепенно уменьшать это расстояние, переходя к сортировке элементов, расположенных ближе друг к другу. Это позволяет эффективно перемещать элементы к их финальным позициям и уменьшать общее количество перестановок.
+
+Принцип работы алгоритма можно описать следующим образом:
+\begin{enumerate}
+\item Задаётся начальное значение шага \texttt{gap}, например \( gap = 1 \), которое затем обновляется по формуле Кнута: \( gap = gap \times 3 + 1 \), пока не превысит длину массива.
+\item Для каждого значения \texttt{gap} выполняется сортировка вставками между элементами, находящимися на расстоянии \texttt{gap}.
+\item После завершения прохода шаг уменьшается (обычно делится на 3), и процедура повторяется до тех пор, пока \texttt{gap} не станет равным 1.
+\end{enumerate}
+
+В данной работе к базовому алгоритму сортировки Шелла добавляется этап поэтапного слияния отсортированных блоков:
+\begin{itemize}
+\item После того как каждый поток (или процесс) завершает сортировку своей части массива, происходит попарное объединение отсортированных блоков.
+\item Для слияния используется стандартный алгоритм merge с временным буфером, что обеспечивает стабильность и корректность результата.
+\item Этап слияния продолжается до тех пор, пока не останется один общий отсортированный массив.
+\end{itemize}
+
+\section{Описание параллельных реализаций алгоритма}
+
+\subsection{OpenMP}
+
+Параллельная реализация сортировки Шелла с простым слиянием с использованием технологии OpenMP выполнена в функции \texttt{ShellSortWithSimpleMerging}, определённой в пространстве имён \texttt{sotskov\_a\_shell\_sorting\_with\_simple\_merging\_omp}. Основной целью данной реализации является распараллеливание как этапа локальной сортировки, так и поэтапного слияния отсортированных блоков.
+
+\textbf{Структура реализации:}
+
+\begin{enumerate}
+  \item \textbf{Определение числа потоков и размера блоков.} 
+  Общее количество потоков определяется через \texttt{omp\_get\_max\_threads()}, а каждый поток обрабатывает блок размером:
+  \[
+  \text{chunk\_size} = \left\lceil \frac{n}{T} \right\rceil,
+  \]
+  где $n$ — размер входного массива, $T$ — число доступных потоков.
+
+  \item \textbf{Локальная сортировка.}
+  Каждый поток сортирует свой диапазон элементов при помощи классической сортировки Шелла, реализованной в функции:
+  \texttt{ShellSort(std::vector<int>\& arr, int left, int right)}.
+
+  Распараллеливание достигается с использованием OpenMP-директив:
+  \begin{lstlisting}
+#pragma omp parallel
+#pragma omp for schedule(dynamic)
+  \end{lstlisting}
+  Сортировка блоков выполняется независимо, без синхронизации между потоками.
+
+  \item \textbf{Слияние блоков.}
+  После завершения сортировки каждого блока выполняется многопоточное попарное слияние соседних блоков. Этап слияния выполняется итеративно, с увеличением размера блоков в два раза на каждой итерации. Для каждой пары блоков вызывается функция \texttt{ParallelMerge}:
+  \begin{lstlisting}
+#pragma omp for schedule(dynamic)
+  for (int left = 0; left < array_size; left += 2 * size) {
+      ...
+      ParallelMerge(arr, left, mid, right, temp_buffer);
+  }
+  \end{lstlisting}
+  Временный буфер \texttt{temp\_buffer} создаётся внутри каждого потока, что гарантирует потокобезопасность и устраняет гонки данных.
+
+  \item \textbf{Функции поддержки.}
+  \begin{itemize}
+    \item \texttt{ShellSort(...)} — сортирует заданный диапазон по алгоритму Шелла.
+    \item \texttt{ParallelMerge(...)} — объединяет два отсортированных подмассива в один с использованием временного буфера.
+  \end{itemize}
+\end{enumerate}
+
+\textbf{Преимущества реализации:}
+\begin{itemize}
+  \item Простота внедрения параллелизма с помощью директив OpenMP;
+  \item Независимая сортировка блоков и отсутствие синхронизации при слиянии благодаря локальным буферам;
+  \item Высокая масштабируемость при увеличении количества потоков;
+  \item Эффективная загрузка вычислительных ядер процессора за счёт использования \texttt{schedule(dynamic)}.
+\end{itemize}
+
+\textbf{Пример:} при размере массива 10000 и использовании 4 потоков каждый поток получает по 2500 элементов. После локальной сортировки блоков, данные объединяются в 2 блока по 5000 и, наконец, в один отсортированный массив из 10000 элементов.
+
+
+\subsection{Intel TBB}
+
+Реализация с использованием библиотеки Intel oneAPI Threading Building Blocks (TBB) использует модель task-based параллелизма, позволяющую эффективно задействовать ресурсы многоядерных процессоров. Параллелизм достигается как на этапе сортировки, так и на этапе слияния.
+
+\textbf{Ключевая функция реализации:} \texttt{ShellSortWithSimpleMerging(std::vector<int>\& arr)}.
+
+\textbf{Основные этапы:}
+\begin{enumerate}
+  \item \textbf{Инициализация:}
+  \begin{itemize}
+    \item Размер входного массива: $n = arr.size()$;
+    \item Число потоков определяется через \texttt{ppc::util::GetPPCNumThreads()};
+    \item Расчёт размера блока: 
+    \[
+    \text{chunk\_size} = \left\lceil \frac{n}{T} \right\rceil.
+    \]
+  \end{itemize}
+  
+  \item \textbf{Параллельная сортировка блоков:}
+  Выполняется с помощью конструкции \texttt{tbb::parallel\_for}. Каждый поток обрабатывает свой диапазон элементов с использованием функции \texttt{ShellSort}, реализующей классический алгоритм Шелла:
+  \begin{lstlisting}
+tbb::parallel_for(0, num_threads, [&](int thread_index) {
+    int left = thread_index * chunk_size;
+    int right = std::min(left + chunk_size - 1, array_size - 1);
+    if (left < right) {
+        ShellSort(arr, left, right);
+    }
+});
+  \end{lstlisting}
+
+  \item \textbf{Параллельное слияние:}
+  После сортировки каждый шаг слияния объединяет пары отсортированных блоков. Размер блоков увеличивается в два раза на каждом уровне. Для этого используется вложенный вызов \texttt{tbb::parallel\_for}:
+  \begin{lstlisting}
+for (int size = chunk_size; size < array_size; size *= 2) {
+    tbb::parallel_for(0, ..., [&](int i) {
+        int left = i * 2 * size;
+        int mid = ...;
+        int right = ...;
+        if (mid < right) {
+            ParallelMerge(arr, left, mid, right);
+        }
+    });
+}
+  \end{lstlisting}
+
+  \item \textbf{Функция \texttt{ParallelMerge}:}
+  Выполняет слияние двух отсортированных частей массива с использованием временного буфера:
+  \begin{itemize}
+    \item Левый и правый диапазоны объединяются в новый вектор;
+    \item Полученный результат копируется обратно в исходный массив.
+  \end{itemize}
+\end{enumerate}
+
+\textbf{Поддерживающие методы:}
+\begin{itemize}
+  \item \texttt{PreProcessingImpl()} — загружает входные данные из буфера задачи;
+  \item \texttt{RunImpl()} — запускает сортировку внутри \texttt{task\_arena}, ограничивая число потоков;
+  \item \texttt{PostProcessingImpl()} — копирует результат обратно в выходной буфер;
+  \item \texttt{ValidationImpl()} — проверяет корректность отсортированного массива.
+\end{itemize}
+
+\textbf{Преимущества реализации TBB:}
+\begin{itemize}
+  \item \textbf{Автоматическое распределение задач} между потоками без явного создания и управления ими;
+  \item \textbf{Поддержка вложенного параллелизма} благодаря конструкции \texttt{task\_arena};
+  \item \textbf{Масштабируемость} на системах с большим количеством ядер;
+  \item Возможность \textbf{точной настройки} количества потоков.
+\end{itemize}
+
+\textbf{Итог:} реализация с использованием Intel TBB демонстрирует эффективную организацию параллельной сортировки и масштабируемость на многоядерных системах при минимальных усилиях по управлению потоками со стороны разработчика.
+
+
+\subsection{STL (std::thread)}
+
+Реализация на основе стандартной библиотеки потоков \texttt{std::thread} требует явного управления потоками и синхронизации. Параллелизм достигается как при сортировке, так и при слиянии блоков.
+
+\textbf{Ключевая функция реализации:} \texttt{ShellSortWithSimpleMerging(std::vector<int>\& arr)}.
+
+\textbf{Основные этапы:}
+\begin{enumerate}
+  \item \textbf{Инициализация:}
+  \begin{itemize}
+    \item Вычисляется число потоков: \texttt{num\_threads = ppc::util::GetPPCNumThreads()}.
+    \item Массив разбивается на подмассивы: 
+    \[
+    \text{chunk\_size} = \left\lceil \frac{n}{T} \right\rceil,
+    \]
+    где $n$ — размер массива, $T$ — количество потоков.
+  \end{itemize}
+
+  \item \textbf{Параллельная сортировка:}
+  Для каждого блока создаётся поток, выполняющий сортировку Шелла:
+  \begin{lstlisting}
+for (int i = 0; i < num_threads; ++i) {
+    int left = i * chunk_size;
+    int right = std::min(left + chunk_size - 1, array_size - 1);
+    if (left < right) {
+        threads.emplace_back(ShellSort, std::ref(arr), left, right);
+    }
+}
+  \end{lstlisting}
+  После запуска всех потоков выполняется синхронизация с помощью \texttt{join()}.
+
+  \item \textbf{Параллельное слияние:}
+  Слияние отсортированных блоков выполняется поэтапно. На каждом этапе пары соседних блоков объединяются параллельно:
+  \begin{lstlisting}
+for (int size = chunk_size; size < array_size; size *= 2) {
+    for (int i = 0; i < array_size; i += 2 * size) {
+        int left = i;
+        int mid = std::min(i + size - 1, array_size - 1);
+        int right = std::min(i + 2 * size - 1, array_size - 1);
+        if (mid < right) {
+            merge_threads.emplace_back(ParallelMerge, std::ref(arr), left, mid, right);
+        }
+    }
+    // join all merge threads
+}
+  \end{lstlisting}
+
+  \item \textbf{Функция \texttt{ParallelMerge}:}
+  Использует временный буфер для последовательного объединения двух отсортированных подмассивов и копирует результат обратно в массив.
+\end{enumerate}
+
+\textbf{Вспомогательные методы:}
+\begin{itemize}
+  \item \texttt{PreProcessingImpl()} — загружает данные во внутренний буфер;
+  \item \texttt{RunImpl()} — запускает алгоритм сортировки;
+  \item \texttt{PostProcessingImpl()} — копирует отсортированные данные в выходной буфер;
+  \item \texttt{ValidationImpl()} — проверяет корректность отсортированных данных.
+\end{itemize}
+
+\textbf{Преимущества реализации:}
+\begin{itemize}
+  \item Полный контроль над созданием и жизненным циклом потоков;
+  \item Простой и прямолинейный способ распараллеливания без внешних зависимостей.
+\end{itemize}
+
+\textbf{Вывод:} реализация на основе \texttt{std::thread} подходит для небольших проектов или образовательных целей, однако в больших проектах предпочтительнее использовать более высокоуровневые средства, такие как OpenMP или Intel TBB.
+
+
+\subsection{MPI + STL}
+
+Гибридная реализация с использованием MPI и стандартной библиотеки потоков C++ (\texttt{std::thread}) сочетает преимущества распределённых вычислений и многопоточности. Каждый MPI-процесс получает часть общего массива, сортирует её параллельно в нескольких потоках, а затем результаты объединяются на корневом процессе.
+
+\textbf{Ключевая функция:} \texttt{ShellSortWithSimpleMerging(std::vector<int>\& arr)}.
+
+\textbf{Основные этапы реализации:}
+\begin{enumerate}
+  \item \textbf{Предобработка:}
+  \begin{itemize}
+    \item На процессе с рангом 0 инициализируется входной массив.
+    \item Вычисляется схема распределения элементов: 
+    \[
+    \texttt{CalculateDistribution(total, counts, displs)}
+    \]
+    и массив разбивается между процессами с использованием \texttt{boost::mpi::scatterv}.
+  \end{itemize}
+
+  \item \textbf{Локальная сортировка:}
+  \begin{itemize}
+    \item Каждый MPI-процесс сортирует свой участок массива с помощью многопоточной реализации (на основе \texttt{std::thread}).
+    \item Каждый поток обрабатывает подмассив с использованием функции \texttt{ShellSort}.
+    \item Далее происходит поэтапное слияние отсортированных блоков с использованием функции \texttt{ParallelMerge}.
+  \end{itemize}
+
+  \item \textbf{Сбор результатов:}
+  \begin{itemize}
+    \item Все отсортированные участки собираются на процессе с рангом 0 с помощью \texttt{boost::mpi::gatherv}.
+    \item После сбора применяется итеративное слияние с использованием \texttt{std::inplace\_merge} для объединения всех блоков в один итоговый массив.
+  \end{itemize}
+
+  \item \textbf{Передача результата:}
+  \begin{itemize}
+    \item Финальный отсортированный массив копируется в выходной буфер.
+  \end{itemize}
+\end{enumerate}
+
+\textbf{Функции реализации:}
+\begin{itemize}
+  \item \texttt{PreProcessingImpl()} — распределение данных по MPI-процессам;
+  \item \texttt{ShellSortWithSimpleMerging()} — многопоточная сортировка на локальных данных;
+  \item \texttt{PostProcessingImpl()} — сбор и слияние отсортированных частей;
+  \item \texttt{ValidationImpl()} — проверка корректности финального массива;
+  \item \texttt{CalculateDistribution()} — вычисление схемы распределения данных.
+\end{itemize}
+
+\textbf{Преимущества:}
+\begin{itemize}
+  \item Хорошая масштабируемость за счёт комбинирования распределённой и многопоточной обработки;
+  \item Эффективная загрузка процессоров внутри узла (через \texttt{std::thread});
+  \item Универсальность подхода — подходит как для кластеров, так и для многопроцессорных машин.
+\end{itemize}
+
+\textbf{Вывод:} гибридная реализация позволяет эффективно использовать как распределённые ресурсы (через MPI), так и ресурсы отдельного узла (через многопоточность), обеспечивая высокую производительность при работе с большими объёмами данных.
+
+\section{Результаты экспериментов}
+
+\hspace*{1.25em}Для оценки производительности реализованных версий алгоритма сортировки Шелла с простым слиянием были проведены замеры времени выполнения в конфигурациях с различным числом потоков и процессов. В таблице ниже представлены усреднённые значения времени выполнения (в секундах) для двух режимов тестирования — \texttt{PipelineRun} и \texttt{TaskRun}, а также рассчитано ускорение (\textit{Speedup}) относительно последовательной версии.
+
+\subsection{Таблица производительности}
+
+\renewcommand{\arraystretch}{1.4}
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Версия} & \textbf{Конфигурация} & \textbf{PipelineRun (с)} & \textbf{TaskRun (с)} & \textbf{Speedup} \\
+\hline
+\textbf{Последовательная} & — & \centering 1.7822 & 0.3560 & \textbf{1.00} \\
+\hline
+\multirow{3}{*}{OpenMP} 
+  & 2 потока & 0.9371 & 0.2278 & 1.56 \\
+  & 3 потока & 0.7432 & 0.2308 & 1.54 \\
+  & 5 потоков & 0.6003 & 0.2314 & 1.54 \\
+\hline
+\multirow{3}{*}{TBB} 
+  & 2 потока & 0.9612 & 0.2662 & 1.34 \\
+  & 3 потока & 0.7119 & 0.2241 & \textbf{1.59} \\
+  & 5 потоков & 0.5852 & 0.2712 & 1.31 \\
+\hline
+\multirow{3}{*}{STL (std::thread)} 
+  & 2 потока & 0.9789 & 0.2488 & 1.43 \\
+  & 3 потока & 0.7342 & 0.2213 & \textbf{1.61} \\
+  & 5 потоков & 0.6204 & 0.2489 & 1.43 \\
+\hline
+\multirow{5}{*}{MPI + STL} 
+  & 2 + 2 & 0.6406 & 0.2410 & 1.48 \\
+  & 3 + 2 & 0.6134 & 0.1727 & 2.06 \\
+  & 3 + 3 & 0.5796 & 0.1604 & 2.22 \\
+  & 5 + 2 & 0.5796 & 0.0685 & 5.19 \\
+  & 5 + 3 & \textbf{0.5672} & \textbf{0.0621} & \textbf{5.73} \\
+\hline
+\end{tabular}
+\label{tab:parallel_perf}
+\end{table}
+\subsection*{Анализ}
+\hspace*{1.25em}На основе таблицы видно, что наивысшее ускорение по сравнению с последовательной реализацией достигается в гибридной версии \textbf{MPI + STL} с конфигурацией \textbf{5 процессов × 3 потока} — более чем \textbf{в 5.7 раза} быстрее по TaskRun.
+
+\hspace*{1.25em}Из локальных реализаций лучше всех показал себя \textbf{std::thread} при 3 потоках (ускорение 1.61) и \textbf{Intel TBB} при 3 потоках (ускорение 1.59), что сопоставимо. OpenMP даёт умеренное и стабильное ускорение при увеличении числа потоков, но его значения почти не изменяются от 3 до 5.
+
+\hspace*{1.25em}Также можно заметить, что эффективность OpenMP ограничена накладными расходами, а гибридные конфигурации становятся эффективными при разумном балансе между числом процессов и потоков. В частности, конфигурации 5+2 и 5+3 демонстрируют превосходные результаты благодаря параллелизму на двух уровнях.
+
+\hspace*{1.25em}Таким образом, при наличии ресурсов кластера и необходимости обрабатывать большие объёмы данных оптимальным выбором является \textbf{гибридная MPI + STL реализация}, в то время как для многопоточной локальной обработки эффективны \texttt{std::thread} и TBB.
+\section{Заключение}
+
+\hspace*{1.25em}В данной работе была реализована и проанализирована модифицированная версия алгоритма сортировки Шелла с добавлением этапа простого слияния отсортированных блоков. Базовая (последовательная) реализация была расширена четырьмя параллельными версиями с использованием современных технологий: OpenMP, Intel TBB, стандартной библиотеки потоков C++ и гибридной модели MPI + std::thread.
+
+\hspace*{1.25em}Каждая из технологий была выбрана с целью изучения её эффективности и особенностей реализации параллельных алгоритмов при обработке больших массивов. Были решены задачи распределения данных между потоками и процессами, организации многопоточного слияния и проверки корректности результатов. Экспериментальные замеры позволили объективно сравнить производительность всех подходов.
+
+\hspace*{1.25em}Наивысшее ускорение продемонстрировала гибридная реализация \textbf{MPI + std::thread} в конфигурации 5 процессов по 3 потока, обеспечив более чем \textbf{5-кратное ускорение} относительно последовательной версии. Среди локальных реализаций лучшие результаты показали \textbf{std::thread} и \textbf{Intel TBB} при 3 потоках, а \textbf{OpenMP} обеспечила стабильную, но более скромную эффективность.
+
+\hspace*{1.25em}Таким образом, все поставленные цели работы были достигнуты:
+\begin{itemize}
+  \item Разработан и протестирован модифицированный алгоритм сортировки Шелла с простым слиянием;
+  \item Реализованы параллельные версии с использованием OpenMP, TBB, std::thread и MPI;
+  \item Проведён экспериментальный анализ производительности всех реализаций;
+  \item Выявлены особенности и ограничения каждой технологии в контексте масштабируемости и удобства разработки.
+\end{itemize}
+
+\hspace*{1.25em}Результаты показывают высокую эффективность применения параллельных вычислений для задач сортировки, особенно при комбинировании потоков и процессов. В перспективе возможна интеграция более сложных стратегий слияния и динамического балансирования нагрузки для дальнейшего повышения производительности.
+
+\section{Список литературы}
+\begin{enumerate}
+    \item Статья: \textit{Что такое OpenMP?}
+    \item Мещеряков И.Н. \textit{Набор и вёрстка в системе \LaTeX}
+    \item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks}. — Нижний Новгород, 2007.
+    \item Статья: \textit{Технологии параллельного программирования. Message Passing Interface (MPI)}
+    \item Шилдт Г. \textit{Язык программирования C++. Полное руководство}. — М.: Вильямс, 2020. — 1200 с.
+    \item Reinders J. \textit{Intel Threading Building Blocks: Outfitting C++ for Multi-core Processor Parallelism}. — O’Reilly Media, 2007.
+    \item OpenMP Architecture Review Board. \textit{OpenMP Application Program Interface Version 5.1}. — 2020. \url{https://www.openmp.org}
+    \item Intel. \textit{oneAPI Threading Building Blocks Developer Guide}. — \url{https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html}
+    \item Gropp W., Lusk E., Skjellum A. \textit{Using MPI: Portable Parallel Programming with the Message Passing Interface}. — MIT Press, 2014.
+    \item Бьерн Страуструп. \textit{Язык программирования C++. Специальное издание}. — Addison-Wesley, 2013.
+    \item Habr. \textit{MPI — Введение и первая программа}. — \url{https://habr.com/ru/articles/548266/}
+    \item TheCode.Media. \textit{Radix Sort — самая быстрая сортировка для чисел и строк}. — \url{https://thecode.media/radix/}
+\end{enumerate}
+\appendix
+\section*{Приложение}
+\addcontentsline{toc}{section}{Приложение}
+
+В этом разделе приведены ключевые фрагменты реализации алгоритма сортировки Шелла с простым слиянием для различных технологий распараллеливания.
+
+\subsection*{OpenMP: функция ShellSortWithSimpleMerging}
+\begin{lstlisting}[language=C++]
+void ShellSortWithSimpleMerging(std::vector<int>& arr) {
+  int array_size = static_cast<int>(arr.size());
+  int num_threads = omp_get_max_threads();
+  int chunk_size = (array_size + num_threads - 1) / num_threads;
+
+#pragma omp parallel
+  {
+    std::vector<int> temp_buffer(chunk_size * 2);
+
+#pragma omp for schedule(dynamic)
+    for (int i = 0; i < num_threads; ++i) {
+      int left = i * chunk_size;
+      int right = std::min(left + chunk_size - 1, array_size - 1);
+      if (left < right) ShellSort(arr, left, right);
+    }
+
+    for (int size = chunk_size; size < array_size; size *= 2) {
+#pragma omp for schedule(dynamic)
+      for (int left = 0; left < array_size; left += 2 * size) {
+        int mid = std::min(left + size - 1, array_size - 1);
+        int right = std::min(left + 2 * size - 1, array_size - 1);
+        if (mid < right) ParallelMerge(arr, left, mid, right, temp_buffer);
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+\subsection*{TBB: функция ShellSortWithSimpleMerging}
+\begin{lstlisting}[language=C++]
+void ShellSortWithSimpleMerging(std::vector<int>& arr) {
+  int array_size = static_cast<int>(arr.size());
+  int num_threads = ppc::util::GetPPCNumThreads();
+  int chunk_size = std::max(1, (array_size + num_threads - 1) / num_threads);
+
+  oneapi::tbb::task_arena arena(num_threads);
+  arena.execute([&] {
+    oneapi::tbb::parallel_for(0, num_threads, [&](int thread_index) {
+      int left = thread_index * chunk_size;
+      int right = std::min(left + chunk_size - 1, array_size - 1);
+      if (left < right) ShellSort(arr, left, right);
+    });
+
+    for (int size = chunk_size; size < array_size; size *= 2) {
+      oneapi::tbb::parallel_for(0, (array_size + 2 * size - 1) / (2 * size), [&](int i) {
+        int left = i * 2 * size;
+        int mid = std::min(left + size - 1, array_size - 1);
+        int right = std::min(left + 2 * size - 1, array_size - 1);
+        if (mid < right) ParallelMerge(arr, left, mid, right);
+      });
+    }
+  });
+}
+\end{lstlisting}
+
+\subsection*{STL (std::thread): функция ShellSortWithSimpleMerging}
+\begin{lstlisting}[language=C++]
+void ShellSortWithSimpleMerging(std::vector<int>& arr) {
+  int array_size = static_cast<int>(arr.size());
+  int num_threads = ppc::util::GetPPCNumThreads();
+  int chunk_size = std::max(1, (array_size + num_threads - 1) / num_threads);
+
+  std::vector<std::thread> threads;
+  for (int i = 0; i < num_threads; ++i) {
+    int left = i * chunk_size;
+    int right = std::min(left + chunk_size - 1, array_size - 1);
+    if (left < right)
+      threads.emplace_back(ShellSort, std::ref(arr), left, right);
+  }
+  for (auto& t : threads) t.join();
+
+  for (int size = chunk_size; size < array_size; size *= 2) {
+    std::vector<std::thread> merge_threads;
+    for (int i = 0; i < array_size; i += 2 * size) {
+      int left = i;
+      int mid = std::min(i + size - 1, array_size - 1);
+      int right = std::min(i + 2 * size - 1, array_size - 1);
+      if (mid < right)
+        merge_threads.emplace_back(ParallelMerge, std::ref(arr), left, mid, right);
+    }
+    for (auto& t : merge_threads) t.join();
+  }
+}
+\end{lstlisting}
+
+\subsection*{MPI + STL: этап PostProcessingImpl (сборка и слияние)}
+\begin{lstlisting}[language=C++]
+bool TestTaskALL::PostProcessingImpl() {
+  int total = 0;
+  if (rank_ == 0) {
+    total = static_cast<int>(task_data->inputs_count[0]);
+  }
+  boost::mpi::broadcast(world_, total, 0);
+
+  std::vector<int> counts, displs;
+  CalculateDistribution(total, counts, displs);
+
+  std::vector<int> result;
+  if (rank_ == 0) result.resize(total);
+
+  boost::mpi::gatherv(world_, input_.data(), input_.size(), result.data(), counts, displs, 0);
+
+  if (rank_ == 0) {
+    for (int step = 1; step < size_; step *= 2) {
+      for (int i = 0; i < size_ - step; i += 2 * step) {
+        int left = displs[i];
+        int mid = displs[i + step];
+        int right = (i + 2 * step < size_) ? displs[i + 2 * step] : total;
+        std::inplace_merge(result.begin() + left, result.begin() + mid, result.begin() + right);
+      }
+    }
+    std::ranges::copy(result, reinterpret_cast<int*>(task_data->outputs[0]));
+  }
+
+  return true;
+}
+\end{lstlisting}
+\end{document}
