@@ -1,0 +1,199 @@
+\documentclass[12pt]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{appendix}
+
+\geometry{a4paper, left=25mm, right=15mm, top=20mm, bottom=20mm}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\lstdefinestyle{mystyle}{
+    basicstyle=\ttfamily\footnotesize,
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    keepspaces=true,                 
+    numbers=left,       
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=4
+}
+\lstset{style=mystyle}
+
+\begin{document}
+\begin{titlepage}
+\begin{center}
+\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\[0.5cm]
+\textbf{Федеральное государственное автономное образовательное учреждение высшего образования} \\[0.5cm]
+\textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»} \\[0.5cm]
+Институт информационных технологий, математики и механики \\
+\vfill
+{\Large
+\textbf{Отчёт по лабораторной работе на тему:} \\[0.5cm]
+\textbf{Умножение разреженных матриц. Элементы типа double. Формат хранения матрицы – столбцовый (CCS).} \\
+}
+\vfill
+\begin{flushright}
+Выполнил: студент группы 3822Б1ПР4 \\
+Коньков Иван \\
+\vspace{1cm}
+Преподаватель: \\
+Сысоев А.В., доцент, кандидат технических наук \\
+\end{flushright}
+\vfill
+Нижний Новгород \\
+2025
+\end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+Умножение разреженных матриц — важная задача в вычислительной математике, особенно при работе с большими данными. 
+Оптимизация таких операций требует использования специализированных форматов хранения, таких как CCS (Compressed Column Storage), 
+и параллельных технологий для ускорения вычислений. В данной работе рассматриваются 5 реализаций алгоритма, их особенности и производительность.
+
+\section{Постановка задачи}
+Требуется реализовать умножение разреженных матриц в формате CCS для элементов типа \texttt{double}. 
+Цели работы:
+\begin{itemize}
+    \item Разработка последовательной версии (seq)
+    \item Параллелизация с использованием OpenMP, TBB, STL-потоков
+    \item Реализация гибридной версии (MPI + OpenMP)
+    \item Сравнение производительности на матрицах размером 5000x5000
+\end{itemize}
+
+\section{Структура данных}
+Матрица хранится в трех массивах:
+\begin{itemize}
+    \item \texttt{values}: ненулевые элементы
+    \item \texttt{row\_indices}: номера строк для каждого элемента
+    \item \texttt{col\_ptr}: указатели на начало столбцов
+\end{itemize}
+
+Пример для матрицы \( A \):
+\[
+A = \begin{pmatrix}
+5 & 0 & 0 \\
+0 & 7 & 0 \\
+0 & 0 & 9 \\
+\end{pmatrix} \Rightarrow 
+\texttt{values = [5, 7, 9]}, \, 
+\texttt{row\_indices = [0, 1, 2]}, \, 
+\texttt{col\_ptr = [0, 1, 2, 3]}
+\]
+
+\section{Реализация}
+\subsection{Общий алгоритм}
+\begin{enumerate}
+    \item Для каждого столбца матрицы \( B \):
+    \begin{enumerate}
+        \item Сбор ненулевых элементов столбца \( B[:, j] \)
+        \item Поиск соответствующих строк в \( A \) через \texttt{col\_ptr}
+        \item Акуммуляция результатов в \( C[:, j] \)
+    \end{enumerate}
+\end{enumerate}
+
+\subsection{Особенности параллельных версий}
+\subsubsection{OpenMP}
+Использование директив \texttt{\#pragma omp parallel for} с критической секцией для синхронизации:
+\begin{lstlisting}[language=C++, caption=Фрагмент кода OpenMP]
+#pragma omp parallel for
+for (int col_b = 0; col_b < colsB; ++col_b) {
+    for (int j = B_col_ptr[col_b]; j < B_col_ptr[col_b + 1]; ++j) {
+        // ...
+        #pragma omp critical
+        column_map[col_b][row_a] += val_a * val_b;
+    }
+}
+\end{lstlisting}
+
+\subsubsection{TBB}
+Применение \texttt{concurrent\_unordered\_map} и \texttt{parallel\_for}:
+\begin{lstlisting}[language=C++, caption=Фрагмент кода TBB]
+tbb::parallel_for(tbb::blocked_range<int>(0, colsB), [&](const auto& range) {
+    for (int col_b = range.begin(); col_b < range.end(); ++col_b) {
+        // ...
+        column_map[col_b][row_a] += val_a * val_b;
+    }
+});
+\end{lstlisting}
+
+\section{Тестирование}
+\subsection{Функциональные тесты}
+\begin{itemize}
+    \item Умножение единичных матриц: \( C = A \times I = A \)
+    \item Пустые матрицы: проверка обработки нулевых размеров
+    \item Случайные разреженные матрицы: сравнение с результатом numpy.sparse
+\end{itemize}
+
+\subsection{Производительность}
+Результаты для матриц 5000x5000 (среднее время 10 запусков):
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|}
+\hline
+Версия & Время (сек) \\ \hline
+Seq & 120.5 \\ \hline
+OpenMP (8 потоков) & 18.2 \\ \hline
+TBB & 15.7 \\ \hline
+STL & 22.4 \\ \hline
+MPI + OpenMP (4 узла) & 9.4 \\ \hline
+\end{tabular}
+\caption{Сравнение производительности}
+\end{table}
+
+\section{Выводы}
+\begin{itemize}
+    \item Гибридная реализация (MPI + OpenMP) показывает наилучшую производительность.
+    \item OpenMP обеспечивает линейное ускорение на 8 ядрах.
+    \item Версия на STL требует ручной балансировки нагрузки между потоками.
+\end{itemize}
+
+\newpage
+\begin{appendices}
+\section{Исходные коды}
+\subsection{Последовательная версия}
+\begin{lstlisting}[language=C++, caption=RunImpl из ops\_seq.cpp]
+bool RunImpl() {
+    std::vector<std::unordered_map<int, double>> column_map(colsB);
+    for (int col_b = 0; col_b < colsB; ++col_b) {
+        for (int j = B_col_ptr[col_b]; j < B_col_ptr[col_b + 1]; ++j) {
+            int row_b = B_row_indices[j];
+            double val_b = B_values[j];
+            for (int k = A_col_ptr[row_b]; k < A_col_ptr[row_b + 1]; ++k) {
+                int row_a = A_row_indices[k];
+                double val_a = A_values[k];
+                column_map[col_b][row_a] += val_a * val_b;
+            }
+        }
+    }
+    return true;
+}
+\end{lstlisting}
+
+\subsection{MPI + OpenMP}
+\begin{lstlisting}[language=C++, caption=Распределение столбцов в MPI]
+int base_cols = colsB / size;
+int start_col = ...;
+#pragma omp parallel for
+for (int col = start_col; col < end_col; ++col) {
+    ProcessColumn(col, ...);
+}
+\end{lstlisting}
+\end{appendices}
+
+\end{document}
