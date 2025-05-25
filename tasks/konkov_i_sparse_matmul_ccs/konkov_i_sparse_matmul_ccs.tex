@@ -127,7 +127,7 @@ for (int col_b = 0; col_b < colsB; ++col_b) {
 tbb::parallel_for(tbb::blocked_range<int>(0, colsB), [&](const auto& range) {
     for (int col_b = range.begin(); col_b < range.end(); ++col_b) {
         // ...
-        column_map[col_b][row_a] += val_a * val_b; // Без явной синхронизации
+        column_map[col_b][row_a] += val_a * val_b;
     }
 });
 \end{lstlisting}
@@ -198,7 +198,7 @@ int base_cols = colsB / size;
 int start_col = ...; // Расчет стартового столбца для процесса
 #pragma omp parallel for
 for (int col = start_col; col < end_col; ++col) {
-    ProcessColumn(col, ...); // Обработка в потоке OpenMP
+    ProcessColumn(col, ...);
 }
 \end{lstlisting}
 \end{appendices}
