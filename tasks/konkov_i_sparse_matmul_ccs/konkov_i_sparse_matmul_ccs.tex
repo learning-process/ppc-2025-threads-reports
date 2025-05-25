@@ -188,7 +188,7 @@ bool RunImpl() {
 \subsection{MPI + OpenMP}
 \begin{lstlisting}[language=C++, caption=Распределение столбцов в MPI]
 int base_cols = colsB / size;
-int start_col = ...; // Расчет стартового столбца для процесса
+int start_col = ...;
 #pragma omp parallel for
 for (int col = start_col; col < end_col; ++col) {
     ProcessColumn(col, ...);
