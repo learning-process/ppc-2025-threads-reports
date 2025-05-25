@@ -1,0 +1,791 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{geometry}
+\usepackage{multirow}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{tocloft}
+\usepackage{xcolor} 
+\usepackage{listings}
+\usepackage{float}
+
+\geometry{a4paper, left=25mm, right=15mm, top=20mm, bottom=20mm}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=black,
+    pdftitle={Отчет по проекту},
+    pdfauthor={Мухина Маргарита},
+    pdfsubject={Алгоритм Дейкстры}
+}
+
+\lstset{
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{blue},
+  commentstyle=\itshape\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=8pt,
+  backgroundcolor=\color{gray!10},
+  showspaces=false,
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  captionpos=b
+}
+
+\renewcommand{\cftsecaftersnum}{.}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\titleformat{\section}{\large\bfseries}{\thesection.}{1em}{}
+
+\begin{document}
+\begin{titlepage}
+    \centering
+    \large
+    Министерство науки и высшего образования Российской Федерации\\[0.5cm]
+    Федеральное государственное автономное образовательное учреждение высшего образования\\[0.5cm]
+    \textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»}\\
+    (ННГУ)\\[1cm]
+    Институт информационных технологий, математики и механики\\[0.5cm]
+    Направление подготовки: \textbf{«Программная инженерия»}\\[2cm]
+
+    \vfill
+    {\LARGE \textbf{ОТЧЕТ}}\\[0.5cm]
+    {\Large по задаче}\\[0.5cm]
+    {\LARGE \textbf{«Поиск кратчайших путей из одной вершины (алгоритм Дейкстры) »}}\\[0.5cm]
+    {\Large \textbf{Вариант №21}}\\[2.5cm]
+
+    \hfill\parbox{0.5\textwidth}{
+        \textbf{Выполнила:} \\
+        студентка группы 3822Б1ПР2 \\
+        \textbf{Мухина Маргарита}
+    }\\[0.5cm]
+
+    \hfill\parbox{0.5\textwidth}{
+        \textbf{Проверил:} \\
+        доцент кафедры ВВСП \\
+        Сысоев А.В.
+
+    }\\[2cm]
+
+    Нижний Новгород\\
+    2025
+\end{titlepage}
+
+
+\thispagestyle{empty}
+\clearpage
+\pagenumbering{arabic} 
+\setcounter{page}{2} 
+\tableofcontents
+\clearpage
+\setcounter{page}{3} 
+\section{Введение}
+
+\hspace*{1.25em}Алгоритм Деейкстры — алгоритм на графах, изобретённый нидерландским учёным Эдсгером Дейкстрой в 1959 году. Находит кратчайшие пути от одной из вершин графа до всех остальных. Алгоритм работает только для графов без рёбер отрицательного веса. Он широко применяется в программировании, например, его используют протоколы маршрутизации OSPF и IS-IS.
+
+Практическая часть работы включает сравнение нескольких вариантов реализации алгоритма Дейкстры:
+\begin{itemize}
+\item Последовательная реализация
+\item Реализация с использованием OpenMP
+\item Реализация с использованием TBB (Threading Building Blocks)
+\item Реализация с помощью стандартных потоков std::thread
+\item Гибридная реализация с использованием MPI + TBB 
+\end{itemize}
+\section{Постановка задачи}
+
+\hspace*{1.25em}Цель работы — провести сравнительный анализ эффективности методов и определить оптимальные стратегии распараллеливания для алгоритма Дейкстры.
+
+В рамках практического задания необходимо выполнить следующее:
+
+\begin{itemize}
+    \item Реализовать последовательный алгоритм;
+    \item Разработать параллельные версии алгоритма с использованием следующих технологий:
+    \begin{enumerate}
+        \item OpenMP (параллельные участки с общей памятью);
+        \item Intel Threading Building Blocks (TBB) — задачно-ориентированная модель;
+        \item Стандартные потоки C++ (`std::thread`);
+        \item MPI в комбинации с TBB — гибридная схема, сочетающая распределённую и потоковую параллельность.
+    \end{enumerate}
+    \item Провести измерения производительности всех версий и сравнить полученные результаты;
+    \item Проанализировать эффективность применённых методов распараллеливания и выявить наиболее подходящие подходы для данной задачи.
+\end{itemize}
+
+\section{Описание алгоритма}
+
+\hspace*{1.25em}Алгоритм вычисляет кратчайшие расстояния от заданной стартовой вершины до всех остальных вершин в графе. Граф представлен списком смежности \texttt{adj\_list}, где \texttt{adj\_list[u]} содержит список пар (\textit{v}, \textit{weight}), представляющих ребра из вершины \textit{u} в вершину \textit{v} с весом \textit{weight}.
+
+\textbf{Инициализация}
+
+Массив \texttt{distances\_} размером \textit{num\_vertices\_} заполняется значением \texttt{INT\_MAX}, за исключением элемента \texttt{distances\_[start\_vertex\_]}, который устанавливается в 0. Это представляет начальные расстояния от стартовой вершины \textit{start\_vertex\_}.
+
+\textbf{Шаг алгоритма}
+
+Приоритетная очередь \texttt{pq} содержит пары (\textit{расстояние}, \textit{номер вершины}), упорядоченные по расстоянию в порядке возрастания. Вначале в очередь добавляется пара (0, \textit{start\_vertex\_}).
+
+Цикл \texttt{while} повторяется, пока очередь \texttt{pq} не пуста. На каждом шаге из очереди извлекается пара (\textit{dist\_u}, \textit{u}), представляющая вершину \textit{u} с минимальным расстоянием \textit{dist\_u}.
+
+Если \textit{dist\_u} больше текущего значения \texttt{distances\_[\textit{u}]}, вершина \textit{u} уже обработана, итерация пропускается.
+
+Для каждой смежной вершины \textit{v} из \texttt{adj\_list[\textit{u}]} проверяется, может ли расстояние до \textit{v} быть улучшено: если \texttt{distances\_[\textit{u}] + weight < distances\_[\textit{v}]}, то \texttt{distances\_[\textit{v}]} обновляется до \texttt{distances\_[\textit{u}] + weight}, и пара (\texttt{distances\_[\textit{v}]}, \textit{v}) добавляется в очередь \texttt{pq}.
+
+\textbf{Завершение}
+
+После обработки всех вершин в массиве \texttt{distances\_} содержатся кратчайшие расстояния от стартовой вершины до всех остальных вершин графа.
+
+\subsection{OpenMP}
+
+\hspace*{1.25em}Параллельная реализация алгоритма с использованием технологии OpenMP выполнена в функции \texttt{RunImpl}. 
+
+Основные особенности:
+
+
+\begin{itemize}
+\item Использование директивы \texttt{\#pragma omp parallel for} для параллельной обработки соседних вершин;
+\item Критическая секция \texttt{\#pragma omp critical} для обновления расстояний и очереди;
+\item  Каждый поток работает со своей частью графа, минимизируя конфликты при доступе к памяти.
+\end{itemize}
+
+\textbf{Преимущества реализации:}
+\begin{itemize}
+\itemПростота реализации благодаря высокоуровневым директивам OpenMP
+\itemАвтоматическое распределение работы между потоками
+\itemХорошая масштабируемость для графов с высокой степенью верши
+\end{itemize}
+
+\subsection{Intel TBB}
+
+\hspace*{1.25em}Intel TBB — это библиотека для параллельного программирования, которая обеспечивает высокоуровневые конструкции для распараллеливания задач. В реализации алгоритма с TBB основной идеей является использование \texttt{parallel\_for}, который позволяет распараллелить обработку множества элементов — в данном случае, соседей вершины.
+
+При обработке вершины u, список её соседей разбивается на части, и каждая часть обрабатывается параллельно. Внутри каждой части происходит сравнение текущего расстояния до соседа и возможное обновление. 
+
+\textbf{Особенности реализации:}
+
+\begin{itemize}
+\item Параллельная очередь: Используется \texttt{tbb::concurrent\_priority\_queue} для безопасного доступа из нескольких потоков.
+\item Параллельная очередь: Используется \texttt{tbb::concurrent\_priority\_queue} для безопасного доступа из нескольких потоков.
+\item Используется \texttt{tbb::spin\_mutex} для эффективной синхронизации.
+\end{itemize}
+
+\textbf{Преимущества реализации:}
+\begin{itemize}
+\item Эффективная работа с очередью благодаря специализированной concurrent-структуре
+\item Автоматическая балансировка нагрузки между потоками
+\item Оптимизированные примитивы синхронизации
+\item Хорошая масштабируемость на системах с большим количеством ядер
+\end{itemize}
+
+\subsection{STL (std::thread) }
+\textbf{Общий принцип:} деление списка вершин на равные части. Каждому потоку назначается часть вершин, и он их обрабатывает параллельно. Для этого создаются несколько потоков, и после их завершения происходит синхронизация.
+
+\textbf{Особенности реализации:}
+\begin{itemize}
+\item \textbf{Явное управление потоками:} Создается фиксированное количество рабочих потоков.
+
+Определение оптимального количества потоков через \texttt{ppc::util::GetPPCNumThreads()}
+\item \textbf{Условные переменные:} Используются для синхронизации работы потоков.
+\item \textbf{Атомарные операции:} Для безопасного обновления расстояний применяются атомарные переменные.
+
+\texttt{compare\_exchange\_weak} для атомарного обновления, \texttt{memory\_order\_relaxed } где допустимо для оптимизации
+\end{itemize}
+
+\textbf{Преимущества реализации:}
+\begin{itemize}
+\item Полный контроль над созданием и распределением потоков
+\item Минимальные накладные расходы на синхронизацию
+\item Гибкость в реализации алгоритма
+\end{itemize}
+
+
+\subsection{MPI + TBB}
+
+\hspace*{1.25em}MPI-часть отвечает за распределение графа между несколькими процессами, запущенными на разных машинах или узлах сети. Каждый процесс получает свою часть графа — набор вершин и ребер.
+После распределения, внутри каждого процесса используется Intel TBB для создания пула потоков, которые обрабатывают локальную часть графа параллельно. 
+
+\textbf{Ключевые механизмы реализации}
+
+\begin{itemize}
+\item Параллельная обработка с TBB
+
+\begin{verbatim}
+oneapi::tbb::parallel_for(
+    oneapi::tbb::blocked_range<size_t>(0, adj_list[u].size()),
+    [&](const auto& range) {
+        // Параллельная обработка диапазона соседей
+        for (size_t i = range.begin(); i != range.end(); ++i) {
+            // Вычисления расстояний
+        }
+    }
+);
+\end{verbatim}
+
+\item Межпроцессная синхронизация:
+\begin{verbatim}
+// Синхронизация минимального расстояния
+std::pair<int, int> global_min;
+boost::mpi::all_reduce(world, local_min, global_min, 
+                      boost::mpi::minimum<std::pair<int, int>>());
+
+// Синхронизация всех расстояний
+boost::mpi::all_reduce(world, local_distances.data(), num_vertices,
+                      global_distances.data(), boost::mpi::minimum<int>());
+\end{verbatim}
+\end{itemize}
+\textbf{Особенности работы алгоритма}
+\begin{itemize}
+    \item \textbf{Инициализация:} Только root-процесс (rank 0) инициализирует начальную вершину. Начальное расстояние распространяется через boost::mpi::broadcast.
+    \item \textbf{Основной цикл:} Каждый процесс обрабатывает свою локальную очередь вершин. Периодически синхронизирует минимальное расстояние со всеми процессами. Параллельно (с помощью TBB) обрабатывает соседей текущей вершины.
+    \item \textbf{Синхронизация:} Двухуровневая синхронизация (между потоками и между процессами). Оптимальный баланс между частотой синхронизации и накладными расходами.
+    \item \textbf{Завершение:} Критерий остановки – все очереди процессов пусты. Сбор результатов на root-процессе.
+\end{itemize}
+
+
+\textbf{Преимущества подхода}
+
+\begin{itemize}
+    \item \textbf{Масштабируемость:} Возможность обработки очень больших графов, не помещающихся в память одного узла. Эффективное использование всех вычислительных ресурсов кластера.
+    \item \textbf{Производительность:} Минимизация накладных расходов за счет локальной обработки внутри узла, оптимальной частоты синхронизации и использования эффективных структур данных TBB.
+    \item \textbf{Гибкость:} Возможность работы в гетерогенных средах. Адаптация к различным размерам графов и конфигурациям кластеров.
+\end{itemize}
+
+
+\section{Результаты экспериментов}
+\hspace*{1.25em}Эксперименты проводились на ПК с следующими параметрами:
+
+\begin{itemize}
+    \item Операционная система: Windows 10
+    \item Процессор: Intel(R) Core(TM) i3-7020U CPU @ 2.30GHz
+    \item Оперативная память: 8 GB DDR4
+\end{itemize}
+
+\hspace*{1.25em}Для оценки производительности реализованных версий алгоритма Деейкстры  проведены замеры времени выполнения в конфигурациях с различным числом потоков и процессов. В таблице представлены усреднённые значения времени выполнения (в секундах) для двух режимов тестирования — \texttt{PipelineRun} и \texttt{TaskRun}.
+
+\subsection{Таблица производительности}
+
+\renewcommand{\arraystretch}{1.4}
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Реализация} & \textbf{Конфигурация} & \textbf{PipelineRun (с)} & \textbf{TaskRun (с)} \\
+\hline
+\textbf{Последовательная} & — & \centering 1.03323 & 0.88266 \\
+\hline
+\multirow{3}{*}{OpenMP} 
+  & 2 потока & 1.03758 & 0.87318 \\
+  & 3 потока & 1.02563 & 0.85473 \\
+  & 4 потока & 1.02012 & 0.84531 \\
+\hline
+\multirow{3}{*}{TBB} 
+  & 2 потока & 1.0288 & 0.87327 \\
+  & 3 потока & 1.01452 & 0.85391 \\
+  & 4 потока & 1.00231 & 0.83045 \\
+\hline
+\multirow{3}{*}{STL (std::thread)} 
+  & 2 потока & 1.0118 & 0.87100 \\
+  & 3 потока & 1.00231 & 0.86473 \\
+  & 4 потока & 1.00198 & 0.85120 \\
+\hline
+\multirow{5}{*}{MPI + TBB} 
+  & 2 + 2 & 1.3979 & 1.35807 \\
+  & 3 + 3 & 1.75376 & 1.45707 \\
+  & 5 + 2 & 1.90758 & 1.31677 \\
+\hline
+\end{tabular}
+\label{tab:parallel_perf}
+\end{table}
+\subsection*{Анализ}
+\hspace*{1.25em}\textbf{Сравнение параллельных реализаций}:
+\begin{itemize}
+\item Максимальное ускорение достигается при использовании 4 потоков в каждой из трёх библиотек — примерно в диапазоне 1.2–1.3 раз по сравнению с последовательной версией.
+\item Наиболее эффективным по времени оказались реализации с \textbf{std::thread} и \textbf{TBB}, что связано с их более гибким управлением потоками.
+\item \textbf{OpenMP} демонстрирует стабильный рост производительности с увеличением числа потоков
+\end{itemize}
+
+\textbf{Гибридная реализация MPI + STL}:
+\begin{itemize}
+\item Показывает \textbf{меньшую эффективность} по сравнению с локальными параллельными подходами.
+\item Ускорение меньше 1, что говорит о негативном эффекте масштабирования при использовании нескольких процессов и потоков.
+\item Основные причины:
+\begin{itemize}
+\item Высокие накладные расходы на коммуникацию между процессами MPI и синхронизацию внутри каждого узла снижают эффективность.
+\item Ограничения размера задачи для эффективного распараллеливания
+\end{itemize}
+\end{itemize}
+
+\textbf{Рекомендации по выбору реализации}:
+\begin{itemize}
+\item Для локальной обработки алгоритма рекомендуется использовать \textbf{TBB} или \textbf{std::thread}
+\item OpenMP демонстрирует стабильную производительность и может быть предпочтительнее для систем с переменной нагрузкой
+\item Для небольших и средних графов гибридный подход MPI + TBB не оправдывает ожиданий, поскольку накладные расходы преобладают над выигрышем.Такой подход более оправдан при очень больших графах и необходимости масштабирования на несколько узлов, но требует тщательной оптимизации.
+\end{itemize}
+
+Таблица наглядно демонстрирует, что для данного размера задачи классические многопоточные подходы (OpenMP, TBB, std::thread) обеспечивают сопоставимую производительность, в то время как распределенные вычисления неоправданно увеличивают время выполнения.
+\section{Заключение}
+
+\hspace*{1.25em}В рамках данной работы была реализована и проанализирована задача поиска кратчайших путей в графе алгоритмом Дейкстры с использованием различных моделей параллельного программирования. Реализация включает:
+
+\begin{itemize}
+\item Последовательнаую версию алгоритма как базовый вариант для сравнения
+\item Параллельные реализации с использованием:
+\begin{itemize}
+\item OpenMP (с динамическим распределением строк)
+\item Intel TBB (с автоматическим разделением работы)
+\item Стандартных потоков std::thread (с явным управлением)
+\item Гибридного подхода MPI + TBB
+\end{itemize}
+\end{itemize}
+
+\textbf{Ключевые результаты тестирования}:
+\begin{itemize}
+\item Лучшую производительность среди локальных реализаций показали версии на TBB и STL;
+\item Реализация OpenMP продемонстрировала сопоставимую эффективность;
+\item Гибридный подход MPI+TBB потребовал дополнительной оптимизации
+\end{itemize}
+
+\hspace*{1.25em}Работа позволила сравнить эффективность различных моделей параллелизма для алгоритма. Полученные результаты подтверждают  целесообразность применения параллельных вычислений для ускорения поиска кратчайших путей в графах, при этом выбор оптимальной модели параллелизма должен учитывать специфику решаемой задачи и характеристики графа.
+
+\section{Список литературы}
+\begin{enumerate}
+\item Cormen T.H., Leiserson C.E., Rivest R.L., Stein C. \textit{Introduction to Algorithms}. — MIT Press, 3rd edition, 2009
+\item Статья: \textit{OpenMP: основы параллельного программирования} 19. — Официальный сайт: \url{https://www.openmp.org}
+\item Воеводин В.В., Воеводин Вл.В. \textit{Параллельные вычисления}. — СПб.: БХВ-Петербург, 2022. — 608 с.
+\item Статья: \textit{MPI: стандарт для распределённых вычислений} [citation:9]. — Ресурс MPI Forum: \url{https://www.mpi-forum.org}
+\item Страуструп Б. \textit{Программирование: принципы и практика с использованием C++}. — М.: Вильямс, 2021. — 1328 с.
+\item Intel Corporation. \textit{Intel® oneAPI Threading Building Blocks Developer Guide} [citation:8]. — \url{https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html}
+\item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks}. — Нижний Новгород, 2007.
+\item Chapman B., Jost G., van der Pas R. \textit{Using OpenMP: Portable Shared Memory Parallel Programming}. — MIT Press, 2007.
+\item Pacheco P. \textit{Parallel Programming with MPI}. — Morgan Kaufmann, 1997.
+\end{enumerate}
+
+\section*{Приложение}
+\addcontentsline{toc}{section}{Приложение}
+
+\hspace*{1.25em}В этом разделе приведены ключевые фрагменты реализации алгоритма Дейкстры для различных технологий распараллеливания.
+
+\subsection*{OpenMP: функция RunImpl}
+\begin{lstlisting}[language=C++]
+bool muhina_m_dijkstra_omp::TestTaskOpenMP::RunImpl() {
+  std::vector<std::vector<std::pair<size_t, int>>> adj_list(num_vertices_);
+  size_t current_vertex = 0;
+  size_t i = 0;
+
+  while (i < graph_data_.size() && current_vertex < num_vertices_) {
+    if (graph_data_[i] == kEndOfVertexList) {
+      current_vertex++;
+      i++;
+      continue;
+    }
+
+    if (i + 1 >= graph_data_.size()) {
+      break;
+    }
+
+    size_t dest = graph_data_[i];
+    int weight = graph_data_[i + 1];
+    if (weight < 0) {
+      return false;
+    }
+
+    if (dest < num_vertices_) {
+      adj_list[current_vertex].emplace_back(dest, weight);
+    }
+
+    i += 2;
+  }
+
+  std::priority_queue<std::pair<int, size_t>, std::vector<std::pair<int, size_t>>, std::greater<>> pq;
+
+  pq.emplace(0, start_vertex_);
+
+  while (!pq.empty()) {
+    size_t u = pq.top().second;
+    int dist_u = pq.top().first;
+    pq.pop();
+
+    if (dist_u > distances_[u]) {
+      continue;
+    }
+
+#pragma omp parallel for
+    for (int idx = 0; idx < static_cast<int>(adj_list[u].size()); ++idx) {
+      size_t v = adj_list[u][idx].first;
+      int weight = adj_list[u][idx].second;
+
+      if (distances_[u] != INT_MAX && distances_[u] + weight < distances_[v]) {
+#pragma omp critical
+        {
+          if (distances_[u] + weight < distances_[v]) {
+            distances_[v] = distances_[u] + weight;
+            pq.emplace(distances_[v], v);
+          }
+        }
+      }
+    }
+  }
+
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{TBB: функции RunDijkstraAlgorithm и RunImpl }
+\begin{lstlisting}[language=C++]
+void RunDijkstraAlgorithm(const std::vector<std::vector<std::pair<size_t, int>>> &adj_list, std::vector<int> &distances,
+                          size_t start_vertex) {
+  oneapi::tbb::concurrent_priority_queue<std::pair<int, size_t>, std::greater<>> pq;
+  pq.push({0, start_vertex});
+  oneapi::tbb::spin_mutex mutex;
+
+  while (true) {
+    std::pair<int, size_t> top;
+    if (!pq.try_pop(top)) {
+      if (pq.empty()) {
+        break;
+      }
+      continue;
+    }
+
+    size_t u = top.second;
+    int dist_u = top.first;
+
+    if (dist_u > distances[u]) {
+      continue;
+    }
+
+    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<size_t>(0, adj_list[u].size()),
+                              [&](const oneapi::tbb::blocked_range<size_t> &r) {
+                                for (size_t i = r.begin(); i != r.end(); ++i) {
+                                  size_t v = adj_list[u][i].first;
+                                  int weight = adj_list[u][i].second;
+                                  int new_dist = distances[u] + weight;
+
+                                  if (new_dist < distances[v]) {
+                                    oneapi::tbb::spin_mutex::scoped_lock lock(mutex);
+                                    if (new_dist < distances[v]) {
+                                      distances[v] = new_dist;
+                                      pq.push({new_dist, v});
+                                    }
+                                  }
+                                }
+                              });
+  }
+}
+\end{lstlisting}
+\begin{lstlisting}[language=C++]
+bool muhina_m_dijkstra_tbb::TestTaskTBB::RunImpl() {
+  std::vector<std::vector<std::pair<size_t, int>>> adj_list(num_vertices_);
+  size_t current_vertex = 0;
+  size_t i = 0;
+
+  while (i < graph_data_.size() && current_vertex < num_vertices_) {
+    if (graph_data_[i] == kEndOfVertexList) {
+      current_vertex++;
+      i++;
+      continue;
+    }
+
+    if (i + 1 >= graph_data_.size()) {
+      break;
+    }
+
+    size_t dest = graph_data_[i];
+    int weight = graph_data_[i + 1];
+    if (weight < 0) {
+      return false;
+    }
+
+    if (dest < num_vertices_) {
+      adj_list[current_vertex].emplace_back(dest, weight);
+    }
+
+    i += 2;
+  }
+  RunDijkstraAlgorithm(adj_list, distances_, start_vertex_);
+
+  return true;
+}
+
+\end{lstlisting}
+\subsection*{STL (std::thread): функции ProcessVertex, RunDijkstraAlgorithm и RunImpl}
+\begin{lstlisting}[language=C++]
+void ProcessVertex(const std::pair<int, size_t>& current,
+                   const std::vector<std::vector<std::pair<size_t, int>>>& adj_list,
+                   std::vector<std::atomic<int>>& atomic_distances,
+                   std::priority_queue<std::pair<int, size_t>, std::vector<std::pair<int, size_t>>, std::greater<>>& pq,
+                   std::mutex& pq_mtx, std::condition_variable& cv, std::atomic<int>& active_threads) {
+  size_t u = current.second;
+  int dist_u = current.first;
+
+  int current_dist_u = atomic_distances[u].load(std::memory_order_relaxed);
+  if (dist_u > current_dist_u) {
+    active_threads--;
+    return;
+  }
+
+  for (const auto& neighbor : adj_list[u]) {
+    size_t v = neighbor.first;
+    int weight = neighbor.second;
+    int new_dist = dist_u + weight;
+
+    int old_dist = atomic_distances[v].load(std::memory_order_relaxed);
+    while (new_dist < old_dist) {
+      if (atomic_distances[v].compare_exchange_weak(old_dist, new_dist, std::memory_order_relaxed)) {
+        std::lock_guard<std::mutex> lock(pq_mtx);
+        pq.emplace(new_dist, v);
+        cv.notify_one();
+        break;
+      }
+      old_dist = atomic_distances[v].load(std::memory_order_relaxed);
+    }
+  }
+
+  active_threads--;
+  std::lock_guard<std::mutex> lock(pq_mtx);
+  cv.notify_all();
+}
+\end{lstlisting}
+\begin{lstlisting}[language=C++]
+void RunDijkstraAlgorithm(const std::vector<std::vector<std::pair<size_t, int>>>& adj_list, std::vector<int>& distances,
+                          size_t start_vertex, int num_threads) {
+  using P = std::pair<int, size_t>;
+  std::priority_queue<P, std::vector<P>, std::greater<>> pq;
+  std::mutex pq_mtx;
+  std::condition_variable cv;
+  std::atomic<bool> finished{false};
+  std::atomic<int> active_threads{0};
+
+  std::vector<std::atomic<int>> atomic_distances(distances.size());
+  for (size_t i = 0; i < distances.size(); ++i) {
+    atomic_distances[i].store(distances[i], std::memory_order_relaxed);
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(pq_mtx);
+    pq.emplace(0, start_vertex);
+  }
+
+  auto worker = [&]() {
+    while (!finished.load(std::memory_order_acquire)) {
+      std::pair<int, size_t> current;
+      bool has_work = false;
+
+      {
+        std::unique_lock<std::mutex> lock(pq_mtx);
+        if (pq.empty()) {
+          if (active_threads == 0) {
+            finished = true;
+            lock.unlock();
+            cv.notify_all();
+            return;
+          }
+          cv.wait(lock, [&] { return !pq.empty() || finished; });
+          if (finished) {
+            return;
+          }
+        } else {
+          current = pq.top();
+          pq.pop();
+          has_work = true;
+          active_threads++;
+          cv.notify_one();
+        }
+      }
+
+      if (!has_work) {
+        continue;
+      }
+
+      ProcessVertex(current, adj_list, atomic_distances, pq, pq_mtx, cv, active_threads);
+    }
+  };
+
+  std::vector<std::thread> threads;
+  threads.reserve(num_threads);
+  for (int i = 0; i < num_threads; ++i) {
+    threads.emplace_back(worker);
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  for (size_t i = 0; i < distances.size(); ++i) {
+    distances[i] = atomic_distances[i].load(std::memory_order_relaxed);
+  }
+}
+\end{lstlisting}
+\begin{lstlisting}[language=C++]
+bool muhina_m_dijkstra_stl::TestTaskSTL::RunImpl() {
+  std::vector<std::vector<std::pair<size_t, int>>> adj_list(num_vertices_);
+  size_t current_vertex = 0;
+  size_t i = 0;
+
+  while (i < graph_data_.size() && current_vertex < num_vertices_) {
+    if (graph_data_[i] == kEndOfVertexList) {
+      current_vertex++;
+      i++;
+      continue;
+    }
+
+    if (i + 1 >= graph_data_.size()) {
+      break;
+    }
+
+    size_t dest = graph_data_[i];
+    int weight = graph_data_[i + 1];
+
+    if (weight < 0) {
+      return false;
+    }
+
+    if (dest < num_vertices_) {
+      adj_list[current_vertex].emplace_back(dest, weight);
+    }
+
+    i += 2;
+  }
+  const int num_threads = ppc::util::GetPPCNumThreads();
+  RunDijkstraAlgorithm(adj_list, distances_, start_vertex_, num_threads);
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{MPI + STL: функции ProcessLocalQueue, SynchronizeMinDistance, ProcessNeighbors, SynchronizeDistances, RunDijkstraAlgorithm, RunImpl}
+\begin{lstlisting}[language=C++]
+bool ProcessLocalQueue(oneapi::tbb::concurrent_priority_queue<std::pair<int, int>, std::greater<>>& pq,
+                       int& local_distance, int& local_vertex) {
+  if (pq.empty()) {
+    return false;
+  }
+
+  std::pair<int, int> local_top;
+  if (pq.try_pop(local_top)) {
+    local_distance = local_top.first;
+    local_vertex = local_top.second;
+    return true;
+  }
+  return false;
+}
+\end{lstlisting}
+\begin{lstlisting}[language=C++]
+std::pair<int, int> SynchronizeMinDistance(boost::mpi::communicator& world, int local_distance, int local_vertex) {
+  std::pair<int, int> local_min{local_distance, local_vertex};
+  std::pair<int, int> global_min;
+  boost::mpi::all_reduce(world, local_min, global_min, boost::mpi::minimum<std::pair<int, int>>());
+  return global_min;
+}
+\end{lstlisting}
+\begin{lstlisting}[language=C++]
+void ProcessNeighbors(size_t u, const std::vector<std::vector<std::pair<size_t, int>>>& adj_list,
+                      std::vector<int>& local_distances,
+                      oneapi::tbb::concurrent_priority_queue<std::pair<int, int>, std::greater<>>& pq,
+                      oneapi::tbb::spin_mutex& mutex) {
+  oneapi::tbb::parallel_for(
+      oneapi::tbb::blocked_range<size_t>(0, adj_list[u].size()), [&](const oneapi::tbb::blocked_range<size_t>& r) {
+        for (size_t i = r.begin(); i != r.end(); ++i) {
+          const size_t v = adj_list[u][i].first;
+          const int weight = adj_list[u][i].second;
+          const int new_dist =
+              (local_distances[u] == INT_MAX || weight == INT_MAX) ? INT_MAX : local_distances[u] + weight;
+
+          if (new_dist < local_distances[v]) {
+            oneapi::tbb::spin_mutex::scoped_lock lock(mutex);
+            if (new_dist < local_distances[v]) {
+              local_distances[v] = new_dist;
+              pq.push({new_dist, static_cast<int>(v)});
+            }
+          }
+        }
+      });
+}
+\end{lstlisting}
+\begin{lstlisting}[language=C++]
+void SynchronizeDistances(boost::mpi::communicator& world, std::vector<int>& local_distances,
+                          std::vector<int>& global_distances, size_t num_vertices) {
+  boost::mpi::all_reduce(world, local_distances.data(), static_cast<int>(num_vertices), global_distances.data(),
+                         boost::mpi::minimum<int>());
+  std::ranges::copy(global_distances.begin(), global_distances.end(), local_distances.begin());
+}
+\end{lstlisting}
+\begin{lstlisting}[language=C++]
+void RunDijkstraAlgorithm(const std::vector<std::vector<std::pair<size_t, int>>>& adj_list, std::vector<int>& distances,
+                          size_t start_vertex, boost::mpi::communicator& world, size_t num_vertices) {
+  oneapi::tbb::concurrent_priority_queue<std::pair<int, int>, std::greater<>> pq;
+  oneapi::tbb::spin_mutex mutex;
+  std::vector<int> local_distances(num_vertices, INT_MAX);
+  std::vector<int> global_distances(num_vertices);
+
+  if (world.rank() == 0) {
+    local_distances[start_vertex] = 0;
+    pq.push({0, static_cast<int>(start_vertex)});
+  }
+
+  while (true) {
+    int local_distance = INT_MAX;
+    int local_vertex = -1;
+    ProcessLocalQueue(pq, local_distance, local_vertex);
+
+    std::pair<int, int> global_min = SynchronizeMinDistance(world, local_distance, local_vertex);
+    if (global_min.first == INT_MAX) {
+      break;
+    }
+
+    const auto u = static_cast<size_t>(global_min.second);
+    const int dist_u = global_min.first;
+
+    if (u >= num_vertices || dist_u > local_distances[u]) {
+      continue;
+    }
+
+    ProcessNeighbors(u, adj_list, local_distances, pq, mutex);
+    SynchronizeDistances(world, local_distances, global_distances, num_vertices);
+  }
+
+  distances = local_distances;
+}
+\end{lstlisting}
+\begin{lstlisting}[language=C++]
+bool muhina_m_dijkstra_all::TestTaskALL::RunImpl() {
+  std::vector<std::vector<std::pair<size_t, int>>> adj_list(num_vertices_);
+  size_t current_vertex = 0;
+  size_t i = 0;
+
+  while (i < graph_data_.size() && current_vertex < num_vertices_) {
+    if (i >= graph_data_.size()) {
+      return false;
+    }
+    if (graph_data_[i] == kEndOfVertexList) {
+      current_vertex++;
+      i++;
+      continue;
+    }
+    if (i + 1 >= graph_data_.size()) {
+      break;
+    }
+
+    const auto dest = static_cast<size_t>(graph_data_[i]);
+    const int weight = graph_data_[i + 1];
+    if (weight < 0) {
+      return false;
+    }
+
+    if (dest < num_vertices_) {
+      adj_list[current_vertex].emplace_back(dest, weight);
+    }
+    i += 2;
+  }
+
+  RunDijkstraAlgorithm(adj_list, distances_, start_vertex_, world_, num_vertices_);
+  return true;
+}
+\end{lstlisting}
+\end{document}
