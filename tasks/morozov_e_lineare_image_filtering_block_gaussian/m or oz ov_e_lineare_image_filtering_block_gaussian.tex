@@ -1,0 +1,726 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
+\usepackage[russian]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{titlesec}
+\usepackage{tabularx}
+\usepackage{url}
+\usepackage{listings}
+\usepackage{multirow}
+\usepackage{xcolor}
+\hypersetup{hidelinks}
+\usepackage{siunitx}
+
+\geometry{top=2cm, bottom=2cm, left=2cm, right=2cm}
+
+\sisetup{
+output-decimal-marker={,},
+group-digits = false
+}
+
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0pt}
+
+% Формат заголовков
+\titleformat{\section}{\normalfont\Large\bfseries\centering}{\thesection.}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection.}{1em}{}
+
+\lstset{
+	basicstyle=\ttfamily\small,
+	keywordstyle=\color{blue},
+	commentstyle=\color{green},
+	stringstyle=\color{red},
+	frame=single,
+	tabsize=4,
+	showstringspaces=false,
+	breaklines=true
+}
+
+\hypersetup{hidelinks}
+
+\begin{document}
+
+% Титульный лист
+\begin{titlepage}
+\begin{center}
+\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\[0.5cm]
+\textbf{Федеральное государственное автономное образовательное учреждение высшего образования} \\[0.5cm]
+\textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»} \\[0.5cm]
+Институт информационных технологий, математики и механики \\
+\vfill
+{\Large
+\textbf{Отчёт по лабораторной работе на тему:} \\[0.5cm]
+\textbf{Линейная фильтрация изображений (блочное разбиение). Ядро Гаусса 3x3.} \\
+}
+\vfill
+\begin{flushright}
+Выполнил: студент группы 3822Б1ПР1 \\
+Морозов Егор \\
+\vspace{1cm}
+Преподаватель: \\
+Сысоев А.В., доцент, кандидат технических наук \\
+\end{flushright}
+\vfill
+Нижний Новгород \\
+2025
+\end{center}
+\end{titlepage}
+
+% Оглавление
+\tableofcontents
+\newpage
+
+% Введение
+\section*{Введение}
+
+Обработка изображений является одной из ключевых задач компьютерного зрения, находящей применение в самых разных областях — от медицинской диагностики до автономных систем управления. Среди множества методов обработки особое место занимает линейная фильтрация, позволяющая эффективно решать задачи сглаживания, подавления шумов и выделения границ. В данной работе рассматривается подход к реализации линейной фильтрации с использованием блочного разбиения изображения и гауссова ядра размером 3x3.
+
+Актуальность исследования обусловлена необходимостью оптимизации вычислительных алгоритмов для обработки больших объемов изображений. Современные системы требуют не только высокой точности обработки, но и эффективного использования вычислительных ресурсов. В этой связи была проведена серия экспериментов с реализацией алгоритма на различных технологиях параллельного программирования: OpenMP, STL, TBB и гибридном подходе MPI+OpenMP. 
+
+Особый интерес представляет сравнение производительности этих технологий применительно к задаче блочной фильтрации. Как показывает практика, выбор оптимального инструментария во многом зависит от специфики решаемой задачи и характеристик используемого оборудования. В ходе работы были учтены различные аспекты параллелизации, включая балансировку нагрузки и минимизацию накладных расходов.
+
+Целью исследования стала не только демонстрация работоспособности алгоритма, но и выявление наиболее эффективных подходов к его параллельной реализации. Полученные результаты позволяют сделать выводы о целесообразности применения тех или иных технологий в зависимости от условий конкретной задачи обработки изображений.
+
+\newpage
+
+\section{Постановка задачи}
+
+В данной работе рассматривается задача \textbf{линейной фильтрации изображений} с использованием \textbf{гауссова ядра} $3\times3$ и \textbf{блочного разбиения} для эффективного распараллеливания вычислений. Основная цель --- исследование и сравнение производительности различных технологий параллельного программирования (\textbf{OpenMP, STL, TBB, MPI+OpenMP}) при обработке изображений большого размера.
+
+\subsection*{Математическая модель}
+Исходное изображение представляется в виде матрицы интенсивностей пикселей $I(x, y)$. Фильтрация осуществляется путём вычисления свёртки каждого пикселя с гауссовым ядром $G$:
+
+\[
+I'(x, y) = \sum_{i=-1}^{1} \sum_{j=-1}^{1} I(x+i, y+j) \cdot G(i+2, j+2),
+\]
+
+где $I'(x, y)$ --- новое значение пикселя после фильтрации, а $G$ --- нормированное ядро Гаусса:
+
+\[
+G = \frac{1}{16}
+\begin{bmatrix}
+1 & 2 & 1 \\
+2 & 4 & 2 \\
+1 & 2 & 1 \\
+\end{bmatrix}.
+\]
+\subsection*{Требования к реализации}
+\begin{enumerate}
+    \item Создать пустое выходное изображение $I'$ размером $M \times N$
+    
+    \item Для каждого пикселя $(x,y)$ исходного изображения ($1 \leq x \leq M$, $1 \leq y \leq N$):
+    \begin{enumerate}
+        \item Инициализировать сумму $sum = 0$
+        
+        \item Для каждого элемента ядра $(i,j)$ где $-1 \leq i,j \leq 1$:
+        \begin{itemize}
+            \item Вычислить координаты соседнего пикселя: 
+            $x' = x + i$, $y' = y + j$
+            
+            \item Если $(x',y')$ выходит за границы изображения пропускаем пиксель
+            
+            \item Добавить в сумму: 
+            $sum \mathrel{+}= I(x',y') \cdot G(i+2,j+2)$
+        \end{itemize}
+        
+        \item Записать результат: $I'(x,y) = sum$
+    \end{enumerate}
+\end{enumerate}
+
+
+\subsection*{Критерии оценки}
+\begin{itemize}
+    \item Время выполнения фильтрации
+    \item Коэффициент ускорения относительно последовательной версии
+    \item Эффективность использования вычислительных ресурсов
+    \item Масштабируемость при увеличении размера изображения
+\end{itemize}
+\newpage
+
+\section{Описание алгоритма}
+
+\begin{enumerate}
+    \item Создать пустое выходное изображение $I'$ размером $M \times N$
+    
+    \item Для каждого пикселя $(x,y)$ исходного изображения ($1 \leq x \leq M$, $1 \leq y \leq N$):
+    \begin{enumerate}
+        \item Инициализировать сумму $sum = 0$
+        
+        \item Для каждого элемента ядра $(i,j)$ где $-1 \leq i,j \leq 1$:
+        \begin{itemize}
+            \item Вычислить координаты соседнего пикселя: 
+            $x' = x + i$, $y' = y + j$
+            
+            \item Если $(x',y')$ выходит за границы изображения пропускаем пиксель
+            
+            \item Добавить в сумму: 
+            $sum \mathrel{+}= I(x',y') \cdot G(i+2,j+2)$
+        \end{itemize}
+        
+        \item Записать результат: $I'(x,y) = sum$
+    \end{enumerate}
+\end{enumerate}
+
+\begin{lstlisting}[language=C++, caption=Реализация алгоритма]
+for (int i = 0; i < n_; ++i) {
+  for (int j = 0; j < m_; ++j) {
+    if (i == 0 || j == 0 || i == n_ - 1 || j == m_ - 1) {
+      res_[(i * m_) + j] = input_[(i * m_) + j];
+    } else {
+      double sum = 0.0;
+      for (int ki = -1; ki <= 1; ++ki) {
+        for (int kj = -1; kj <= 1; ++kj) {
+          sum += input_[((i + ki) * m_) + (j + kj)] * kernel[ki + 1][kj + 1];
+        }
+      }
+      res_[(i * m_) + j] = sum;
+    }
+  }
+}
+\end{lstlisting}
+
+\newpage
+\section{Описание схемы распараллеливания}
+
+Основная идея параллелизации алгоритма Гауссовой фильтрации заключается в эффективном распределении обработки пикселей между вычислительными потоками. В представленной реализации используется подход декомпозиции по данным, который особенно хорошо подходит для задач обработки изображений.
+
+\subsection*{Декомпозиция изображения}
+Алгоритм естественным образом допускает параллелизацию за счет независимости операций фильтрации для большинства пикселей:
+\begin{itemize}
+    \item Изображение разбивается на горизонтальные полосы (по строкам)
+    \item Каждый поток обрабатывает свою группу строк независимо
+    \item Граничные строки (первая и последняя) обрабатываются специальным образом
+\end{itemize}
+\subsection*{Масштабируемость и производительность}
+Эффективность параллельной реализации зависит от:
+\begin{itemize}
+    \item Размера обрабатываемого изображения
+    \item Балансировки нагрузки между потоками
+    \item Накладных расходов на создание потоков
+\end{itemize}
+
+Для больших изображений алгоритм демонстрирует хорошую масштабируемость, так как вычислительная нагрузка существенно превосходит затраты на организацию параллелизма.
+
+\newpage
+
+\section{Реализация на OpenMP: простота и эффективность}
+
+При разработке параллельной версии алгоритма Гауссовой фильтрации подход с использованием OpenMP оказался наиболее естественным выбором. Красота этого решения заключается в его удивительной простоте — буквально одна строка с директивой компилятора превращает последовательный код в параллельный, сохраняя при этом всю его логику и читаемость.
+
+OpenMP в данном случае работает как умный распределитель работы. Он берет основной цикл по строкам изображения и делит эти строки между доступными потоками процессора примерно поровну. При этом не нужно вручную прописывать логику распределения — вся сложность скрыта за простой директивой \texttt{\#pragma omp parallel for}, что делает код чистым и понятным.
+
+Особенно удобно, что каждый поток получает свой независимый кусок работы и никак не мешает другим. Все что им нужно — это исходное изображение и место для записи результата. При этом ядро фильтра, хранящееся в константном массиве, одинаково доступно всем потокам без необходимости создания отдельных копий.
+
+Такая реализация особенно хорошо показывает себя на современных многоядерных процессорах. Когда изображение достаточно большое, скорость обработки увеличивается практически пропорционально количеству ядер. При этом, что немаловажно, код остается таким же понятным и поддерживаемым.
+
+\begin{lstlisting}[language=C++, caption=OMP-реализации]
+#pragma omp parallel for
+  for (int i = 0; i < n_; ++i) {
+    for (int j = 0; j < m_; ++j) {
+      if (i == 0 || j == 0 || i == n_ - 1 || j == m_ - 1) {
+        res_[(i * m_) + j] = input_[(i * m_) + j];
+      } else {
+        double sum = 0.0;
+        for (int ki = -1; ki <= 1; ++ki) {
+          for (int kj = -1; kj <= 1; ++kj) {
+            sum += input_[((i + ki) * m_) + (j + kj)] * kernel[ki + 1][kj + 1];
+          }
+        }
+        res_[(i * m_) + j] = sum;
+      }
+    }
+  }
+\end{lstlisting}
+
+\newpage
+
+\section{Описание TBB-версии}
+
+При реализации алгоритма Гауссовой фильтрации с использованием TBB был применен принципиально иной подход к параллелизации по сравнению с OpenMP-версией. Вместо простого распределения строк между потоками здесь используется интеллектуальное двумерное разбиение изображения на прямоугольные блоки, что позволяет лучше учитывать особенности работы с матричными данными.
+
+Основу реализации составляет шаблон \texttt{tbb::parallel\_for}, работающий с двумерным диапазоном \texttt{blocked\_range2d}. Это обеспечивает автоматическое разбиение изображения на оптимальные по размеру блоки, которые эффективно помещаются в кэш-память процессора. Каждый поток получает для обработки свою локальную прямоугольную область, причем размеры этих областей динамически адаптируются под конкретную аппаратную конфигурацию.
+
+Особенностью данной реализации является сохранение всех преимуществ предыдущих версий - константное ядро фильтра доступно всем потокам, граничные пиксели обрабатываются по упрощенной схеме, а линейная организация данных обеспечивает хорошую локализацию. Однако TBB добавляет новый уровень оптимизации за счет более умного распределения нагрузки.
+
+\begin{lstlisting}[language=C++, caption=TBB-реализация]
+  tbb::parallel_for(tbb::blocked_range2d<int>(0, n_, 0, m_), [&](const tbb::blocked_range2d<int> &r) {
+    for (int i = r.rows().begin(); i < r.rows().end(); ++i) {
+      for (int j = r.cols().begin(); j < r.cols().end(); ++j) {
+        if (i == 0 || j == 0 || i == n_ - 1 || j == m_ - 1) {
+          res_[(i * m_) + j] = input_[(i * m_) + j];
+        } else {
+          double sum = 0.0;
+          for (int ki = -1; ki <= 1; ++ki) {
+            for (int kj = -1; kj <= 1; ++kj) {
+              sum += input_[((i + ki) * m_) + (j + kj)] * kernel[ki + 1][kj + 1];
+            }
+          }
+          res_[(i * m_) + j] = sum;
+        }
+      }
+    }
+  });
+\end{lstlisting}
+
+\newpage
+
+\section{Описание STL-версии}
+
+Данная реализация алгоритма Гауссовой фильтрации использует низкоуровневый подход к параллелизации через стандартные потоки C++ (std::thread). В отличие от OpenMP и TBB версий, здесь явно создаются и управляются потоки, что дает полный контроль над процессом параллельной обработки.
+
+Основная идея заключается в статическом разделении изображения на примерно равные части по строкам, где каждый поток получает свой диапазон строк для обработки. Алгоритм начинается с расчета базового количества строк на поток (count\_el) и остатка (count\_el\_remain), который распределяется по первым потокам. Это обеспечивает достаточно равномерную нагрузку между всеми рабочими потоками.
+
+Каждый поток выполняет функцию ThreadTask, которая обрабатывает назначенный ему диапазон строк. Для каждой строки в своем диапазоне поток последовательно обрабатывает все пиксели, применяя к ним ядро Гаусса. Граничные пиксели (первая/последняя строка и первый/последний столбец) копируются без изменений, в то время как внутренние пиксели подвергаются полной процедуре свертки с ядром 3×3.
+
+\begin{lstlisting}[language=C++, caption=Фрагмент STL-реализации]
+inline void ThreadTask(const std::vector<double> &in_vec, int n, int m, std::vector<double> &res_vec, int begin_pos,
+                       int end_pos) {
+  for (int i = begin_pos; i < end_pos; ++i) {
+    for (int j = 0; j < m; ++j) {
+      if (i == 0 || j == 0 || i == n - 1 || j == m - 1) {
+        res_vec[(i * m) + j] = in_vec[(i * m) + j];
+      } else {
+        double sum = 0.0;
+        for (int ki = -1; ki <= 1; ++ki) {
+          for (int kj = -1; kj <= 1; ++kj) {
+            sum += in_vec[((i + ki) * m) + (j + kj)] * kErnel[ki + 1][kj + 1];
+          }
+        }
+        res_vec[(i * m) + j] = sum;
+      }
+    }
+  }
+}
+
+for (int i = 0; i < num_threads; ++i) {
+  int end_index = count_el + cur_count + (i < count_el_remain ? 1 : 0);
+  threads[i] = std::thread(ThreadTask, std::cref(input_), n_, m_, std::ref(res_), cur_count, end_index);
+  if (i < count_el_remain) {
+    cur_count++;
+  }
+  cur_count += count_el;
+}
+for (int i = 0; i < num_threads; ++i) {
+  threads[i].join();
+}
+\end{lstlisting}
+
+\section{Описание гибридной MPI+STL версии}
+
+
+\subsection*{Распределение задач между узлами}
+\begin{itemize}
+\item \textbf{MPI уровень} (между узлами):
+\begin{itemize}
+\item Изображение разбивается на крупные блоки по строкам
+\item Каждый MPI-процесс получает свой диапазон строк через \texttt{GetStartEndIndices}
+\item Распределение учитывает общее количество процессов и ранг текущего процесса
+\end{itemize}
+
+\item \textbf{OpenMP уровень} (внутри узла):
+\begin{itemize}
+\item Каждый MPI-процесс создаёт team потоков для обработки своего блока
+\item Директива \texttt{\#pragma omp parallel for} распределяет строки блока между потоками
+\item Все потоки одного процесса работают с общей памятью
+\end{itemize}
+\end{itemize}
+
+\noindent\textbf{Особенности обработки данных:}
+
+\begin{itemize}
+\item Граничные условия обрабатываются аналогично другим реализациям
+\item Функция \texttt{ApplyGaussianFilter} инкапсулирует логику применения ядра 3×3
+\item Каждый MPI-процесс работает только с выделенной ему частью изображения
+\end{itemize}
+
+\begin{lstlisting}[language=C++, caption=Основные моменты реализации с MPI+STL]
+  auto start_end_pair = GetStartEndIndices(world_.size(), world_.rank(), n_);
+  int start = start_end_pair.first;
+  int end = start_end_pair.second;
+#pragma omp parallel for
+  for (int i = start; i < end; ++i) {
+    for (int j = 0; j < m_; ++j) {
+      if (i == 0 || j == 0 || i == n_ - 1 || j == m_ - 1) {
+        res_[(i * m_) + j] = input_[(i * m_) + j];
+      } else {
+        res_[(i * m_) + j] = ApplyGaussianFilter(i, j);
+      }
+    }
+  }
+\end{lstlisting}
+\newpage
+% Результаты экспериментов
+\section{Результаты экспериментов}
+Для оценки времени выполнения последовательной версии и параллельной использовалась следующая система:
+\begin{itemize}
+    \item Операционная система: Windows 10
+    \item Процессор: Intel Core i5 12400f (6 ядер x 2.5ГГц)
+    \item Оперативная память: 16 ГБ.
+\end{itemize}
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Сравнение эффективности параллельных реализаций}
+\begin{tabularx}{\textwidth}{|X|l|c|c|c|}
+\hline
+\textbf{} & \textbf{Кол-во потоков} & \textbf{pipeline\_run (мс)} & \textbf{task\_run (мс)} & \textbf{Ускорение} \\
+\hline
+Последовательная & — & 1338 & 846 & 1.00 \\
+\hline
+\multirow{3}{*}{OMP} 
+  & 2 потока & 1157 & 597 & 1.15 \\
+  & 4 потока & 1067 & 486 & 1.25 \\
+  & 8 потоков & 1080 & 506 & 1.23 \\
+\hline
+\multirow{3}{*}{TBB} 
+  & 2 потока & 1202 & 634 & 1.11 \\
+  & 3 потока & 1078 & 529 & 1.24 \\
+  & 5 потоков & 1071 & 545 & 1.25 \\
+\hline
+\multirow{3}{*}{STL} 
+  & 2 потока & 1084 & 568 & 1.23 \\
+  & 3 потока & 1014 & 477 & 1.30 \\
+  & 5 потоков & 1005 & 478 & 1.33 \\
+\hline
+\multirow{5}{*}{MPI + OMP}  
+& 1 + 1 & 1824 & 1810 & 0.73 \\
+& 1 + 2 & 1089 & 1194 & 1.22 \\
+  & 2 + 1 & 1107 & 1094 & 1.20 \\
+  & 2 + 2 & 741 & 708 & 1.80 \\
+  & 4 + 2 & 579 & 561 & 2.30 \\
+  & 2 + 4 & 561 & 592 & 2.38 \\
+  & 4 + 4 & 669 & 689 & 2.00 \\
+\hline
+\end{tabularx}
+\end{table}
+
+\newpage
+
+\section{Выводы}
+
+В ходе работы были исследованы различные подходы к параллельной обработке изображений с использованием технологий \textbf{OpenMP}, \textbf{Intel TBB}, \textbf{STL (std::thread)} и гибридной схемы \textbf{MPI + OpenMP}. Экспериментальные результаты показали, что распараллеливание позволяет достичь ускорения до \textbf{2.38$\times$} по сравнению с последовательной реализацией.
+
+\subsection{Ключевые результаты}
+\begin{itemize}
+    \item \textbf{OpenMP} демонстрирует стабильное ускорение (1.25$\times$ при 4 потоках), однако дальнейшее увеличение числа потоков не дает значительного прироста производительности.
+    
+    \item \textbf{Intel TBB} показывает сравнимые с OpenMP результаты (1.25$\times$ при 5 потоках), но обеспечивает более предсказуемую масштабируемость благодаря оптимизированному планировщику задач.
+    
+    \item \textbf{STL (std::thread)} достигает наилучшего ускорения среди однопроцессорных методов (1.33$\times$ при 5 потоках), но требует более тщательной ручной настройки.
+    
+    \item \textbf{Гибридный подход (MPI + OpenMP)} демонстрирует максимальное ускорение (2.38$\times$ при конфигурации 2 MPI-процесса + 4 OMP-потока), однако критически зависит от балансировки нагрузки.
+\end{itemize}
+
+\section{Заключение}
+Проведённые исследования подтверждают, что:
+\begin{itemize}
+    \item Параллельные реализации позволяют значительно ускорить обработку изображений
+    \item Выбор оптимального метода зависит от архитектуры целевой системы
+    \item Гибридные схемы (MPI + OMP) обеспечивают наибольший прирост производительности в многопроцессорных средах
+\end{itemize}
+
+\newpage
+
+\section{Список литературы}
+\begin{enumerate}
+
+\bibitem{boost_mpi} Boost C++ Libraries. Boost.MPI Documentation. \\ 
+\url{https://www.boost.org/doc/libs/release/libs/mpi/}
+
+\bibitem{tbb} Intel® oneAPI Threading Building Blocks (TBB) Documentation. \\ 
+\url{https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb}
+
+\bibitem{omp} OpenMP Architecture Review Board. OpenMP Specifications. \\ 
+\url{https://www.openmp.org/specifications/}\
+
+\bibitem{stl} C++ Standard Library Reference — cppreference.com. \\ 
+\url{https://en.cppreference.com/w/}
+
+
+
+\item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks}. — Нижний Новгород, 2007.
+\end{enumerate}
+
+\newpage
+
+\section{Приложение}
+
+\subsection{ops\_seq.cpp}
+\begin{lstlisting}[language=C++]
+#include "omp/morozov_e_lineare_image_filtering_block_gaussian_omp/include/ops_omp.hpp"
+
+#include <cmath>
+#include <vector>
+
+bool morozov_e_lineare_image_filtering_block_gaussian::TestTaskSequential::RunImpl() {
+  // clang-format off
+  const std::vector<std::vector<double>> kernel = {
+      {1.0 / 16, 2.0 / 16, 1.0 / 16},
+      {2.0 / 16, 4.0 / 16, 2.0 / 16},
+      {1.0 / 16, 2.0 / 16, 1.0 / 16}};
+  // clang-format on
+  for (int i = 0; i < n_; ++i) {
+    for (int j = 0; j < m_; ++j) {
+      if (i == 0 || j == 0 || i == n_ - 1 || j == m_ - 1) {
+        res_[(i * m_) + j] = input_[(i * m_) + j];
+      } else {
+        double sum = 0.0;
+        for (int ki = -1; ki <= 1; ++ki) {
+          for (int kj = -1; kj <= 1; ++kj) {
+            sum += input_[((i + ki) * m_) + (j + kj)] * kernel[ki + 1][kj + 1];
+          }
+        }
+        res_[(i * m_) + j] = sum;
+      }
+    }
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection{ops\_omp.cpp}
+\begin{lstlisting}[language=C++]
+bool morozov_e_lineare_image_filtering_block_gaussian_omp::TestTaskOpenMP::RunImpl() {
+  // clang-format off
+  const std::vector<std::vector<double>> kernel = {
+      {1.0 / 16, 2.0 / 16, 1.0 / 16},
+      {2.0 / 16, 4.0 / 16, 2.0 / 16},
+      {1.0 / 16, 2.0 / 16, 1.0 / 16}};
+  // clang-format on
+#pragma omp parallel for
+  for (int i = 0; i < n_; ++i) {
+    for (int j = 0; j < m_; ++j) {
+      if (i == 0 || j == 0 || i == n_ - 1 || j == m_ - 1) {
+        res_[(i * m_) + j] = input_[(i * m_) + j];
+      } else {
+        double sum = 0.0;
+        for (int ki = -1; ki <= 1; ++ki) {
+          for (int kj = -1; kj <= 1; ++kj) {
+            sum += input_[((i + ki) * m_) + (j + kj)] * kernel[ki + 1][kj + 1];
+          }
+        }
+        res_[(i * m_) + j] = sum;
+      }
+    }
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection{ops\_tbb.cpp}
+\begin{lstlisting}[language=C++]
+#include <cmath>
+#include <vector>
+
+#include "oneapi/tbb/blocked_range2d.h"
+#include "oneapi/tbb/parallel_for.h"
+#include "tbb/morozov_e_lineare_image_filtering_block_gaussian_tbb/include/ops_tbb.hpp"
+
+bool morozov_e_lineare_image_filtering_block_gaussian_tbb::TestTaskTBB::RunImpl() {
+  // clang-format off
+  const std::vector<std::vector<double>> kernel = {
+      {1.0 / 16, 2.0 / 16, 1.0 / 16},
+      {2.0 / 16, 4.0 / 16, 2.0 / 16},
+      {1.0 / 16, 2.0 / 16, 1.0 / 16}};
+  // clang-format on
+  tbb::parallel_for(tbb::blocked_range2d<int>(0, n_, 0, m_), [&](const tbb::blocked_range2d<int> &r) {
+    for (int i = r.rows().begin(); i < r.rows().end(); ++i) {
+      for (int j = r.cols().begin(); j < r.cols().end(); ++j) {
+        if (i == 0 || j == 0 || i == n_ - 1 || j == m_ - 1) {
+          res_[(i * m_) + j] = input_[(i * m_) + j];
+        } else {
+          double sum = 0.0;
+          for (int ki = -1; ki <= 1; ++ki) {
+            for (int kj = -1; kj <= 1; ++kj) {
+              sum += input_[((i + ki) * m_) + (j + kj)] * kernel[ki + 1][kj + 1];
+            }
+          }
+          res_[(i * m_) + j] = sum;
+        }
+      }
+    }
+  });
+
+  return true;
+}
+\end{lstlisting}
+
+\subsection{ops\_stl.cpp}
+\begin{lstlisting}[language=C++]
+#include "stl/morozov_e_lineare_image_filtering_block_gaussian_stl/include/ops_stl.hpp"
+
+#include <array>
+#include <cmath>
+#include <functional>
+#include <thread>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+inline void ThreadTask(const std::vector<double> &in_vec, int n, int m, std::vector<double> &res_vec, int begin_pos,
+                       int end_pos) {
+  for (int i = begin_pos; i < end_pos; ++i) {
+    for (int j = 0; j < m; ++j) {
+      if (i == 0 || j == 0 || i == n - 1 || j == m - 1) {
+        res_vec[(i * m) + j] = in_vec[(i * m) + j];
+      } else {
+        double sum = 0.0;
+        for (int ki = -1; ki <= 1; ++ki) {
+          for (int kj = -1; kj <= 1; ++kj) {
+            sum += in_vec[((i + ki) * m) + (j + kj)] * kErnel[ki + 1][kj + 1];
+          }
+        }
+        res_vec[(i * m) + j] = sum;
+      }
+    }
+  }
+}
+
+bool morozov_e_lineare_image_filtering_block_gaussian_stl::TestTaskSTL::RunImpl() {
+  const int num_threads = ppc::util::GetPPCNumThreads();
+  std::vector<std::thread> threads(num_threads);
+  int count_el = n_ / num_threads;
+  int count_el_remain = n_ % num_threads;
+  int cur_count = 0;
+  for (int i = 0; i < num_threads; ++i) {
+    int end_index = count_el + cur_count + (i < count_el_remain ? 1 : 0);
+    threads[i] = std::thread(ThreadTask, std::cref(input_), n_, m_, std::ref(res_), cur_count, end_index);
+    if (i < count_el_remain) {
+      cur_count++;
+    }
+    cur_count += count_el;
+  }
+  for (int i = 0; i < num_threads; ++i) {
+    threads[i].join();
+  }
+  return true;
+}
+\end{lstlisting}
+
+
+
+\subsection{ops\_all.cpp}
+\begin{lstlisting}[language=C++]
+#include "all/morozov_e_lineare_image_filtering_block_gaussian_all/include/ops_all.hpp"
+
+#include <boost/mpi/communicator.hpp>
+#include <cmath>
+#include <utility>
+#include <vector>
+namespace {
+std::pair<int, int> GetStartEndIndices(int count_proc, int curr_runk_proc, int array_size) {
+  int start = 0;
+  int end = 0;
+  int count = array_size / count_proc;
+  int rem = array_size % count_proc;
+  if (count_proc < array_size) {
+    if (count_proc % array_size == 0) {
+      start = curr_runk_proc * count;
+      end = start + count;
+    } else {
+      if (curr_runk_proc < rem) {
+        start = (curr_runk_proc) * (count + 1);
+        end = start + count + 1;
+      } else {
+        start = rem * (count + 1) + (curr_runk_proc - rem) * (count);
+        end = start + count;
+      }
+    }
+  } else {
+    if (curr_runk_proc < array_size) {
+      start = curr_runk_proc;
+      end = start + 1;
+    }
+  }
+  return {start, end};
+}
+
+}  // namespace
+bool morozov_e_lineare_image_filtering_block_gaussian_all::TestTaskALL::PreProcessingImpl() {
+  n_ = static_cast<int>(task_data->inputs_count[0]);
+  m_ = static_cast<int>(task_data->inputs_count[1]);
+  auto *in_ptr = reinterpret_cast<double *>(task_data->inputs[0]);
+  input_ = std::vector<double>(in_ptr, in_ptr + (m_ * n_));
+  res_ = std::vector<double>(n_ * m_, 0);
+  return true;
+}
+
+bool morozov_e_lineare_image_filtering_block_gaussian_all::TestTaskALL::ValidationImpl() {
+  if (world_.rank() == 0) {
+    return task_data->inputs_count[0] == task_data->outputs_count[0] && task_data->inputs_count[0] > 0 &&
+           task_data->inputs_count[1] == task_data->outputs_count[1] && task_data->inputs_count[1] > 0;
+  }
+  return true;
+}
+inline double morozov_e_lineare_image_filtering_block_gaussian_all::TestTaskALL::ApplyGaussianFilter(int i, int j) {
+  const std::vector<std::vector<double>> kernel = {
+      {1.0 / 16, 2.0 / 16, 1.0 / 16}, {2.0 / 16, 4.0 / 16, 2.0 / 16}, {1.0 / 16, 2.0 / 16, 1.0 / 16}};
+  double sum = 0.0;
+  for (int ki = -1; ki <= 1; ++ki) {
+    for (int kj = -1; kj <= 1; ++kj) {
+      sum += input_[((i + ki) * m_) + (j + kj)] * kernel[ki + 1][kj + 1];
+    }
+  }
+  return sum;
+}
+bool morozov_e_lineare_image_filtering_block_gaussian_all::TestTaskALL::RunImpl() {
+  auto start_end_pair = GetStartEndIndices(world_.size(), world_.rank(), n_);
+  int start = start_end_pair.first;
+  int end = start_end_pair.second;
+#pragma omp parallel for
+  for (int i = start; i < end; ++i) {
+    for (int j = 0; j < m_; ++j) {
+      if (i == 0 || j == 0 || i == n_ - 1 || j == m_ - 1) {
+        res_[(i * m_) + j] = input_[(i * m_) + j];
+      } else {
+        res_[(i * m_) + j] = ApplyGaussianFilter(i, j);
+      }
+    }
+  }
+  if (world_.rank() == 0) {
+    for (int p = 1; p < world_.size(); ++p) {
+      int start_p = 0;
+      int end_p = 0;
+      world_.recv(p, 0, &start_p, 1);
+      world_.recv(p, 0, &end_p, 1);
+      std::vector<double> temp((end_p - start_p) * m_);
+      world_.recv(p, 0, temp.data(), (end_p - start_p) * m_);
+      for (int i = start_p; i < end_p; ++i) {
+        for (int j = 0; j < m_; ++j) {
+          res_[(i * m_) + j] = temp[((i - start_p) * m_) + j];
+        }
+      }
+    }
+  } else {
+    world_.send(0, 0, &start, 1);
+    world_.send(0, 0, &end, 1);
+    std::vector<double> temp((end - start) * m_);
+    for (int i = start; i < end; ++i) {
+      for (int j = 0; j < m_; ++j) {
+        temp[((i - start) * m_) + j] = res_[(i * m_) + j];
+      }
+    }
+    world_.send(0, 0, temp.data(), (end - start) * m_);
+  }
+  return true;
+}
+
+bool morozov_e_lineare_image_filtering_block_gaussian_all::TestTaskALL::PostProcessingImpl() {
+  if (world_.rank() == 0) {
+    for (int i = 0; i < n_; i++) {
+      for (int j = 0; j < m_; j++) {
+        reinterpret_cast<double *>(task_data->outputs[0])[(i * m_) + j] = res_[(i * m_) + j];
+      }
+    }
+  }
+  return true;
+}
+
+\end{lstlisting}
+
+\end{document}
