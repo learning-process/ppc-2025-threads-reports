@@ -1,0 +1,834 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
+\usepackage[russian]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{titlesec}
+\usepackage{url}
+\usepackage{listings}
+\usepackage{xcolor}
+\hypersetup{hidelinks}
+\usepackage{siunitx}
+\usepackage{hyperref}
+\usepackage{tabularx}
+
+\geometry{top=2cm, bottom=2cm, left=2cm, right=2cm}
+
+\sisetup{
+output-decimal-marker={,},
+group-digits = false
+}
+
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0pt}
+
+% Формат заголовков
+\titleformat{\section}{\normalfont\Large\bfseries\centering}{\thesection.}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection.}{1em}{}
+
+\lstset{
+	basicstyle=\ttfamily\small,
+	keywordstyle=\color{blue},
+	commentstyle=\color{green},
+	stringstyle=\color{red},
+	frame=single,
+	tabsize=4,
+	showstringspaces=false,
+	breaklines=true
+}
+
+\hypersetup{hidelinks}
+
+\begin{document}
+
+% Титульный лист
+\begin{titlepage}
+\begin{center}
+\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\[0.5cm]
+\textbf{Федеральное государственное автономное образовательное учреждение высшего образования} \\[0.5cm]
+\textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»} \\[0.5cm]
+Институт информационных технологий, математики и механики \\
+\vfill
+{\Large
+\textbf{Отчёт по лабораторной работе на тему:} \\[0.5cm]
+\textbf{Вычисление многомерных интегралов методом Монте-Карло} \\
+}
+\vfill
+\begin{flushright}
+Выполнил: студент группы 3822Б1ПР1 \\
+Крылов Михаил \\
+\vspace{1cm}
+Преподаватель: \\
+Сысоев А.В., доцент, кандидат технических наук \\
+\end{flushright}
+\vfill
+Нижний Новгород \\
+2025
+\end{center}
+\end{titlepage}
+
+% Оглавление
+\tableofcontents
+\newpage
+
+% Введение
+\section{Введение}
+
+Многомерное интегрирование является критически важной задачей в вычислительной математике, физике, машинном обучении и других областях, где требуется вычисление интегралов в пространствах высокой размерности. Однако классические численные методы, такие как квадратурные формулы, становятся неэффективными при увеличении размерности из-за экспоненциального роста вычислительной сложности. В таких условиях метод Монте-Карло, основанный на статистической выборке, оказывается наиболее перспективным благодаря своей линейной зависимости сложности от размерности.
+
+Одной из ключевых проблем при использовании метода Монте-Карло остается высокая вычислительная нагрузка, особенно для задач с большой точностью. Это делает актуальным применение параллельных вычислений, позволяющих распределить генерацию случайных точек и их обработку между несколькими вычислительными узлами. В данной работе исследуются различные подходы к распараллеливанию алгоритма: технологии \textbf{OpenMP}, \textbf{TBB} (Intel Threading Building Blocks), \textbf{STL} (\texttt{std::thread} — из стандартной библиотеки C++) для многопоточности с разделяемой памятью, а также гибридная реализация для распределенных систем c помощью \textbf{MPI} и \textbf{STL} для обеспечения параллезима внутри узла. Целью работы является сравнительный анализ производительности и масштабируемости этих подходов.
+
+\newpage
+
+\section{Постановка задачи}
+
+Вычисление многомерного интеграла 
+\[
+I = \int_{[a_1, b_1] \times \dots \times [a_d, b_d]} f(\mathbf{x}) \, d\mathbf{x}
+\] 
+методом Монте-Карло сводится к оценке математического ожидания функции \( f \) на равномерно распределенных случайных точках \( \{\mathbf{x}_i\}_{i=1}^N \). Приближение интеграла выражается через объем области \( V \) и среднее арифметическое значений функции:  
+\[
+I \approx V \cdot \frac{1}{N} \sum_{i=1}^N f(\mathbf{x}_i).
+\]
+
+Хотя метод эффективен для задач высокой размерности, его практическое применение сталкивается с двумя ключевыми ограничениями. Во-первых, точность оценки обратно пропорциональна квадратному корню из числа выборок \( N \), что требует обработки экстремально больших объемов данных для достижения приемлемой погрешности. Во-вторых, при \( d \geq 5 \) классические детерминированные алгоритмы становятся вычислительно нереализуемыми из-за экспоненциального роста сложности — явления, известного как «проклятие размерности».
+
+Целью работы является исследование возможностей ускорения метода Монте-Карло за счет параллельных вычислений. Для этого сравниваются многопоточные реализации на базе OpenMP, TBB и STL для систем с общей памятью и гибридная MPI+STL-версия для систем с памятью распределенной. 
+
+Критерии сравнения включают время выполнения, масштабируемость на различном числе потоков/процессов и устойчивость к росту размерности. Отдельное внимание уделяется проверке корректности: все параллельные реализации должны статистически соответствовать последовательной версии, а ускорение ключевых этапов (генерация точек, вычисление \( f \)) — приближаться к линейному. 
+
+\newpage
+
+\section{Описание алгоритма}
+
+Алгоритм вычисления многомерного интеграла методом Монте-Карло состоит из четырех ключевых этапов:
+
+\begin{enumerate}
+\item \textbf{Инициализация параметров:}
+\begin{itemize}
+\item $d$ -- размерность пространства,
+\item $N$ -- число случайных выборок,
+\item $[a_k, b_k]$ -- границы интегрирования по каждой координате,
+\item $V = \prod_{k=1}^d (b_k - a_k)$ -- объем области.
+\end{itemize}
+
+\item \textbf{Генерация случайных точек:} Для каждой из $N$ итераций:
+\begin{itemize}
+\item Создается точка $\mathbf{x} = (x_1, ..., x_d)$,
+\item Координаты $x_k$ распределены в $[a_k, b_k]$ (обеспечивается генерацией случайных чисел с помощью \texttt{std::mt19937} и \texttt{std::uniform\_real\_distribution}).
+\end{itemize}
+
+\item \textbf{Вычисление суммы:} Накопление суммы значений функции:
+\[
+S = \sum_{i=1}^N f(\mathbf{x}_i)
+\]
+
+\item \textbf{Усреднение:} Оценка интеграла:
+\[
+I \approx \frac{V \cdot S}{N}
+\]
+\end{enumerate}
+\begin{lstlisting}[language=C++, caption=Ключевой фрагмент реализации]
+std::vector<double> x(dimensions);
+double sum = 0.;
+for (std::size_t i = 0; i < iterations; ++i) {
+  for (std::size_t p = 0; p < dimensions; ++p) {
+    x[p] = dists[p](gen);
+  }
+  sum += func(x);
+}
+res = (vol * sum) / iterations;
+\end{lstlisting}
+
+\newpage
+
+\section{Описание схемы распараллеливания}
+
+Основная идея параллелизации метода Монте-Карло заключается в распределении независимых вычислительных задач между потоками или процессами. Алгоритм допускает декомпозицию на двух уровнях: 
+
+\subsection{Распределение итераций}
+Каждая из \( N \) итераций метода (генерация точки и вычисление \( f(\mathbf{x}_i) \)) является независимой. Это позволяет разделить весь набор итераций на \( p \) блоков, которые обрабатываются параллельно. Например, при использовании \( p \) потоков каждый из них выполняет \( \lceil N/p \rceil \) итераций, что обеспечивает естественное распараллеливание без необходимости синхронизации на этапе вычислений.
+
+\subsection{Стратегии редукции}
+Накопление общей суммы \( S = \sum f(\mathbf{x}_i) \) требует синхронизации. Для минимизации накладных расходов применяется двухуровневая схема:
+\begin{itemize}
+\item \textit{Локальные суммы:} Каждый поток вычисляет частичную сумму \( S_k \) в своем блоке итераций.
+\item \textit{Глобальное объединение:} Локальные результаты агрегируются через операции редукции (сложение, атомарные обновления) или передачу данных между процессами в распределенных системах.
+\end{itemize}
+
+\subsection{Генерация случайных чисел}
+Параллельная генерация статистически корректных последовательностей требует:
+\begin{itemize}
+\item \textit{Разделение состояния:} Каждый поток/процесс использует независимый генератор с уникальным зерном для предотвращения перекрытия последовательностей.
+\end{itemize}
+
+\subsection{Масштабируемость}
+Эффективность схемы зависит от соотношения времени вычисления \( f(\mathbf{x}) \) и накладных расходов на:
+\begin{itemize}
+\item Распределение задач между потоками,
+\item Синхронизацию результатов,
+\item Генерацию случайных чисел.
+\end{itemize}
+
+Для задач с высокой вычислительной сложностью \( f(\mathbf{x}) \) (например, моделирование методом Монте-Карло в физике) алгоритм демонстрирует близкое к линейному ускорение. В сценариях с доминирующей генерацией точек критически важна оптимизация параллельных генераторов псевдослучайных чисел (например, через предвыделение блоков данных). 
+
+\newpage
+
+\section{Описание OpenMP-версии}
+
+Реализация на OpenMP использует декларативный подход к параллелизму через директивы компилятора. Основной цикл генерации точек и вычисления функции распределяется между потоками автоматически. Директива \texttt{\#pragma omp parallel} создает пул потоков, каждый из которых получает локальную копию генератора случайных чисел \texttt{gen} благодаря модификатору \texttt{firstprivate}. Это гарантирует, что каждый поток работает с независимой последовательностью псевдослучайных значений, избегая конфликтов доступа к общему состоянию генератора.
+
+Распределение итераций цикла между потоками осуществляется через директиву \texttt{\#pragma omp for}, которая динамически разделяет диапазон \( N \) на блоки. Для объединения частичных сумм, вычисленных в каждом потоке, применяется редукция с операцией сложения — \texttt{reduction(+:sum)}. Механизм редукции в OpenMP автоматически создает приватные переменные для потоков и агрегирует результаты после завершения параллельной секции, минимизируя накладные расходы на синхронизацию.
+
+Важным аспектом является потокобезопасность генерации точек. Вектор координат \texttt{x} объявлен внутри параллельной секции, что обеспечивает его локальность для каждого потока. Это предотвращает состояние гонки при обновлении памяти, так как каждый поток оперирует собственной копией данных. Генераторы \texttt{std::mt19937} инициализируются через \texttt{std::random\_device}, что гарантирует уникальность зерен даже при одновременном создании в нескольких потоках.
+
+К преимуществам данной реализации относится минимализм кода — всего две директивы OpenMP обеспечивают эффективное распараллеливание.
+
+\begin{lstlisting}[language=C++, caption=Фрагмент OMP-реализации]
+#pragma omp parallel firstprivate(gen)
+{
+  std::vector<double> x(dimensions);
+  #pragma omp for reduction(+ : sum)
+  for (std::int64_t _ = 0; _ < iterations; ++_) {
+    for (std::size_t p = 0; p < dimensions; ++p) {
+      x[p] = dists[p](gen);
+    }
+    sum += func(x); 
+  }
+}
+\end{lstlisting}
+
+\newpage
+
+\section{Описание TBB-версии}
+
+Реализация на Intel Threading Building Blocks (TBB) использует модель задач (task-based parallelism) с явным управлением пулом потоков через \texttt{task\_arena}. Основной цикл параллелизуется с помощью шаблона \texttt{parallel\_reduce}, который автоматически разделяет диапазон итераций и объединяет частичные суммы. 
+
+Инициализация \texttt{task\_arena} порождает изолированную среду выполнения с контролируемым числом потоков, что позволяет явно задавать параллелизм для вложенных вычислений. Метод \texttt{parallel\_reduce} разделяет общий диапазон \( N \) итераций на блоки, размер которых адаптивно определяется на основе числа доступных потоков (\texttt{max\_concurrency}). Это обеспечивает оптимизацию под кэш процессора за счет локализации данных внутри каждого блока. Каждый поток получает собственную копию генератора случайных чисел через захват \texttt{local\_gen = gen} внутри лямбда-выражения.
+
+Механизм редукции реализован через бинарную операцию \texttt{std::plus<>}, которая суммирует частичные результаты из всех блоков. TBB автоматически обрабатывает синхронизацию, совмещая вычисления с объединением промежуточных результатов для минимизации простоев. Вектор координат \texttt{x} объявлен внутри тела задачи, обеспечивая локальность данных для каждого потока.
+
+\begin{lstlisting}[language=C++, caption=Фрагмент TBB-реализации]
+tbb::task_arena arena(ppc::util::GetPPCNumThreads());
+const double sum = arena.execute([&] {
+  return tbb::parallel_reduce(
+    tbb::blocked_range<std::size_t>(0, iterations,
+      iterations / tbb::this_task_arena::max_concurrency()
+    ),
+    0.0,
+    [&](const tbb::blocked_range<std::size_t>& r, double partial_sum) {
+      auto local_gen = gen;
+      std::vector<double> x(dimensions);
+      for (std::size_t _ = r.begin(); _ < r.end(); ++_) {
+        for (std::size_t p = 0; p < dimensions; ++p) {
+          x[p] = dists[p](local_gen);
+        }
+        partial_sum += func(x);
+      }
+      return partial_sum;
+    },
+    std::plus<>());
+});
+
+res = (vol * sum) / static_cast<double>(iterations);
+\end{lstlisting}
+
+\newpage
+
+\section{Описание STL-версии}
+
+Реализация на базе стандартной библиотеки C++ (STL) использует низкоуровневый подход к многопоточности через \texttt{std::thread}, \texttt{std::promise} и \texttt{std::future}. В отличие от декларативных моделей OpenMP и TBB, параллелизм управляется вручную: явно задается число потоков, распределяются задачи и синхронизируются результаты.
+
+\textbf{Распределение итераций.} 
+Общее число выборок \( N \) делится на \( p \) потоков с балансировкой нагрузки: каждому потоку назначается \( \lfloor N/p \rfloor \) итераций, а остаток \( N \% p \) распределяется равномерно, по одной дополнительной итерации на первые \( N \% p \) потоков. Это гарантирует отклонение не более одной итерации между потоками. Например, для \( N = 100 \) и \( p = 8 \): 13 итераций для 4 потоков и 12 — для остальных.
+
+\textbf{Механизм передачи данных.} 
+Все потоки получают собственные \texttt{std::promise}, через которые потоки возвращают частичную сумму. Основной поток извлекает результаты с помощью ассоциированных объектов \texttt{std::future}, обеспечивая синхронизацию через неблокирующие ожидание. Функция \texttt{std::transform\_reduce} агрегирует результаты всех потоков в общую сумму.
+
+\textbf{Потокобезопасность.} 
+Локальные копии генератора \texttt{std::mt19937} (\texttt{local\_gen = gen}) создаются внутри каждого потока, предотвращая конфликты доступа. Вектор координат \texttt{x} объявляется внутри потока, исключая разделение памяти.
+
+В сравнении с OMP/TBB, STL обеспечивает максимальный контроль над параллелизмом, но требует ручного управления.
+
+\begin{lstlisting}[language=C++, caption=Фрагмент STL-реализации]
+const auto calculation_thread = [&](std::size_t local_iterations,
+                                    std::promise<double>&& promise) {
+  auto local_gen = gen;
+  std::vector<double> x(dimensions);
+  double partial_sum = 0.;
+  for (std::size_t _ = 0; _ < local_iterations; ++_) {
+    generate_point(x, local_gen, dists); 
+    partial_sum += func(x);
+  }
+  promise.set_value(partial_sum);
+};
+
+std::vector<std::thread> threads(workers);
+for (std::size_t i = 0; i < workers; ++i) {
+  std::promise<double> promise;
+  futures[i] = promise.get_future();
+  threads[i] = std::thread(calculation_thread,
+                           assigned,
+                           std::move(promise));
+}
+
+const double sum = std::transform_reduce(
+  futures.begin(), futures.end(), 0.,
+  std::plus{}, [](auto& f) { return f.get(); }
+);
+\end{lstlisting}
+
+\section{Описание гибридной MPI+STL версии}
+
+Реализация сочетает распределенные вычисления через MPI с многопоточностью на уровне узлов, используя двухуровневую модель параллелизма. 
+
+\subsection{Распределение задач между узлами}
+\begin{itemize}
+\item Главный процесс (ранг 0) рассылает параметры задачи (границы интегрирования, размерность \( d \), функцию \( f \)) через \texttt{boost::mpi::broadcast}.
+\item Глобальное число итераций \( N \) делится между узлами с балансировкой остатка. Каждый узел получает \( \lfloor N/p_{\text{MPI}} \rfloor \) итераций, где \( p_{\text{MPI}} \) — число MPI-процессов. Остаток распределяется по одному на первые \( N \% p_{\text{MPI}} \) узлов.
+\end{itemize}
+
+\subsubsection{Параллелизм внутри узла}
+\begin{itemize}
+\item На каждом узле задача делится между \( p_{\text{threads}} \) потоками через \texttt{std::thread}, аналогично чистой STL-реализации.
+\item Локальные суммы потоков агрегируются через \texttt{std::transform\_reduce}.
+\item Генераторы случайных чисел инициализируются через \texttt{std::random\_device}, но требуют явного смещения зерен на основе ранга MPI и ID потока для предотвращения корреляции.
+\end{itemize}
+
+\subsubsection{Сбор результатов}
+\begin{itemize}
+\item Частичные суммы с узлов собираются на процессе 0 через \texttt{boost::mpi::reduce} с операцией сложения.
+\item Итоговый интеграл вычисляется только на ранге 0: 
+\[
+I \approx \frac{V \cdot \sum S_i}{N}, \quad S_i \text{ — сумма с } i\text{-го узла}.
+\]
+\end{itemize}
+
+\begin{lstlisting}[language=C++, caption=Основные моменты реализации с MPI+STL]
+boost::mpi::broadcast(world_, params, 0);
+
+const auto node_iterations = global_iterations / nodes
+                             + (rank < threshold ? 1 : 0);
+
+std::vector<std::thread> threads(node_workers);
+for (auto& thread : threads) {
+  thread = std::thread(calculation_thread, ...);
+}
+
+double sum{};
+boost::mpi::reduce(world_, partial_sum, sum, std::plus{}, 0);
+\end{lstlisting}
+
+% Результаты экспериментов
+\section{Результаты экспериментов}
+\textbf{Проведенные эксперименты.}
+Для оценки производительности и корректности работы параллельной версии алгоритма были проведены следующие эксперименты:
+
+\begin{enumerate}
+\item\textbf{Функциональные тесты:}
+\begin{itemize}
+\item Проверка корректности работы алгоритма на наборе тестовых данных. 
+\item Использовались различные сочетания входных данных — функций, пределов интегрирования, и числа итераций.
+
+\end{itemize}
+
+\item\textbf{Тесты производительности:}
+\begin{itemize}
+\item Оценка времени выполнения алгоритма в параллельном и последовательном режимах.
+\item Сравнение результатов и времени работы для определения преимуществ параллельной версии.
+\item Каждое исполнение тестировалось в течение 10 итераций, чтобы получить статистически значимые данные о производительности.
+\end{itemize}
+\end{enumerate}
+
+\textbf{Подтверждение корректности.}
+Корректность работы алгоритма верифицируется двумя способами:
+\begin{enumerate}
+\item Сравнение результата работы алгоритма с заранее известными ожидаемыми результатами для тестового набора.
+\item Сравнение результата работы параллельного алгоритма с результатом работы последовательного.
+\item Многократное повторение экспериментов для выявления случайных ошибок.
+\end{enumerate}
+
+
+\subsection{Методика тестирования}
+Эксперименты проводились на вычислительной машине на базе CPU Intel Core i7-13650HX (14 ядер, 2.6 ГГц). Параметры:
+\begin{itemize}
+\item \textbf{Число итераций:} \(10 800 000\).
+\item \textbf{Подынтегральная функция:} $f(\mathbf{x}) = \ln x_1 + \sin x_2 + \cos x_3 + \tan x_4 + e^{x_5}, \quad \mathbf{x} = (x_1, \dots, x_5) \in \mathbb{R}^5$.
+\item \textbf{Пределы интегрирования:} $0 \leq x_i \leq 1, \quad i = 1, 2, 3, 4, 5$.
+\item \textbf{Конфигурации:} 
+\begin{itemize}
+\item OpenMP/TBB/STL: 1–16 потоков на одном узле.
+\item MPI+STL: 2-4 узлов, по 1-4 потоков на узел.
+\end{itemize}
+\end{itemize}
+
+\subsection{Анализ производительности}
+
+
+\begin{table}[H]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{0.95\textwidth}{@{}l>{\raggedright}Xrrr@{}}
+\toprule
+\textbf{Версия} & \textbf{Конфигурация} & \textbf{PipelineRun (с)} & \textbf{TaskRun (с)} & \textbf{Ускорение} \\ 
+\midrule
+Последовательная & — & 4.113 & 4.111 & 1.00 \\
+\midrule
+
+OpenMP 
+  & 2 потока & 2.3297 & 2.219 & 1.85 \\
+  & 4 потока & 1.5745 & 1.154 & 3.56 \\
+  & 8 потоков & 1.1742 & 1.495 & 2.74 \\
+  & 16 потоков & 1.1742 & 1.018 & 4.03 \\
+\midrule
+
+TBB 
+  & 2 потока & 2.190 & 2.181 & 1.88 \\
+  & 4 потока & 1.101 & 1.090 & 3.77 \\
+  & 8 потоков & 0.933 & 0.935 & 4.39 \\
+  & 16 потоков & 0.593 & 0.595 & 6.90 \\
+\midrule
+
+STL
+  & 2 потока & 1.5745 & 2.285 & 1.80 \\
+  & 4 потокоа & 1.1742 & 0.960 & 4.28 \\
+  & 8 потоков & 1.1742 & 0.617 & 6.66 \\
+  & 16 потоков & 2.3297 & 0.590 & 6.96 \\
+\midrule
+
+MPI + OMP 
+  & 2 потока × 2 процесса & 1.194 & 1.192 & 3.44 \\
+  & 2 потока × 4 процесса & 1.244 & 1.240 & 3.31 \\
+  & 4 потока × 2 процесса & 0.942 & 0.937 & 4.38 \\
+  & 4 потока × 4 процесса & 0.655 & 0.649 & 6.33 \\
+\bottomrule
+
+\end{tabularx}
+\caption{Сравнение производительности}
+\label{table:benchmark}
+\end{table}
+
+\subsection{Выводы из результатов}
+
+Результаты демонстрируют следующие закономерности: \\
+
+\textbf{OpenMP:} 
+\begin{itemize}
+\item На 4 потоках достигнуто максимальное ускорение 3.73× (1.101 секунды против 4.111 секунды в последовательной версии), что соответствует 93\% эффективности.
+\item Рост до 8 потоков приводит к \textit{деградации производительности} (1.495 с) из-за конкуренции за ресурсы гипертрединга.
+\item На 16 потоках ускорение 6.96× подтверждает ограничения масштабируемости на CPU с 16 физическими ядрами.
+\end{itemize}
+
+\textbf{TBB:} 
+\begin{itemize}
+\item Превосходит OpenMP на всех конфигурациях: 16 потоков дают ускорение 6.91× (0.595 с) с эффективностью 43.2\%.
+\item Лучшая оптимизация планировщика задач: на 8 потоках TBB на 37.5\% быстрее OpenMP (0.935 с vs 1.495 с).
+\end{itemize}
+
+\textbf{STL:} 
+\begin{itemize}
+\item Ручное управление потоками уступает TBB: на 16 потоках время 0.617 с (6.66×) против 0.595 с у TBB.
+\item Сравнимое с OpenMP масштабирование на малом числе потоков (4 потока: 1.189 с vs 1.154 с).
+\end{itemize}
+
+\textbf{MPI+STL:} 
+\begin{itemize}
+\item Гибридный подход 4×4 (4 процесса × 4 потока) дает ускорение 6.33× (0.649 с), уступая чисто потоковым реализациям.
+\item Неоптимальная балансировка: конфигурация 2×4 (1.240 с) медленнее 2×2 (1.192 с) из-за накладных расходов.
+\end{itemize}
+
+\textbf{Итог:}
+\begin{enumerate}
+\item TBB демонстрирует наилучшую масштабируемость благодаря адаптивному планировщику задач.
+\item Гибридный MPI+STL требует тщательного подбора соотношения процессов/потоков.
+\item Рост числа потоков свыше физических ядер (16) не дает значительного прироста.
+\end{enumerate}
+
+\newpage
+
+\section{Заключение}
+
+В ходе работы были исследованы различные подходы к распараллеливанию алгоритма многомерного интегрирования методом Монте-Карло. Реализованы четыре версии: на базе OpenMP, TBB, STL и гибридная MPI+STL. Экспериментальные результаты подтвердили, что параллельные вычисления позволяют достичь значительного ускорения — до 6.9× для TBB и 6.3× для MPI+STL — при обработке выборок размером \( N = 10^9 \) в 5-мерном пространстве.
+
+\begin{itemize}
+\item \textbf{TBB} продемонстрировал наилучшую масштабируемость благодаря оптимизированному планировщику задач, превзойдя OpenMP на 37.5\% при 8 потоках.
+\item \textbf{OpenMP} показал высокую эффективность (до 89\%) на малом числе потоков.
+\item \textbf{STL} требует ручной оптимизации, однако обеспечивает гибкость, сравнимую с TBB.
+\item \textbf{MPI+STL} эффективен для распределенных систем, но критически зависим от балансировки нагрузки между процессами и потоками.
+\end{itemize}
+
+Результаты подтверждают, что выбор технологии должен определяться параметрами задачи:
+\begin{itemize}
+\item Для одноузловых CPU-систем оптимальны TBB или OpenMP,
+\item Для распределенных кластеров — гибридный MPI+STL подход,
+\item STL целесообразен при необходимости низкоуровневого контроля.
+\end{itemize}
+
+\newpage
+
+\section{Список литературы}
+\begin{enumerate}
+\bibitem{omp} OpenMP Architecture Review Board. OpenMP Specifications. \\ 
+\url{https://www.openmp.org/specifications/}
+
+\bibitem{tbb} Intel® oneAPI Threading Building Blocks (TBB) Documentation. \\ 
+\url{https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb}
+
+\bibitem{stl} C++ Standard Library Reference — cppreference.com. \\ 
+\url{https://en.cppreference.com/w/}
+
+\bibitem{boost_mpi} Boost C++ Libraries. Boost.MPI Documentation. \\ 
+\url{https://www.boost.org/doc/libs/release/libs/mpi/}
+
+\item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks}. — Нижний Новгород, 2007.
+\end{enumerate}
+
+\newpage
+
+\section{Приложение}
+
+\subsection{mci\_common.cpp}
+\begin{lstlisting}[language=C++]
+#include "../include/mci_common.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <random>
+
+bool krylov_m_monte_carlo::TaskCommon::ValidationImpl() {
+	return std::ranges::all_of(IntegrationParams::FromTaskData(*task_data).bounds,
+	[](const Bound& bound) { return bound.second >= bound.first; });
+}
+
+bool krylov_m_monte_carlo::TaskCommon::PreProcessingImpl() {
+	params = &IntegrationParams::FromTaskData(*task_data);
+	res = {};
+	vol = 1.;
+	//
+	const std::size_t dimensions = params->Dimensions();
+	dists.resize(dimensions);
+	//
+	
+	auto dist_it = dists.begin();
+	for (const auto& bound : params->bounds) {
+		*(dist_it++) = std::uniform_real_distribution<double>{bound.first, bound.second};
+		vol *= bound.second - bound.first;
+	}
+	
+	return true;
+}
+
+bool krylov_m_monte_carlo::TaskCommon::PostProcessingImpl() {
+	IntegrationParams::OutputOf(*task_data) = res;
+	return true;
+}	
+\end{lstlisting}
+
+\subsection{mci\_seq.cpp}
+\begin{lstlisting}[language=C++]
+#include "../include/mci_seq.hpp"
+
+#include <cmath>
+#include <cstddef>
+#include <random>
+#include <vector>
+
+bool krylov_m_monte_carlo::TaskSequential::RunImpl() {
+	const auto dimensions = params->Dimensions();
+	const auto iterations = params->iterations;
+	const auto func = params->func;
+	
+	std::random_device dev;
+	std::mt19937 gen(dev());
+	
+	std::vector<double> x(dimensions);
+	double sum = 0.;
+	for (std::size_t _ = 0; _ < iterations; ++_) {
+		for (std::size_t p = 0; p < dimensions; ++p) {
+			x[p] = dists[p](gen);
+		}
+		sum += func(x);
+	}
+	
+	res = (vol * sum) / static_cast<double>(iterations);
+	
+	return true;
+}
+\end{lstlisting}
+
+\subsection{mci\_omp.cpp}
+\begin{lstlisting}[language=C++]
+#include "../include/mci_omp.hpp"
+
+#include <omp.h>
+
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <random>
+#include <vector>
+
+#include "../include/mci_common.hpp"
+
+bool krylov_m_monte_carlo::TaskOpenMP::ValidationImpl() {
+	return IntegrationParams::FromTaskData(*task_data).iterations <=
+	static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max()) &&
+	TaskCommon::ValidationImpl();
+}
+
+bool krylov_m_monte_carlo::TaskOpenMP::RunImpl() {
+	const auto dimensions = params->Dimensions();
+	const auto iterations = static_cast<std::int64_t>(params->iterations);
+	const auto func = params->func;
+	
+	std::random_device dev;
+	std::mt19937 gen(dev());
+	
+	double sum = 0.;
+	#pragma omp parallel firstprivate(gen)
+	{
+		std::vector<double> x(dimensions);
+		#pragma omp for reduction(+ : sum)
+		for (std::int64_t _ = 0; _ < iterations; ++_) {
+			for (std::size_t p = 0; p < dimensions; ++p) {
+				x[p] = dists[p](gen);
+			}
+			sum += func(x);
+		}
+	}
+	
+	res = (vol * sum) / static_cast<double>(iterations);
+	
+	return true;
+}
+\end{lstlisting}
+
+\subsection{mci\_tbb.cpp}
+\begin{lstlisting}[language=C++]
+#include "../include/mci_tbb.hpp"
+
+#include <oneapi/tbb/parallel_reduce.h>
+#include <oneapi/tbb/task_arena.h>
+#include <tbb/tbb.h>
+
+#include <cmath>
+#include <cstddef>
+#include <functional>
+#include <random>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+#include "oneapi/tbb/blocked_range.h"
+#include "oneapi/tbb/parallel_for.h"
+#include "oneapi/tbb/partitioner.h"
+
+bool krylov_m_monte_carlo::TaskTBB::RunImpl() {
+	const auto dimensions = params->Dimensions();
+	const auto iterations = params->iterations;
+	const auto func = params->func;
+	
+	std::random_device dev;
+	std::mt19937 gen(dev());
+	
+	oneapi::tbb::task_arena arena(ppc::util::GetPPCNumThreads());
+	const double sum = arena.execute([&] {
+		return oneapi::tbb::parallel_reduce(
+		oneapi::tbb::blocked_range<std::size_t>(0, iterations,
+		iterations / oneapi::tbb::this_task_arena::max_concurrency()),
+		0.0,
+		[&](const tbb::blocked_range<std::size_t>& r, double partial_sum) {
+			auto local_gen = gen;
+			std::vector<double> x(dimensions);
+			for (std::size_t _ = r.begin(); _ < r.end(); ++_) {
+				for (std::size_t p = 0; p < dimensions; ++p) {
+					x[p] = dists[p](local_gen);
+				}
+				partial_sum += func(x);
+			}
+			return partial_sum;
+		},
+		std::plus<>());
+	});
+	
+	res = (vol * sum) / static_cast<double>(iterations);
+	
+	return true;
+}
+\end{lstlisting}
+
+\subsection{mci\_stl.cpp}
+\begin{lstlisting}[language=C++]
+#include "../include/mci_stl.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <functional>
+#include <future>
+#include <numeric>
+#include <random>
+#include <thread>
+#include <utility>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+bool krylov_m_monte_carlo::TaskSTL::RunImpl() {
+	const auto dimensions = params->Dimensions();
+	const auto iterations = params->iterations;
+	const auto func = params->func;
+	
+	std::random_device dev;
+	std::mt19937 gen(dev());
+	
+	const auto calculation_thread = [&](std::size_t local_iterations, std::promise<double> &&promise) {
+		auto local_gen = gen;
+		std::vector<double> x(dimensions);
+		double partial_sum = 0.;
+		for (std::size_t _ = 0; _ < local_iterations; ++_) {
+			for (std::size_t p = 0; p < dimensions; ++p) {
+				x[p] = dists[p](local_gen);
+			}
+			partial_sum += func(x);
+		}
+		
+		promise.set_value(partial_sum);
+	};
+	
+	const std::size_t workers = ppc::util::GetPPCNumThreads();
+	std::vector<std::future<double>> futures(workers);
+	{
+		const std::size_t amount = iterations / workers;
+		const std::size_t threshold = iterations % workers;
+		
+		std::vector<std::thread> threads(workers);
+		for (std::size_t i = 0; i < workers; i++) {
+			const std::size_t assigned = amount + ((i < threshold) ? 1 : 0);
+			std::promise<double> promise;
+			futures[i] = promise.get_future();
+			threads[i] = std::thread(calculation_thread, assigned, std::move(promise));
+		}
+		std::ranges::for_each(threads, [](auto &thread) { thread.join(); });
+	}
+	
+	const double sum = std::transform_reduce(futures.begin(), futures.end(), 0., std::plus{},
+	[](std::future<double> &future) { return future.get(); });
+	
+	res = (vol * sum) / static_cast<double>(iterations);
+	
+	return true;
+}
+\end{lstlisting}
+
+\subsection{mci\_all.cpp}
+\begin{lstlisting}[language=C++]
+#include "../include/mci_all.hpp"
+
+#include <algorithm>
+#include <boost/mpi/collectives/broadcast.hpp>
+#include <boost/mpi/collectives/reduce.hpp>
+#include <boost/serialization/utility.hpp>
+#include <boost/serialization/vector.hpp>
+#include <cmath>
+#include <cstddef>
+#include <functional>
+#include <future>
+#include <numeric>
+#include <random>
+#include <thread>
+#include <utility>
+#include <vector>
+
+#include "../include/mci_common.hpp"
+#include "core/util/include/util.hpp"
+
+bool krylov_m_monte_carlo::TaskALL::ValidationImpl() { return world_.rank() != 0 || TaskCommon::ValidationImpl(); }
+
+bool krylov_m_monte_carlo::TaskALL::PreProcessingImpl() {
+	if (world_.rank() == 0) {
+		return TaskCommon::PreProcessingImpl();
+	}
+	
+	// just for func
+	params = &IntegrationParams::FromTaskData(*task_data);
+	return true;
+}
+
+bool krylov_m_monte_carlo::TaskALL::PostProcessingImpl() {
+	return world_.rank() != 0 || TaskCommon::PostProcessingImpl();
+}
+
+bool krylov_m_monte_carlo::TaskALL::RunImpl() {
+	const auto func = params->func;
+	boost::mpi::broadcast(world_, params, 0);
+	if (world_.rank() != 0) {
+		params->func = func;
+		ApplyParams();
+	}
+	
+	const auto dimensions = params->Dimensions();
+	
+	const auto global_iterations = params->iterations;
+	const auto node_iterations = [this, &global_iterations] {
+		const auto nodes = world_.size();
+		const std::size_t amount = global_iterations / nodes;
+		const std::size_t threshold = global_iterations % nodes;
+		//
+		return amount + (static_cast<std::size_t>(world_.rank()) < threshold ? 1 : 0);
+	}();
+	
+	std::random_device dev;
+	std::mt19937 gen(dev());
+	
+	const auto calculation_thread = [&](std::size_t local_iterations, std::promise<double>&& promise) {
+		auto local_gen = gen;
+		std::vector<double> x(dimensions);
+		double partial_sum = 0.;
+		for (std::size_t _ = 0; _ < local_iterations; ++_) {
+			for (std::size_t p = 0; p < dimensions; ++p) {
+				x[p] = dists[p](local_gen);
+			}
+			partial_sum += func(x);
+		}
+		
+		promise.set_value(partial_sum);
+	};
+	
+	const std::size_t node_workers = ppc::util::GetPPCNumThreads();
+	std::vector<std::future<double>> futures(node_workers);
+	{
+		const std::size_t amount = node_iterations / node_workers;
+		const std::size_t threshold = node_iterations % node_workers;
+		
+		std::vector<std::thread> threads(node_workers);
+		for (std::size_t i = 0; i < node_workers; i++) {
+			const std::size_t assigned = amount + ((i < threshold) ? 1 : 0);
+			std::promise<double> promise;
+			futures[i] = promise.get_future();
+			threads[i] = std::thread(calculation_thread, assigned, std::move(promise));
+		}
+		std::ranges::for_each(threads, [](auto& thread) { thread.join(); });
+	}
+	
+	const double partial_sum = std::transform_reduce(futures.begin(), futures.end(), 0., std::plus{},
+	[](std::future<double>& future) { return future.get(); });
+	
+	double sum{};
+	boost::mpi::reduce(world_, partial_sum, sum, std::plus{}, 0);
+	
+	res = (vol * sum) / static_cast<double>(global_iterations);
+	
+	return true;
+}
+\end{lstlisting}
+
+\end{document}
