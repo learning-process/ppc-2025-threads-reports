@@ -1,0 +1,776 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
+\usepackage[russian]{babel}
+\usepackage{indentfirst}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{multirow}
+\usepackage{mathptmx}
+\usepackage{tempora}
+\usepackage{geometry}
+
+\geometry{left=2cm, right=2cm, top=2cm, bottom=2cm}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green},
+    stringstyle=\color{red},
+    frame=single,
+    tabsize=2,
+    showstringspaces=false,
+    breaklines=true
+}
+
+\begin{document}
+
+\begin{titlepage}
+    \begin{center}
+        \textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ}\\
+        \textbf{федеральное государственное автономное образовательное учреждение высшего образования}\\
+        \textbf{«Национальный исследовательский Нижегородский государственный университет им. Н. И. Лобачевского»}\\
+        \vspace{0.5cm}
+        Институт информационных технологий, математики и механики\\
+        \vfill
+
+        {\Large \textbf{ОТЧЁТ}}\\
+        \vspace{0.5cm}
+        по практической работе \\ 
+        по курсу Параллельное программирование \\
+        Вариант 30\\
+        Тема: \textit{Построение выпуклой оболочки для компонент бинарного изображения.}
+        \vfill
+
+        \hfill\begin{minipage}{0.3\textwidth}
+        \textbf{Выполнил:}\\
+        студент группы 3822Б1ПР1\\
+        Ворошилов Виталий\\
+        \\
+        \textbf{Проверил:}\\
+        к.т.н., доцент\\
+        Сысоев А.В.
+        \end{minipage}
+
+        \vfill
+        Нижний Новгород\\
+        2025
+    \end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+
+Цель данной работы — разработка параллельного алгоритма построения выпуклых оболочек для компонент связности на бинарном изображении. Эта задача возникает во многих областях обработки изображений и компьютерного зрения, включая распознавание объектов, анализ форм и сегментацию.
+
+\newpage
+       
+\section{Постановка задачи}
+
+В бинарном изображении (где пиксели либо 0, либо 1) компоненты связности представляют собой группы связанных пикселей, которые образуют объекты. То есть на вход подаётся массив пикселей со значениями 0 - чёрный цвет и 1 - белый цвет. В данном решении для нахождения компонент связности используется понятие 8-связности: пиксель входит в компоненту, если он соединен с другими пикселями диагонально, по горизонтали или по вертикали (8 вариантов поиска соседей для пикселя).
+
+Далее на этом изображении можно выделить отдельные белые объекты на чёрном фоне - это компоненты связности.
+
+Таким образом, первая часть задачи - сформировать массив всех компонент связности данного изображения.
+
+Вторая часть задачи - построить выпуклую оболочку для каждой из компонент. Выпуклая оболочка (convex hull) множества точек — это наименьший выпуклый многоугольник, который содержит все точки данного множества.
+
+В результате получаем решение задачи - множество оболочек.
+
+\newpage
+
+\section{Описание алгоритма}
+Алгоритм программы можно описать следующим образом:
+\begin{enumerate}
+    \item поиск компонент связности бинарного изображения:
+        \begin{enumerate}
+            \item обход в цикле всех пикселей изображения (функция `\texttt{FindComponents()}`);
+            \item если попадается пиксель со значением 1, запускается "поиск в глубину" (функция `\texttt{DepthComponentSearch()}`) - реализованный с помощью стека обход всех соседей пикселя (8 вариантов), а затем обход соседей соседей и так далее, а когда соседей не останется - возврат обратно по стеку к изначально обнаруженному пикселю. При этом все просмотренные пиксели обнуляются, поэтому при дальнейшем проходе по всем пикселям изображения они уже не будут учтены (так как данная компонента уже полностью найдена).
+        \end{enumerate}
+    \item построение выпуклых оболочек для всех найденных компонент с помощью алгоритма "быстрой выпуклой оболчки" (функция `\texttt{QuickHull()}`):
+        \begin{enumerate}
+            \item Соединить крайние точки (крайнюю левую и крайнюю правую) отрезком;
+            \item Разделить остальные точки на две группы - те, что находятся выше этого отрезка, и те, что находятся ниже (разделяем по известным геометрическим формулам);
+            \item Для обоих групп точек находим самую удалённую от отрезка точку (находим по известной геометрической формуле), соединяем её с вершинами отрезка, получая треугольник, и удаляем из рассмотрения все точки внутри этого треугольника;
+            \item Пункт (c) повторяется для оставшихся вне треугольника точек, пока они вообще остаются.
+        \end{enumerate}
+\end{enumerate}
+
+В результате получаем решение задачи - множество оболочек
+
+\newpage
+
+\section{Описание схемы параллельного алгоритма}
+
+В ходе работы алгоритм решения данной задачи модифицировался для того чтобы использовать возможности параллельного исполнения. При параллельном исполнении работа может разделяться на несколько имеющихся "вычислительных сущностей", что может влиять на время работы программы.
+
+Параллельный алгоритм решения задачи:
+\begin{enumerate}
+    \item Поиск компонент по "полосам" изображения в функции `\texttt{FindComponents()}` (итерации зависимы, после поиска каждая "вычислительная сущность" получает локальный массив компонент для своей полосы и затем следует последовательный алгоритм склейки компонент на границах полос);
+    \item Построение оболочки для каждой из компонент в функции `\texttt{QuickHullAll()}` (итерации независимы, найденные компоненты разделяются на части и каждая "вычислительная сущность" получает свою часть и строит для неё оболочки).
+\end{enumerate}
+
+\newpage
+
+\section{Описание программной реализации}
+\subsection{Версия OpenMP}
+
+OMP-версия программы реализована на языке программирования \texttt{C++} с помощью стандарта \texttt{OpenMP} и предполагает параллельное выполнение кода программы несколькими потоками с общей памятью.
+
+Алгоритм работы параллельной OMP-программы можно описать следующим образом:
+
+\begin{enumerate}
+    \item Создание объекта \texttt{Image} в конструкторе \texttt{Image::Image()}: распараллеливание независимых итераций цикла по полосам изображения с помощью директивы \texttt{\#pragma omp parallel for}; (см. приложение~\nameref{appendix:omp_1})
+    \item Поиск компонент по "полосам" изображения в функции \texttt{FindComponentsOMP()}: распараллеливание цикла по полосам изображения с помощью директивы \texttt{\#pragma omp parallel} и запуска функции \texttt{FindComponentsInArea()} для своей полосы; каждый поток получает локальный массив компонент для своей полосы, затем из-за зависимости итераций (т.к. компоненты из разных полос могли изначально пересекаться) запускается последовательный алгоритм склейки компонент на границах полос; (см. приложение~\nameref{appendix:omp_2})
+    \item Построение оболочки для каждой из компонент в функции \texttt{QuickHullAllOMP()}: распараллеливание независимых итераций цикла по компонентам с помощью директивы \texttt{\#pragma omp parallel for schedule(dynamic)} и запуск \texttt{QuickHull()} для компонент; (см. приложение~\nameref{appendix:omp_3})
+    \item Формирование единой структуры ответа в функции \texttt{PackHulls()}: распараллеливание зависимых итераций цикла по найденным оболочкам с помощью директивы \texttt{\#pragma omp parallel for}, реализуется синхронизация обновления глобально уникального счётчика для однозначной идентификации каждой из оболочек в ответе; единая структура ответа необходима, т.к. размерность ответа изначально неизвестна, ведь на изображении сгенерированном случайным образом неизвестно количество компонент и соответственно неизвестно количество точек которые попадут в ответ как составляющие оболочек, поэтому массив результирующих точек отображается на изображение и в результате ответ имеет размер равный размеру исходного изображения; (см. приложение~\nameref{appendix:omp_4})
+\end{enumerate}
+
+\newpage
+
+\subsection{Версия TBB}
+
+TBB-версия программы реализована на языке программирования \texttt{C++} с помощью библиотеки \texttt{Intel Threading Building Blocks} и предполагает параллельное выполнение кода программы несколькими потоками с общей памятью.
+
+Алгоритм работы параллельной TBB-программы можно описать следующим образом:
+
+\begin{enumerate}
+    \item Создание объекта \texttt{Image} в конструкторе \texttt{Image::Image()}: распараллеливание независимых итераций цикла по полосам изображения с помощью функции \texttt{oneapi::tbb::parallel\_for()}; (см. приложение~\nameref{appendix:tbb_1})
+    \item Поиск компонент по "полосам" изображения в функции \texttt{FindComponentsTBB()}: распараллеливание цикла по полосам изображения с помощью функции \texttt{oneapi::tbb::parallel\_for()} и запуска функции \texttt{FindComponentsInArea()} для своей полосы; каждый поток получает локальный массив компонент для своей полосы, затем из-за зависимости итераций (т.к. компоненты из разных полос могли изначально пересекаться) запускается последовательный алгоритм склейки компонент на границах полос; (см. приложение~\nameref{appendix:tbb_2})
+    \item Построение оболочки для каждой из компонент в функции \texttt{QuickHullAllTBB()}: распараллеливание независимых итераций цикла по компонентам с помощью функции \texttt{oneapi::tbb::parallel\_for()} и запуск \texttt{QuickHull()} для компонент; (см. приложение~\nameref{appendix:tbb_3})
+    \item Формирование единой структуры ответа в функции \texttt{PackHulls()}: распараллеливание зависимых итераций цикла по найденным оболочкам с помощью функции \texttt{oneapi::tbb::parallel\_for()}, реализуется синхронизация обновления глобально уникального счётчика для однозначной идентификации каждой из оболочек в ответе; единая структура ответа необходима, т.к. размерность ответа изначально неизвестна, ведь на изображении сгенерированном случайным образом неизвестно количество компонент и соответственно неизвестно количество точек которые попадут в ответ как составляющие оболочек, поэтому массив результирующих точек отображается на изображение и в результате ответ имеет размер равный размеру исходного изображения; (см. приложение~\nameref{appendix:tbb_4})
+\end{enumerate}
+
+\newpage
+
+\subsection{Версия STL}
+
+STL-версия программы реализована на языке программирования \texttt{C++} с помощью \texttt{std::thread} из стандартной библиотеки и предполагает параллельное выполнение кода программы несколькими потоками с общей памятью.
+
+Алгоритм работы параллельной STL-программы можно описать следующим образом:
+
+\begin{enumerate}
+    \item Создание объекта \texttt{Image} в конструкторе \texttt{Image::Image()}: распараллеливание независимых итераций цикла по полосам изображения посредством запуска на потоках \texttt{std::vector<std::thread> threads} части итераций; (см. приложение~\nameref{appendix:stl_1})
+    \item Поиск компонент по "полосам" изображения в функции \texttt{FindComponentsSTL()}: распараллеливание цикла по полосам изображения посредством запуска на потоках \texttt{std::vector<std::thread> threads} части итераций и запуска функции \texttt{FindComponentsInArea()} для своей полосы; каждый поток получает локальный массив компонент для своей полосы, затем из-за зависимости итераций (т.к. компоненты из разных полос могли изначально пересекаться) запускается последовательный алгоритм склейки компонент на границах полос; (см. приложение~\nameref{appendix:stl_2})
+    \item Построение оболочки для каждой из компонент в функции \texttt{QuickHullAllSTL()}: распараллеливание независимых итераций цикла по компонентам посредством запуска на потоках \texttt{std::vector<std::thread> threads} части итераций и запуск \texttt{QuickHull()} для компонент; (см. приложение~\nameref{appendix:stl_3})
+    \item Формирование единой структуры ответа в функции \texttt{PackHulls()}: распараллеливание зависимых итераций цикла по найденным оболочкам посредством запуска на потоках \texttt{std::vector<std::thread> threads} части итераций, реализуется синхронизация обновления глобально уникального счётчика для однозначной идентификации каждой из оболочек в ответе; единая структура ответа необходима, т.к. размерность ответа изначально неизвестна, ведь на изображении сгенерированном случайным образом неизвестно количество компонент и соответственно неизвестно количество точек которые попадут в ответ как составляющие оболочек, поэтому массив результирующих точек отображается на изображение и в результате ответ имеет размер равный размеру исходного изображения; (см. приложение~\nameref{appendix:stl_4})
+\end{enumerate}
+
+\newpage
+
+\subsection{Версия MPI+OMP}
+
+MPI+OMP-версия программы реализована на языке программирования \texttt{C++} с помощью библиотеки \texttt{boost::mpi} и стандарта \texttt{OpenMP} и предполагает параллельное выполнение кода программы несколькими процессами с разделённой памятью, на каждом из которых работает несколько потоков с общей памятью.
+
+Алгоритм работы параллельной MPI+OMP-программы можно описать следующим образом:
+
+\begin{enumerate}
+    \item Создание объекта \texttt{Image} в конструкторе \texttt{Image::Image()}: распараллеливание независимых итераций цикла по полосам изображения с помощью директивы \texttt{\#pragma omp parallel for}; (см. приложение~\nameref{appendix:mpi_1})
+    \item Поиск компонент по "полосам" изображения в функции \texttt{FindComponentsOMP()}: распараллеливание цикла по полосам изображения с помощью директивы \texttt{\#pragma omp parallel} и запуска функции \texttt{FindComponentsInArea()} для своей полосы; каждый поток получает локальный массив компонент для своей полосы, затем из-за зависимости итераций (т.к. компоненты из разных полос могли изначально пересекаться) запускается последовательный алгоритм склейки компонент на границах полос; (см. приложение~\nameref{appendix:mpi_2})
+    \item Построение оболочки для каждой из компонент в функции \texttt{QuickHullAllMPIOMP()}: распараллеливание независимых итераций цикла по компонентам между процессами (итерации распределяются по процессам с помощью функции \texttt{boost::mpi::scatter()}, затем процесс распараллеливает внутри себя цикл с помощью директивы \texttt{\#pragma omp parallel for schedule(dynamic)} и запускает \texttt{QuickHull()} для компонент, в результате чего у каждого процесса находится локальный вектор оболочек, затем все процессы отправляют свои локальные векторы root-процессу с помощью функции \texttt{boost::mpi::gather()}, в итоге на root-процессе имеется полноценный ответ на задачу; (см. приложение~\nameref{appendix:mpi_3})
+\end{enumerate}
+
+\newpage
+
+\section{Результаты экспериментов}
+\subsection{Алгоритм проверки корректности}
+Для тестирования корректности работы алгоритма использовались простейшие целочисленные векторы пикселей небольшой размерности. 
+
+Также корректность выполнения была проверена на реальных изображениях с использованием библиотеки \texttt{OpenCV}, которая позволила:
+\begin{enumerate}
+    \item загрузить исходное изображение из файла;
+    \item перевести его в оттенки серого, затем бинаризовать (сделать чёрно-белым);
+    \item записать значения пикселей получившегося бинарного изображения в целочисленный массив, который и будет подан на вход алгоритма;
+    \item нарисовать на исходном изображении оболочку (рисуются точки, которые выдал алгоритм, и затем они соединяются отрезками), и получившееся изображение сравнить с ожидаемым результирующим изображением (предварительно тоже загруженным из файла); также для проверки использовалось сравнение с неверным ожидаемым изображением, и в таком случае результат сравнения ожидался отрицательный.
+\end{enumerate}
+(см. приложение~\nameref{appendix:image_run_test})
+
+\subsection{Алгоритм проверки производительности}
+Кроме тестов корректности, были проведены тесты производительности на больших массивах пикселей:
+\begin{enumerate}
+    \item сгенерировать массив пикселей большой размерности;
+    \item запустить алгоритм для сгенерированного массива пикселей, замерить время работы алгоритма;
+    \item проверить корректность ответа с помощью библиотеки \texttt{OpenCV}:
+    \begin{enumerate}
+        \item сгенерированный массив пикселей перевести в бинарное \texttt{OpenCV}-изображение;
+        \item с помощью функционала \texttt{OpenCV} построить оболочки для компонент изображения;
+        \item сравнить результат работы тестируемой программы с заведомо корректным результатом \texttt{OpenCV};
+    \end{enumerate}
+\end{enumerate}
+(см. приложение~\nameref{appendix:generate_rectangles_components})
+
+(см. приложение~\nameref{appendix:get_hulls_with_opencv})
+
+\subsection{Условия тестирования}
+Для тестирования использовалась система:
+\begin{itemize}
+    \item Процессор: Intel Core i5-13500H (12 ядер, 16 логических процессоров);
+    \item Оперативная память: 16 ГБ;
+    \item Операционная система: Windows 11 64-bit;  
+    \item Компилятор: MSVC 19.40.33813
+\end{itemize}
+
+\subsection{Результаты тестов производительности}
+
+Для оценки производительности использовались тесты двух типов:
+\begin{enumerate}
+    \item \texttt{pipeline run} - тест полного цикла работы программы: \texttt{Validation} (проверка корректности входных данных), \texttt{PreProcessing} (подготовка необходимых буферов и копирование входных данных в эти буферы), \texttt{Run} (работа алгоритма) и \texttt{PostProcessing} (формирование выходных данных);
+    \item \texttt{task run} - тест исключительно работы алгоритма \texttt{Run} на уже загруженных данных и без выгрузки выходных данных.
+\end{enumerate}
+
+Ускорение вычислялось как:
+\[
+\text{SpeedUp} = \frac{T_{\text{seq}} - T_{\text{par}}}{T_{\text{seq}}} * 100\%,
+\]
+где
+\begin{itemize}
+    \item \(T_{seq}\) - время работы \texttt{pipeline run} последовательной версии,
+    \item \(T_{par}\) - время работы \texttt{pipeline run} параллельной версии
+\end{itemize}
+
+Ускорение считалось именно по \texttt{pipeline run}, т.к. в \texttt{PreProcessing} и в \texttt{PostProcessing} также применялось распараллеливание.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+\textbf{Версия}   & \textbf{Процессы} & \textbf{Потоки} & \textbf{pipeline run, с} & \textbf{task run, с} & \textbf{Ускорение} \\
+\hline
+\multirow{1}{*}{Последовательная}  &              &                  & 4.70                  & 2.35               & \\
+\hline
+\multirow{3}{*}{OMP}               &              & 2                & 3.76                  & 2.34               & +20\% \\
+                                   &              & 4                & 2.81                  & 1.62               & +40\% \\
+                                   &              & 8                & 2.55                  & 1.33               & +46\% \\
+\hline
+\multirow{3}{*}{TBB}               &              & 2                & 3.79                  & 2.31               & +19\% \\
+                                   &              & 4                & 2.82                  & 1.55               & +40\% \\
+                                   &              & 8                & 2.49                  & 1.29               & +47\% \\
+\hline
+\multirow{3}{*}{STL}               &              & 2                & 3.90                  & 2.37               & +17\% \\
+                                   &              & 4                & 2.92                  & 1.62               & +38\% \\
+                                   &              & 8                & 2.55                  & 1.32               & +46\% \\
+\hline
+\multirow{9}{*}{MPI+OMP}    & \multirow{3}{*}{2}  & 2                & 3.46                  & 2.51               & +26\% \\
+                            &                     & 4                & 2.53                  & 1.74               & +46\% \\
+                            &                     & 8                & 2.27                  & 1.51               & +52\% \\
+\cline{2-6}
+                            & \multirow{3}{*}{4}  & 2                & 3.65                  & 2.64               & +22\% \\
+                            &                     & 4                & 2.73                  & 1.90               & +42\% \\
+                            &                     & 8                & 2.42                  & 1.65               & +49\% \\
+\cline{2-6}
+                            & \multirow{3}{*}{8}  & 2                & 3.86                  & 2.67               & +18\% \\
+                            &                     & 4                & 3.07                  & 1.96               & +35\% \\
+                            &                     & 8                & 2.58                  & 1.72               & +45\% \\
+\hline
+\end{tabular}
+\caption{Результаты тестирования производительности}
+\end{table}
+
+\newpage
+
+\section{Вывод из результатов}
+Исходя из результатов тестирования видно, что по мере увеличения количества потоков и процессов производительность программы значительно возрастает.
+
+Но постепенно с ростом количества процессов и потоков прирост производительности замедляется. Например, можно заметить, что на 8 процессах программа в целом работает медленнее чем на 4 процессах (если учитывать одинаковое число потоков на процесс), т.к. потоков становится слишком много для системы на которой проводилось тестирование (которая имеет 16 логических процессоров, в то время как потоков уже появляется 16, 32 и даже 64) и они начинают конкурировать между собой, к тому же возрастают накладные расходы на межпроцессное взаимодействие (отправка данных между процессами).
+
+При этом можно заметить, что различные применяемые технологии распараллеливания дают почти одинаковые результаты по производительности. А переход на многопроцессность не даёт ощутимого прироста по сравнению с многопоточностью (есть небольшой прирост на 2 и 4 процессах, но на 8 процессах уже наблюдается ухудшение производительности).
+
+\newpage
+
+\section{Заключение}
+В ходе работы реализованы последоваельная и несколько параллельных версий программы, позволяющие решить задачу построения выпуклых оболочек для компонент бинарного изображения.
+
+Параллельные версии были выполнены с помощью технологий \texttt{OpenMP}, \texttt{IntelTBB}, \texttt{std::thread} и \texttt{BOOST::MPI}. Все 4 параллельные версии программы дали значительный прирост производительности по сравнению с последовательной версией, и при этом на выходе давали корректный результат.
+
+Итак, ускорение получено, точность решения не утеряна, поэтому можно утверждать что схема распараллеливания для данной задачи реализована успешно.
+
+\newpage
+
+\section{Список литературы}
+\begin{enumerate}
+\item Что такое OpenMP? \\ 
+\url{https://parallel.ru/tech/tech_dev/openmp.html}
+\item Библиотека Intel Threading Building Blocks. \\ 
+\url{https://web.archive.org/web/20220406024622/http://www.unn.ru/pages/e-library/aids/2007/12.pdf}
+\item Многопоточность, новые возможности стандарта C++11. \\ 
+\url{https://web.archive.org/web/20200608173050/http://www.quizful.net/post/multithreading-cpp11}
+\item Технологии параллельного программирования. Message Passing Interface (MPI). \\ 
+\url{https://parallel.ru/vvv/mpi.html#p1}
+\end{enumerate}
+
+\newpage
+
+\section{Приложения}
+\subsection{OMP-версия, основные участки кода}
+\label{appendix:omp_1}
+\begin{lstlisting}[language=C++, caption={OMP-версия, Создание объекта Image в конструкторе Image::Image()}]
+#pragma omp parallel for
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x++) {
+      pixels[(y * width) + x] = Pixel(y, x, pxls[(y * width) + x]);
+    }
+  }
+}
+\end{lstlisting}
+\label{appendix:omp_2}
+\begin{lstlisting}[language=C++, caption={OMP-версия, Поиск компонент по "полосам" изображения в функции FindComponentsOMP()}]
+#pragma omp parallel
+  {
+    int thread_id = omp_get_thread_num();
+
+    thread_components[thread_id] =
+        FindComponentsInArea(tmp_image, start_y[thread_id], end_y[thread_id], index_offset[thread_id]);
+  }
+\end{lstlisting}
+\label{appendix:omp_3}
+\begin{lstlisting}[language=C++, caption={OMP-версия, Построение оболочки для каждой из компонент в функции QuickHullAllOMP()}]
+#pragma omp parallel for schedule(dynamic)
+  for (int i = 0; i < components_size; i++) {
+    hulls[i].pixels = QuickHull(components[i]);
+  }
+
+  return hulls;
+}
+\end{lstlisting}
+\label{appendix:omp_4}
+\begin{lstlisting}[language=C++, caption={OMP-версия, Формирование единой структуры ответа в функции PackHulls()}]
+std::atomic<int> uniq_hull_index(1);
+
+#pragma omp parallel for
+  for (int i = 0; i < hulls_size; i++) {
+    int pixel_index = 1;
+    int pixels_size = static_cast<int>(hulls[i].pixels.size());
+    int hull_index = uniq_hull_index.fetch_add(1);
+
+    for (int j = 0; j < pixels_size; j++) {
+      hulls_indexes[(hulls[i].pixels[j].y * width) + hulls[i].pixels[j].x] = hull_index;
+      pixels_indexes[(hulls[i].pixels[j].y * width) + hulls[i].pixels[j].x] = pixel_index;
+      pixel_index++;
+    }
+  }
+\end{lstlisting}
+
+\newpage
+
+\subsection{TBB-версия, основные участки кода}
+\label{appendix:tbb_1}
+\begin{lstlisting}[language=C++, caption={TBB-версия, Создание объекта Image в конструкторе Image::Image()}]
+int num_threads = ppc::util::GetPPCNumThreads();
+  oneapi::tbb::task_arena arena(num_threads);
+
+  arena.execute([&] {
+    oneapi::tbb::parallel_for(0, height, [&](int y) {
+      for (int x = 0; x < width; x++) {
+        pixels[(y * width) + x] = Pixel(y, x, pxls[(y * width) + x]);
+      }
+    });
+  });
+\end{lstlisting}
+\label{appendix:tbb_2}
+\begin{lstlisting}[language=C++, caption={TBB-версия, Поиск компонент по "полосам" изображения в функции FindComponentsTBB()}]
+oneapi::tbb::task_arena arena(num_threads);
+
+  arena.execute([&] {
+    oneapi::tbb::parallel_for(0, num_threads, [&](int thread_id) {
+      thread_components[thread_id] =
+          FindComponentsInArea(tmp_image, start_y[thread_id], end_y[thread_id], index_offset[thread_id]);
+    });
+  });
+\end{lstlisting}
+\label{appendix:tbb_3}
+\begin{lstlisting}[language=C++, caption={TBB-версия, Построение оболочки для каждой из компонент в функции QuickHullAllTBB()}]
+  int num_threads = ppc::util::GetPPCNumThreads();
+  oneapi::tbb::task_arena arena(num_threads);
+
+  arena.execute([&] { oneapi::tbb::parallel_for(0, components_size, [&](int i) { hulls[i] = QuickHull(components[i]); }); });
+\end{lstlisting}
+\label{appendix:tbb_4}
+\begin{lstlisting}[language=C++, caption={TBB-версия, Формирование единой структуры ответа в функции PackHulls()}]
+std::atomic<int> uniq_hull_index(1);
+
+  int num_threads = ppc::util::GetPPCNumThreads();
+  oneapi::tbb::task_arena arena(num_threads);
+
+  arena.execute([&] {
+    oneapi::tbb::parallel_for(0, hulls_size, [&](int i) {
+      int pixel_index = 1;
+      int pixels_size = static_cast<int>(hulls[i].size());
+      int hull_index = uniq_hull_index.fetch_add(1);
+
+      for (int j = 0; j < pixels_size; j++) {
+        hulls_indexes[(hulls[i][j].y * width) + hulls[i][j].x] = hull_index;
+        pixels_indexes[(hulls[i][j].y * width) + hulls[i][j].x] = pixel_index;
+        pixel_index++;
+      }
+    });
+  });
+\end{lstlisting}
+
+\newpage
+
+\subsection{STL-версия, основные участки кода}
+\label{appendix:stl_1}
+\begin{lstlisting}[language=C++, caption={STL-версия, Создание объекта Image в конструкторе Image::Image()}]
+int num_threads = ppc::util::GetPPCNumThreads();
+  int chunk = (height + num_threads - 1) / num_threads;
+  std::vector<std::thread> threads;
+
+  for (int t = 0; t < num_threads; t++) {
+    int y1 = t * chunk;
+    int y2 = std::min(y1 + chunk, height);
+    threads.emplace_back([this, y1, y2, &pxls]() {
+      for (int y = y1; y < y2; y++) {
+        for (int x = 0; x < width; x++) {
+          pixels[(y * width) + x] = Pixel(y, x, pxls[(y * width) + x]);
+        }
+      }
+    });
+  }
+
+  for (auto& th : threads) {
+    th.join();
+  }
+\end{lstlisting}
+\label{appendix:stl_2}
+\begin{lstlisting}[language=C++, caption={STL-версия, Поиск компонент по "полосам" изображения в функции FindComponentsSTL()}]
+std::vector<std::thread> threads;
+  int num_threads = ppc::util::GetPPCNumThreads();
+  std::vector<std::vector<Component>> local_components(num_threads);
+  int chunk_height = (height + num_threads - 1) / num_threads;
+  std::vector<int> y2(num_threads);
+
+  std::vector<int> index_offset(num_threads);
+  for (int i = 0; i < num_threads; i++) {
+    index_offset[i] = (i * 100000) + 2;
+  }
+
+  for (int t = 0; t < num_threads; t++) {
+    int y1 = t * chunk_height;
+    threads.emplace_back([&, t, y1]() {
+      y2[t] = std::min(y1 + chunk_height, height);
+      local_components[t] = FindComponentsInArea(tmp_image, y1, y2[t], index_offset[t]);
+    });
+  }
+
+  for (auto& th : threads) {
+    th.join();
+  }
+  threads.clear();
+\end{lstlisting}
+\label{appendix:stl_3}
+\begin{lstlisting}[language=C++, caption={STL-версия, Построение оболочки для каждой из компонент в функции QuickHullAllSTL()}]
+  std::vector<std::thread> threads;
+  size_t num_threads = ppc::util::GetPPCNumThreads();
+  size_t chunk = (components.size() + num_threads - 1) / num_threads;
+
+  for (size_t t = 0; t < num_threads; t++) {
+    size_t c1 = t * chunk;
+    size_t c2 = std::min(c1 + chunk, components.size());
+    threads.emplace_back([=, &components, &hulls]() {
+      for (size_t c = c1; c < c2; c++) {
+        hulls[c] = QuickHull(components[c]);
+      }
+    });
+  }
+
+  for (auto& th : threads) {
+    th.join();
+  }
+\end{lstlisting}
+\label{appendix:stl_4}
+\begin{lstlisting}[language=C++, caption={STL-версия, Формирование единой структуры ответа в функции PackHulls()}]
+  std::vector<int> hulls_indexes(height * width, 0);
+  std::vector<int> pixels_indexes(height * width, 0);
+  std::atomic<int> uniq_hull_index(1);
+
+  std::vector<std::thread> threads;
+  size_t num_threads = ppc::util::GetPPCNumThreads();
+  size_t chunk = (hulls.size() + num_threads - 1) / num_threads;
+
+  for (size_t t = 0; t < num_threads; t++) {
+    size_t h1 = t * chunk;
+    size_t h2 = std::min(h1 + chunk, hulls.size());
+    threads.emplace_back([=, &hulls, &hulls_indexes, &pixels_indexes, &uniq_hull_index]() {
+      for (size_t h = h1; h < h2; h++) {
+        int pixel_index = 1;
+        int pixels_size = static_cast<int>(hulls[h].size());
+        int hull_index = uniq_hull_index.fetch_add(1);
+
+        for (int j = 0; j < pixels_size; j++) {
+          hulls_indexes[(hulls[h][j].y * width) + hulls[h][j].x] = hull_index;
+          pixels_indexes[(hulls[h][j].y * width) + hulls[h][j].x] = pixel_index;
+          pixel_index++;
+        }
+      }
+    });
+  }
+
+  for (auto& th : threads) {
+    th.join();
+  }
+\end{lstlisting}
+
+\newpage
+
+\subsection{MPI+OMP-версия, основные участки кода}
+\label{appendix:mpi_1}
+\begin{lstlisting}[language=C++, caption={MPI+OMP-версия, Создание объекта Image в конструкторе Image::Image()}]
+#pragma omp parallel for
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x++) {
+      pixels[(y * width) + x] = Pixel(y, x, pxls[(y * width) + x]);
+    }
+  }
+}
+\end{lstlisting}
+\label{appendix:mpi_2}
+\begin{lstlisting}[language=C++, caption={MPI+OMP-версия, Поиск компонент по "полосам" изображения в функции FindComponentsOMP()}]
+#pragma omp parallel
+  {
+    int thread_id = omp_get_thread_num();
+
+    thread_components[thread_id] =
+        FindComponentsInArea(tmp_image, start_y[thread_id], end_y[thread_id], index_offset[thread_id]);
+  }
+\end{lstlisting}
+\label{appendix:mpi_3}
+\begin{lstlisting}[language=C++, caption={MPI+OMP-версия, Построение оболочки для каждой из компонент в функции QuickHullAllMPIOMP()}]
+  boost::mpi::communicator world;
+  boost::mpi::broadcast(world, image_width, 0);
+
+  std::vector<int> comp_sizes;
+  if (world.rank() == 0) {
+    comp_sizes.reserve(components.size());
+    for (Component& comp : components) {
+      comp_sizes.push_back(static_cast<int>(comp.size()));
+    }
+  }
+  boost::mpi::broadcast(world, comp_sizes, 0);
+
+  std::vector<int> parts;
+  std::vector<int> offsets;
+  if (world.rank() == 0) {
+    ComputePartition(static_cast<int>(components.size()), world.size(), parts, offsets);
+  }
+  boost::mpi::broadcast(world, parts, 0);
+  boost::mpi::broadcast(world, offsets, 0);
+
+  std::vector<std::vector<int>> split_idxs;
+  if (world.rank() == 0) {
+    split_idxs = PackIdxs(components, image_width, parts, offsets, comp_sizes);
+  }
+
+  std::vector<int> local_idxs;
+  boost::mpi::scatter(world, split_idxs, local_idxs, 0);
+
+  std::vector<Component> local_components(parts[world.rank()]);
+  int pos = 0;
+  for (int i = 0; i < parts[world.rank()]; i++) {
+    int comp_size = comp_sizes[offsets[world.rank()] + i];
+    Component comp;
+    comp.reserve(comp_size);
+    for (int j = 0; j < comp_size; j++, pos++) {
+      int idx = local_idxs[pos];
+      int y = idx / image_width;
+      int x = idx % image_width;
+      comp.emplace_back(y, x, 1);
+    }
+    local_components[i] = std::move(comp);
+  }
+
+  int local_components_size = static_cast<int>(local_components.size());
+  std::vector<Hull> local_hulls(local_components.size());
+
+#pragma omp parallel for schedule(dynamic)
+  for (int i = 0; i < local_components_size; i++) {
+    local_hulls[i] = QuickHull(local_components[i]);
+  }
+
+  std::vector<std::vector<Hull>> gathered_hulls;
+  boost::mpi::gather(world, local_hulls, gathered_hulls, 0);
+  if (world.rank() == 0) {
+    std::vector<Hull> hulls;
+    for (auto& vector_hulls : gathered_hulls) {
+      hulls.insert(hulls.end(), std::make_move_iterator(vector_hulls.begin()),
+                   std::make_move_iterator(vector_hulls.end()));
+    }
+
+    return hulls;
+  }
+
+  return {};
+\end{lstlisting}
+
+\newpage
+
+\subsection{Функции для тестирования}
+\label{appendix:image_run_test}
+\begin{lstlisting}[language=C++, caption={Функция ImageRunTest() проверки корректности с помощью OpenCV}]
+  bool ImageRunTest(std::string& src_path, std::string& exp_path) {
+  // Load source image:
+  cv::Mat src_image = cv::imread(src_path);
+  if (src_image.empty()) {
+    return false;
+  }
+
+  // Convert to shades of gray:
+  cv::Mat gray_image;
+  cv::cvtColor(src_image, gray_image, cv::COLOR_BGR2GRAY);
+
+  // Convert to black and white:
+  cv::Mat bin_image;
+  cv::threshold(gray_image, bin_image, 128, 1, cv::THRESH_BINARY);
+
+  // Convert to std::vector<int>:
+  std::vector<int> pixels(bin_image.rows * bin_image.cols);
+  for (int i = 0; i < bin_image.rows; i++) {
+    for (int j = 0; j < bin_image.cols; j++) {
+      pixels[(i * bin_image.cols) + j] = bin_image.at<uchar>(i, j);
+    }
+  }
+
+  int* p_height = &bin_image.rows;
+  int height = bin_image.rows;
+  int* p_width = &bin_image.cols;
+  int width = bin_image.cols;
+  std::vector<int> hulls_indexes_out(height * width);
+  std::vector<int> pixels_indexes_out(height * width);
+
+  auto task_data_all = std::make_shared<ppc::core::TaskData>();
+
+  boost::mpi::communicator world;
+  if (world.rank() == 0) {
+    task_data_all->inputs.emplace_back(reinterpret_cast<uint8_t*>(p_height));
+    task_data_all->inputs.emplace_back(reinterpret_cast<uint8_t*>(p_width));
+    task_data_all->inputs.emplace_back(reinterpret_cast<uint8_t*>(pixels.data()));
+    task_data_all->inputs_count.emplace_back(pixels.size());
+    task_data_all->outputs.emplace_back(reinterpret_cast<uint8_t*>(hulls_indexes_out.data()));
+    task_data_all->outputs.emplace_back(reinterpret_cast<uint8_t*>(pixels_indexes_out.data()));
+    task_data_all->outputs_count.emplace_back(0);
+  }
+  ChcTaskALL chc_task_all(task_data_all);
+  chc_task_all.ValidationImpl();
+  chc_task_all.PreProcessingImpl();
+  chc_task_all.RunImpl();
+  chc_task_all.PostProcessingImpl();
+
+  if (world.rank() == 0) {
+    int hulls_size = static_cast<int>(task_data_all->outputs_count[0]);
+    std::vector<Hull> hulls = UnpackHulls(hulls_indexes_out, pixels_indexes_out, height, width, hulls_size);
+
+    // Draw hulls on source image:
+    for (Hull hull : hulls) {
+      for (size_t i = 0; i < hull.size() - 1; i++) {
+        cv::circle(src_image, cv::Point(hull[i].x, hull[i].y), 2, cv::Scalar(0, 0, 255), cv::FILLED);
+
+        cv::line(src_image, cv::Point(hull[i].x, hull[i].y), cv::Point(hull[i + 1].x, hull[i + 1].y),
+                 cv::Scalar(0, 0, 255), 1);
+      }
+      cv::circle(src_image, cv::Point(hull[hull.size() - 1].x, hull[hull.size() - 1].y), 2, cv::Scalar(0, 0, 255),
+                 cv::FILLED);
+
+      cv::line(src_image, cv::Point(hull[hull.size() - 1].x, hull[hull.size() - 1].y), cv::Point(hull[0].x, hull[0].y),
+               cv::Scalar(0, 0, 255), 1);
+    }
+
+    // Load expected image:
+    cv::Mat exp_image = cv::imread(exp_path);
+    if (exp_image.empty()) {
+      src_image.release();
+      gray_image.release();
+      bin_image.release();
+      return false;
+    }
+
+    // cv::imwrite(exp_path, src_image);
+
+    // Compare edited source image with expected image:
+    double difference = cv::norm(src_image, exp_image);
+
+    src_image.release();
+    gray_image.release();
+    bin_image.release();
+    exp_image.release();
+    // They are same if difference == 0.0
+    return difference <= 0.0;
+  }
+  return true;
+}
+\end{lstlisting}
+
+\label{appendix:generate_rectangles_components}
+\begin{lstlisting}[language=C++, caption={Функция GenerateRectanglesComponents() генерации массива пикселей}]
+std::vector<int> GenerateRectanglesComponents(int width, int height, int num_components, int size_y, int size_x) {
+  std::mt19937 rng(std::random_device{}());
+  std::uniform_int_distribution<int> dist_x(0, width - size_y);
+  std::uniform_int_distribution<int> dist_y(0, height - size_x);
+
+  std::vector<int> bin_vec(width * height);
+
+  for (int i = 0; i < num_components; i++) {
+    int x_start = dist_x(rng);
+    int y_start = dist_y(rng);
+    for (int y = y_start; y < y_start + size_y && y < height; y++) {
+      for (int x = x_start; x < x_start + size_x && x < width; x++) {
+        bin_vec[(y * width) + x] = 1;
+      }
+    }
+  }
+
+  return bin_vec;
+}
+\end{lstlisting}
+
+\label{appendix:get_hulls_with_opencv}
+\begin{lstlisting}[language=C++, caption={Функция GetHullsWithOpencv() построения оболочек компонент с помощью OpenCV}]
+std::vector<Hull> GetHullsWithOpencv(int height, int width, std::vector<int>& pixels) {
+  cv::Mat binary_mat(height, width, CV_8U);
+  for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      if (pixels[(i * width) + j] == 0) {
+        binary_mat.at<uchar>(i, j) = 0;
+      } else {
+        binary_mat.at<uchar>(i, j) = 255;
+      }
+    }
+  }
+
+  cv::Mat labels(height, width, CV_32S);
+  int num_labels = cv::connectedComponents(binary_mat, labels, 8, CV_32S);
+
+  std::vector<std::vector<cv::Point>> components_cv(num_labels - 1);
+  for (int y = 0; y < height; ++y) {
+    const int* row = reinterpret_cast<const int*>(labels.ptr(y));
+    for (int x = 0; x < width; ++x) {
+      int label = row[x];
+      if (label > 0) {  // 0 is background
+        components_cv[label - 1].emplace_back(x, y);
+      }
+    }
+  }
+
+  std::vector<Hull> hulls_cv;
+  for (const auto& component_cv : components_cv) {
+    if (component_cv.empty()) {
+      continue;
+    }
+    std::vector<cv::Point> hull_cv;
+    cv::convexHull(component_cv, hull_cv);
+
+    Hull hull;
+    for (const cv::Point& p : hull_cv) {
+      Pixel pixel(p.y, p.x);
+      hull.push_back(pixel);
+    }
+    hulls_cv.push_back(hull);
+  }
+
+  return hulls_cv;
+}
+\end{lstlisting}
+
+\end{document}
