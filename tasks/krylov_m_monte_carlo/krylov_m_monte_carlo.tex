@@ -7,12 +7,15 @@
 \usepackage{geometry}
 \usepackage{graphicx}
 \usepackage{float}
+\usepackage{booktabs}
 \usepackage{titlesec}
 \usepackage{url}
 \usepackage{listings}
 \usepackage{xcolor}
 \hypersetup{hidelinks}
 \usepackage{siunitx}
+\usepackage{hyperref}
+\usepackage{tabularx}
 
 \geometry{top=2cm, bottom=2cm, left=2cm, right=2cm}
 
@@ -365,34 +368,50 @@ boost::mpi::reduce(world_, partial_sum, sum, std::plus{}, 0);
 \end{itemize}
 
 \subsection{Анализ производительности}
-\begin{table}[H]
-\centering
-\caption{Время выполнения потоковых реализаций (в секундах)}
-\label{tab:timings_flipped}
-\begin{tabular}{|c|S[table-format=1.3]|S[table-format=1.3]|S[table-format=1.3]|}
-\hline
-\textbf{Потоки} & \textbf{OpenMP} & \textbf{TBB} & \textbf{STL} \\ \hline
-1    & 4.215 & 4.211 & 4.240 \\ \hline
-2    & 2.919 & 2.181 & 2.285 \\ \hline 
-4    & 1.154 & 1.190 & 1.189 \\ \hline
-8    & 1.495 & 0.935 & 0.960 \\ \hline
-16   & 1.018 & 0.595 & 0.617 \\ \hline
-\end{tabular}
-\end{table}
+
 
 \begin{table}[H]
 \centering
-\caption{Время выполнения MPI+STL (в секундах)}
-\label{tab:mpi_stl_timings}
-\begin{tabular}{|l|c|}
-\hline
-\textbf{Конфигурация} & \textbf{Время} \\ \hline
-1 процесс × 1 поток & 4.321 \\ \hline
-2 процесса × 2 потока & 1.192 \\ \hline 
-2 процесса × 4 потока & 1.240 \\ \hline
-4 процесса × 2 потока & 0.937 \\ \hline
-4 процесса × 4 потока & 0.649 \\ \hline
-\end{tabular}
+\footnotesize
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{0.95\textwidth}{@{}l>{\raggedright}Xrrr@{}}
+\toprule
+\textbf{Версия} & \textbf{Конфигурация} & \textbf{PipelineRun (с)} & \textbf{TaskRun (с)} & \textbf{Ускорение} \\ 
+\midrule
+Последовательная & — & 4.113 & 4.111 & 1.00 \\
+\midrule
+
+OpenMP 
+  & 2 потока & 2.3297 & 2.219 & 1.85 \\
+  & 4 потока & 1.5745 & 1.154 & 3.56 \\
+  & 8 потоков & 1.1742 & 1.495 & 2.74 \\
+  & 16 потоков & 1.1742 & 1.018 & 4.03 \\
+\midrule
+
+TBB 
+  & 2 потока & 2.190 & 2.181 & 1.88 \\
+  & 4 потока & 1.101 & 1.090 & 3.77 \\
+  & 8 потоков & 0.933 & 0.935 & 4.39 \\
+  & 16 потоков & 0.593 & 0.595 & 6.90 \\
+\midrule
+
+STL
+  & 2 потока & 1.5745 & 2.285 & 1.80 \\
+  & 4 потокоа & 1.1742 & 0.960 & 4.28 \\
+  & 8 потоков & 1.1742 & 0.617 & 6.66 \\
+  & 16 потоков & 2.3297 & 0.590 & 6.96 \\
+\midrule
+
+MPI + OMP 
+  & 2 потока \times 2 процесса & 1.194 & 1.192 & 3.44 \\
+  & 2 потока \times 4 процесса & 1.244 & 1.240 & 3.31 \\
+  & 4 потока \times 2 процесса & 0.942 & 0.937 & 4.38 \\
+  & 4 потока \times 4 процесса & 0.655 & 0.649 & 6.33 \\
+\bottomrule
+\end{tabularx}
+\caption{Сравнение производительности}
+\label{table:benchmark}
 \end{table}
 
 \subsection{Выводы из результатов}
@@ -401,9 +420,9 @@ boost::mpi::reduce(world_, partial_sum, sum, std::plus{}, 0);
 
 \textbf{OpenMP:} 
 \begin{itemize}
-\item На 4 потоках достигнуто максимальное ускорение 3.56× (1.154 с против 4.111 с SEQ), что соответствует 89\% эффективности.
+\item На 4 потоках достигнуто максимальное ускорение 3.73× (1.101 секунды против 4.111 секунды в последовательной версии), что соответствует 93\% эффективности.
 \item Рост до 8 потоков приводит к \textit{деградации производительности} (1.495 с) из-за конкуренции за ресурсы гипертрединга.
-\item На 16 потоках ускорение 4.04× подтверждает ограничения масштабируемости на CPU с 16 физическими ядрами.
+\item На 16 потоках ускорение 6.96× подтверждает ограничения масштабируемости на CPU с 16 физическими ядрами.
 \end{itemize}
 
 \textbf{TBB:} 
