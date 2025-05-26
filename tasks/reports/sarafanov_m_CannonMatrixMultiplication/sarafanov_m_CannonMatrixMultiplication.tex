@@ -1,7 +1,8 @@
-\documentclass[20pt]{article}
+\documentclass[12pt]{article}
 \usepackage[T1]{fontenc}
 
 \usepackage{lipsum}
+\usepackage{times}
 \usepackage{graphicx}
 \usepackage[utf8]{inputenc}
 \usepackage[russian]{babel}
@@ -38,7 +39,7 @@
 \vspace{0.5cm}
  Лектор: Сысоев А. В. \\
 \end{flushright}
-\vspace{3.5cm}
+\vspace{2cm}
 \begin{center}
     Нижний Новгород 2025\newpage
 \end{center}
@@ -324,7 +325,8 @@ bool sarafanov_m_canon_mat_mul_stl::CanonMatMulOMP::RunImpl() {
   ThreadDataAmount data_amount
   (ppc::util::GetPPCNumThreads(), 
   static_cast<int>(a_matrix_.GetSize()));
-  auto multiplicator = [&](int start_index, int end_index, size_t thread_index) {
+  auto multiplicator = [&](int start_index, int end_index, 
+  size_t thread_index) {
     for (int i = start_index; i < end_index; ++i) {
       mul_results[thread_index]
       += a_matrix_.MultiplicateMatrix(b_matrix_, i);
