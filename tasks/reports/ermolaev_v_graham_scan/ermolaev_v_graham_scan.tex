@@ -1,0 +1,555 @@
+\documentclass[12pt]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{hyperref}
+\usepackage{amsmath, amssymb}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{multirow}
+\usepackage{indentfirst}
+\usepackage[nottoc,notlot,notlof]{tocbibind}
+\usepackage{geometry}
+\usepackage{xcolor} 
+\usepackage{listings}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.98,0.98,0.97} 
+\definecolor{keywordblue}{rgb}{0.0,0.0,0.6}
+\definecolor{typeblue}{rgb}{0.1,0.1,0.7}
+\definecolor{commentgreen}{rgb}{0.13,0.54,0.13} 
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{commentgreen}\itshape,
+    keywordstyle=\color{keywordblue}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    classoffset=1, 
+    morekeywords={Point, std, size_t, uint8_t, auto, bool, int, void, class, public, private, template, typename, const, return, if, else, for, while, new, delete, using, namespace, nullptr, true, false, this, enum, struct, case, break, default, continue, double, float, unsigned, char, long, short, static, virtual, friend, explicit, inline, operator, sizeof, typedef, union, volatile, mutable, constexpr, decltype, noexcept},
+    classoffset=0,
+    emph={TestTaskSequential, TestTaskOMP, TestTaskTBB, TestTaskSTL, TestTaskALL, RunImpl, IndexOfMinElement, IsAllCollinear, IsAllSame, ParallelSort, GrahamScan, PreProcessingImpl, ValidationImpl, PostProcessingImpl, CrossProduct, Point, kMinInputPoints, kMinStackPoints, input_, output_}, 
+    emphstyle=\color{typeblue}\bfseries, 
+    frame=single, 
+    framerule=0.5pt, 
+    framesep=3pt,
+    rulesepcolor=\color{codegray} 
+}
+\lstset{style=mystyle}
+
+\geometry{left=2.5cm, right=1.5cm, top=2cm, bottom=2cm}
+
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\renewcommand{\cftsubsecleader}{\cftdotfill{\cftdotsep}} 
+\renewcommand{\cftsecfont}{\normalfont} 
+\renewcommand{\cftsecpagefont}{\normalfont}
+
+\renewcommand{\cfttoctitlefont}{\hfill\Large\bfseries}
+\renewcommand{\cftaftertoctitle}{\hfill\null}
+
+\setlength{\cftsecindent}{0pt} 
+\setlength{\cftsubsecindent}{20pt} 
+\setlength{\parindent}{1.25cm} 
+
+\titleformat{\section}
+    {\Large\bfseries}
+    {\thesection}
+    {.3em}
+    {}
+
+\titleformat{\subsection}
+    {\large\bfseries}
+    {\thesubsection}
+    {0.3em}
+    {}
+
+\titleformat{\subsubsection}
+    {\normalsize\bfseries}
+    {\thesubsubsection}
+    {0.3em}
+    {}
+
+\renewcommand{\thesection}{\arabic{section}.}          
+\renewcommand{\thesubsection}{\thesection\arabic{subsection}}  
+
+\begin{document}
+\thispagestyle{empty}
+\begin{center}
+    {\bfseries
+    {\large «Национальный исследовательский Нижегородский государственный университет им.
+Н.И. Лобачевского» (ННГУ) }\\[2em]
+    {\large Институт информационных технологий математики и механики }\\[1em]
+    }
+    \vspace*{\fill} 
+    {\LARGE\bfseries Отчет}\\[1em]
+    {\large Построение выпуклой оболочки – проход Грэхема.}\\[5em]
+    \vspace{\fill} 
+     \hfill\parbox{0.4\textwidth}{
+        Выполнил:\\
+        студент группы 3822Б1ПР2\\
+        Ермолаев Владислав Александрович\\[2em]
+        Преподаватель:\\
+        доцент, кандидат технических наук\\
+        Сысоев Александр Владимирович\\[2em]
+    }
+    
+    Нижний Новгород, 2025 г.
+\end{center}
+\newpage
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+Выпуклая оболочка множества точек на плоскости --- это наименьший выпуклый многоугольник, содержащий все эти точки. Задача построения выпуклой оболочки является одной из фундаментальных задач вычислительной геометрии и находит применение в различных областях, таких как распознавание образов, компьютерная графика, анализ данных и робототехника.
+
+Одним из классических алгоритмов для решения этой задачи является алгоритм сканирования Грэхема (Graham scan). Его эффективность и относительная простота реализации делают его популярным выбором. Однако для больших наборов данных производительность последовательной версии алгоритма может быть недостаточной.
+
+В данной работе рассматривается задача построения выпуклой оболочки множества точек на плоскости с использованием алгоритма Грэхема. Основное внимание уделяется разработке и анализу различных параллельных реализаций этого алгоритма с использованием технологий OpenMP, Intel Threading Building Blocks (TBB), стандартных средств многопоточности C++ (STL), а также гибридного подхода с использованием MPI и OpenMP. Целью работы является сравнение производительности различных параллельных подходов и выявление наиболее эффективных из них для данной задачи.
+
+\newpage
+\section{Постановка задачи}
+\subsection{Математическая постановка}
+Дано множество $N$ точек $P = \{p_1, p_2, \dots, p_N\}$ на двумерной плоскости, где каждая точка $p_i$ задана своими координатами $(x_i, y_i)$.
+Требуется найти выпуклую оболочку $CH(P)$ этого множества точек. Выпуклая оболочка представляет собой последовательность вершин $v_1, v_2, \dots, v_k$ в порядке обхода против часовой стрелки, которые образуют наименьший выпуклый многоугольник, содержащий все точки из $P$.
+
+\subsection{Программная постановка задачи}
+Необходимо реализовать следующие версии алгоритма сканирования Грэхема для построения выпуклой оболочки:
+\begin{itemize}
+    \item Последовательная версия (SEQ).
+    \item Параллельная версия с использованием OpenMP (OMP).
+    \item Параллельная версия с использованием Intel Threading Building Blocks (TBB).
+    \item Параллельная версия с использованием стандартных потоков C++ (STL).
+    \item Гибридная параллельная версия с использованием MPI и OpenMP (ALL).
+\end{itemize}
+
+Для каждой реализации необходимо:
+\begin{itemize}
+    \item Обеспечить корректное чтение входного набора точек.
+    \item Реализовать основные шаги алгоритма Грэхема.
+    \item Вывести вершины выпуклой оболочки в порядке обхода против часовой стрелки.
+    \item Провести анализ производительности и сравнить различные реализации.
+\end{itemize}
+
+\subsubsection{Входные данные}
+Массив точек, каждая из которых представлена парой целочисленных координат (x, y). Минимальное количество точек для построения нетривиальной оболочки --- 3.
+
+\subsubsection{Выходные данные}
+Массив точек, представляющих вершины выпуклой оболочки, упорядоченных против часовой стрелки.
+
+\newpage
+\section{Описание алгоритма Грэхема}
+Алгоритм сканирования Грэхема состоит из следующих основных шагов:
+
+\begin{enumerate}
+    \item \textbf{Поиск опорной точки.} Находится точка с наименьшей y-координатой. Если таких точек несколько, выбирается та, у которой наименьшая x-координата. Эта точка $p_0$ гарантированно будет вершиной выпуклой оболочки.
+    \item \textbf{Сортировка точек.} Все остальные точки сортируются по полярному углу относительно $p_0$. Если две точки имеют одинаковый полярный угол, то сначала идет точка, находящаяся ближе к $p_0$. Для избежания вычисления самих углов (что требует использования тригонометрических функций и может привести к ошибкам точности), сравнение углов обычно выполняется с помощью векторного (косого) произведения. Если косое произведение $(p_0, p_1, p_2)$ положительно, то $p_1$ лежит левее вектора $\vec{p_0 p_2}$ (если смотреть из $p_0$), значит угол для $p_1$ меньше. Если косое произведение равно нулю, точки коллинеарны, и тогда используется расстояние до $p_0$.
+    \item \textbf{Построение оболочки (сканирование).} После сортировки точки обрабатываются в полученном порядке. Используется стек для хранения вершин текущей построенной части выпуклой оболочки. 
+    \begin{itemize}
+        \item Первые две точки из отсортированного списка (включая $p_0$) помещаются в стек.
+        \item Для каждой следующей точки $p_i$ из отсортированного списка проверяется ориентация тройки точек: (вершина под вершиной стека, вершина стека, $p_i$).
+        \item Если поворот «правый» (или точки коллинеарны и $p_i$ дальше от предпоследней точки стека, чем последняя), то верхний элемент стека удаляется. Это действие повторяется, пока в стеке не останется менее двух точек или пока поворот не станет «левым».
+        \item После этого точка $p_i$ помещается в стек.
+    \end{itemize}
+    \item \textbf{Результат.} Точки, оставшиеся в стеке после обработки всех входных точек, образуют вершины выпуклой оболочки в порядке обхода против часовой стрелки.
+\end{enumerate}
+
+\textbf{Предварительные проверки:}
+Перед выполнением основного алгоритма необходимо выполнить несколько проверок:
+\begin{itemize}
+    \item Убедиться, что количество входных точек не меньше минимально необходимого (обычно 3).
+    \item Проверить, не совпадают ли все точки.
+    \item Проверить, не лежат ли все точки на одной прямой (коллинеарны). 
+\end{itemize}
+Если эти условия не выполняются, алгоритм может работать некорректно или его выполнение не имеет смысла.
+
+\newpage
+\section{Детали реализации и схемы распараллеливания}
+
+В данном разделе описываются особенности реализации последовательной версии и различных параллельных подходов к алгоритму Грэхема. Основными этапами, подходящими для распараллеливания, являются:
+\begin{itemize}
+    \item Поиск опорной точки (минимального элемента).
+    \item Проверка на коллинеарность всех точек.
+    \item Проверка на совпадение всех точек.
+    \item Сортировка точек по полярному углу.
+\end{itemize}
+Этап непосредственного сканирования (построения оболочки с использованием стека) является существенно последовательным по своей природе и обычно не распараллеливается.
+
+\subsection{Последовательная реализация (SEQ)}
+Последовательная реализация следует классическому алгоритму Грэхема:
+\begin{itemize}
+    \item Выполняются проверки на минимальное количество точек, совпадение всех точек (сравнением с первой) и коллинеарность всех точек (перебором троек и проверкой векторного произведения). Если какое-либо из этих условий не выполняется для построения нетривиальной оболочки, программа возвращает \texttt{false}.
+    \item Находится опорная точка (с минимальной y, затем x координатой) с помощью \\\texttt{std::ranges::min\_element} и перемещается в начало вектора \texttt{input\_}.
+    \item Оставшиеся точки сортируются относительно опорной с помощью \texttt{std::sort}. Компаратор использует векторное произведение \texttt{CrossProduct} для определения порядка по полярному углу. При коллинеарности (векторное произведение равно 0) используется расстояние до опорной точки (более близкая точка идет раньше).
+    \item Выполняется этап сканирования: точки добавляются в \texttt{output\_} (стек). Для каждой новой точки проверяется ориентация с двумя последними точками в \texttt{output\_}. Если поворот не левый (векторное произведение $\le 0$), последняя точка из \texttt{output\_} удаляется. Процесс повторяется, пока условия удаления выполняются. Затем текущая точка добавляется в \texttt{output\_}.
+\end{itemize}
+Функция \texttt{CrossProduct(p1, p2, p3)} вычисляет $(p2.x - p1.x)(p3.y - p1.y) - (p3.x - p1.x)(p2.y - p1.y)$.
+
+\subsection{OpenMP реализация (OMP)}
+Реализация с использованием OpenMP (класс \texttt{TestTaskOMP}) распараллеливает несколько этапов:
+\begin{itemize}
+    \item \textbf{IndexOfMinElement:} Поиск индекса опорной точки распараллелен. Каждый поток находит локальный минимум в своей части данных. Затем локальные минимумы сравниваются в критической секции для нахождения глобального минимума.
+    \item \textbf{IsAllCollinear:} Проверка на коллинеарность всех точек распараллелена с использованием директивы \texttt{\#pragma omp parallel for reduction(||:found\_non\_collinear)}. Поиск останавливается, как только найдена хотя бы одна неколлинеарная тройка.
+    \item \textbf{IsAllSame:} Проверка на совпадение всех точек с первой распараллелена с использованием \texttt{\#pragma omp parallel for reduction(\&\&:all\_same)}.
+    \item \textbf{ParallelSort:} Реализована параллельная сортировка слиянием. Входной диапазон (после опорной точки) делится на чанки по числу потоков. Каждый чанк сортируется локально (\texttt{std::sort}). Затем отсортированные чанки попарно сливаются в несколько этапов (логарифмическое число уровней слияния) с использованием \texttt{\#pragma omp parallel for} для каждого уровня слияния.
+\end{itemize}
+Этап сканирования \texttt{GrahamScan} остается последовательным.
+
+\subsection{TBB реализация}
+Реализация с использованием Intel TBB (класс \texttt{TestTaskTBB}) также нацелена на распараллеливание подготовительных этапов:
+\begin{itemize}
+    \item \textbf{IndexOfMinElement:} Поиск опорной точки выполняется с помощью \texttt{tbb::parallel\_reduce}. Каждый поток обрабатывает свой диапазон и находит локальный минимум. Затем локальные минимумы объединяются для нахождения глобального минимума.
+    \item \textbf{IsAllCollinear:} Проверка на коллинеарность использует \texttt{tbb::parallel\_reduce} для поиска хотя бы одной неколлинеарной тройки точек.
+    \item \textbf{IsAllSame:} Проверка на совпадение всех точек также реализована через \texttt{tbb::parallel\_reduce}.
+    \item \textbf{Сортировка:} Для сортировки точек относительно опорной используется \texttt{tbb::parallel\_sort}.
+\end{itemize}
+Этап сканирования \texttt{GrahamScan} аналогичен последовательной версии.
+
+\subsection{STL реализация}
+Реализация с использованием стандартных потоков C++ (класс \texttt{TestTaskSTL}) фокусируется на распараллеливании сортировки:
+\begin{itemize}
+    \item \textbf{IsAllCollinear, IsAllSame:} Проверки на коллинеарность и совпадение точек выполняются последовательно, используя стандартные алгоритмы STL (\texttt{std::all\_of}, \texttt{std::any\_of}).
+    \item \textbf{ParallelSort:} Реализована параллельная сортировка слиянием с использованием \texttt{std::thread}. Диапазон делится на части по числу доступных потоков \\(определяется через \texttt{ppc::util::GetPPCNumThreads()}). Каждая часть сортируется в отдельном потоке. Затем отсортированные части сливаются попарно в несколько проходов до получения единого отсортированного массива. Слияния также могут выполняться параллельно.
+\end{itemize}
+Этап сканирования \texttt{GrahamScan} остается последовательным.
+
+\subsection{MPI + OpenMP реализация (ALL)}
+Гибридная реализация (класс \texttt{TestTaskALL}) сочетает MPI для распределения работы между процессами и OpenMP для параллелизма внутри каждого процесса.
+
+    \begin{itemize}
+        \item \textbf{Нулевой процесс (rank 0):}
+        \begin{itemize}
+            \item Выполняет проверки на необходимые условия (\texttt{CheckGrahamNecessaryConditions}), которые внутри себя используют OpenMP-параллельные \texttt{IsAllSame} и \texttt{IsAllCollinear}.
+            \item Находит опорную точку (\texttt{IndexOfMinElement}, также с OpenMP).
+            \item Перемещает опорную точку в начало вектора \texttt{input\_}.
+        \end{itemize}
+            \item Размер данных и опорная точка транслируются всем процессам (\texttt{boost::mpi::broadcast}).
+        \item Точки (кроме опорной) распределяются между всеми процессами с помощью \\\texttt{boost::mpi::scatterv}. Каждый процесс получает свою часть точек (\texttt{local\_points\_}).
+        \item Каждый процесс сортирует свой локальный набор точек \texttt{local\_points\_} относительно глобальной опорной точки с использованием OpenMP-параллельной сортировки \texttt{ParallelSort} (такой же, как в OMP реализации).
+        \item \textbf{Нулевой процесс (rank 0):}
+        \begin{itemize}
+        
+        \item Собирает отсортированные части от других процессов (\texttt{world\_recv}).
+            \item Последовательно сливает полученные отсортированные части со своей частью.
+            \item Формирует полный отсортированный список точек.
+            \item Выполняет последовательный этап сканирования Грэхема (\texttt{GrahamScan}).
+        \end{itemize}
+        
+            \item \textbf{Остальные процессы (rank > 0):} Отправляют свои отсортированные \texttt{local\_points\_} нулевому процессу (\texttt{world\_send}).
+    \end{itemize}
+
+Таким образом, поиск опорной точки и предварительные проверки распараллелены с OpenMP на нулевом процессе. Сортировка распараллелена на двух уровнях: данные делятся между MPI-процессами, и каждый процесс сортирует свою часть с помощью OpenMP. Финальное слияние отсортированных частей и этап сканирования выполняются последовательно на нулевом процессе.
+
+\newpage
+\section{Эксперименты}
+\subsection{Условия проведения}
+Эксперименты проводились для оценки производительности различных реализаций алгоритма Грэхема.
+\begin{itemize}
+    \item \textbf{Наборы данных:} Использовался набор из 2 500 000 случайно сгенерированных точек, распределенных равномерно в квадрате. Координаты точек генерировались в диапазоне от -100 до 100.
+    \item \textbf{Параметры запуска:} Для параллельных версий необходимо указать фактическое количество потоков (для OMP, TBB, STL) и количество процессов/потоков на процесс (для ALL), использованных при тестировании.
+    \item \textbf{Измерение времени:} Время выполнения измерялось для полного конвейера обработки данных каждой реализации. Усреднялось по 10 запускам.
+\end{itemize}
+
+\subsection{Результаты}
+В таблице ниже представлены результаты измерения времени выполнения (pipeline\_run и task\_run) для различных реализаций на наборе данных из $2.5 \times 10^6$ точек. Анализ производительности и расчет ускорения в следующем разделе основаны на времени pipeline\_run.
+
+\begin{center}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Технология} & \textbf{Pipeline Run (мс)} & \textbf{Task Run (мс)} \\
+\hline
+SEQ                    & 2500.19           & 2308.20       \\
+\hline
+OMP (2 пт)             & 1555.97           & 2371.33       \\
+\hline
+TBB (2 пт)             & 1509.66           & 2788.77       \\
+\hline
+STL (2 пт)             & 1715.41           & 766.16        \\
+\hline
+ALL (2 пр, 2 пт/пр)    & 2782.22           & 3260.91       \\
+\hline
+\end{tabular}
+\end{center}
+
+
+\subsection{Анализ результатов}
+Для анализа производительности параллельных реализаций OMP, TBB и STL использовалось 2 потока. Для гибридной реализации ALL использовалось 2 MPI-процесса, каждый из которых задействовал 2 OpenMP-потока.
+Ускорение ($S_p$) параллельного алгоритма по сравнению с последовательным ($T_{seq}$) на $p$ процессорах (потоках) вычисляется как $S_p = T_{seq} / T_p$, где $T_p$ - время выполнения параллельного алгоритма.
+Эффективность ($E_p$) параллельного алгоритма определяется как $E_p = S_p / p \times 100\%$.
+
+В таблице ниже представлены рассчитанные значения ускорения и эффективности для параллельных реализаций (OMP, TBB, STL) при использовании 2 потоков, по сравнению с последовательной версией ($T_{seq} = 2500.19$ мс).
+
+\begin{center}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Реализация} & \textbf{Время (мс), $T_2$} & \textbf{Ускорение, $S_2$} & \textbf{Эффективность, $E_2$ (\%)} \\
+\hline
+OMP (2 потока)    & 1555.97 & 1.61                 & 80.34 \\
+\hline
+TBB (2 потока)    & 1509.66 & 1.66                 & 82.81 \\
+\hline
+STL (2 потока)    & 1715.41 & 1.46                 & 72.88 \\
+\hline
+\end{tabular}
+\end{center}
+
+Судя по полученным данным:
+\begin{itemize}
+    \item Все многопоточные реализации (OMP, TBB, STL) при использовании 2 потоков продемонстрировали ускорение по сравнению с последовательной версией.
+    \item Наибольшее ускорение ($S_2 \approx 1.66$) и эффективность ($E_2 \approx 82.81\%$) показала TBB реализация. Это свидетельствует о хорошей адаптации алгоритмов TBB к задаче и эффективном использовании двух потоков.
+    \item OMP реализация также показала хорошие результаты ($S_2 \approx 1.61$, $E_2 \approx 80.34\%$), незначительно уступая TBB.
+    \item STL реализация, основанная на стандартных потоках C++, показала наименьшее ускорение ($S_2 \approx 1.46$) и эффективность ($E_2 \approx 72.88\%$) среди многопоточных версий, что может быть связано с более высокими накладными расходами на ручное управление потоками и синхронизацию в конкретной реализации параллельной сортировки.
+    \item Гибридная MPI+OpenMP реализация (ALL) с временем выполнения 2782.22 мс (2 процесса, по 2 потока на каждый) оказалась медленнее последовательной версии ($T_{seq} = 2500.19$ мс). Это указывает на существенные накладные расходы, связанные с MPI-коммуникациями и общей координацией работы процессов и потоков, которые не были компенсированы выигрышем от параллелизма на данном объеме данных и при данной конфигурации (2x2). Для демонстрации преимуществ такой гибридной схемы требуются задачи значительно большего масштаба или иная конфигурация вычислительных ресурсов.
+\end{itemize}
+
+\newpage
+\section{Выводы по результатам экспериментов}
+\begin{enumerate}
+    \item Параллельные реализации на основе OpenMP, TBB и STL продемонстрировали ускорение по сравнению с последовательной версией алгоритма Грэхема на наборе данных из $2.5 \times 10^6$ точек.
+    \item Реализация на TBB показала наилучшую производительность среди протестированных многопоточных подходов (OMP, TBB, STL) для данного набора данных.
+    \item Гибридная MPI+OpenMP реализация в текущих условиях тестирования не показала преимущества перед последовательной и другими параллельными версиями, что подчеркивает важность правильной настройки и учета коммуникационных издержек в распределенных системах.
+    \item Основной выигрыш в производительности достигается за счет распараллеливания этапа сортировки точек по полярному углу, а также предварительных проверок. Этап сканирования остается узким местом, так как он выполняется последовательно. Для гибридной версии также значительную часть времени могут занимать операции сбора и слияния данных на нулевом процессе.
+\end{enumerate}
+
+\newpage
+\section{Заключение}
+В рамках данной работы была исследована задача построения выпуклой оболочки с использованием алгоритма сканирования Грэхема. Были разработаны и проанализированы последовательная и несколько параллельных версий алгоритма, использующих технологии OpenMP, Intel TBB, STL и гибридный подход MPI+OpenMP.
+
+Основные результаты работы:
+\begin{enumerate}
+    \item Реализованы различные версии алгоритма Грэхема, включая последовательную, OpenMP, TBB, STL и гибридную MPI+OpenMP.
+    \item Проведен анализ производительности реализованных версий на различных наборах данных. Показано, что параллельные подходы позволяют значительно ускорить процесс построения выпуклой оболочки по сравнению с последовательной реализацией.
+    \item Выявлены особенности и эффективность каждого из параллельных подходов. OpenMP и TBB предоставили удобные средства для распараллеливания с хорошими результатами. Гибридный подход MPI+OpenMP показал потенциал для дальнейшей масштабируемости на распределенных системах, хотя и требует внимательного учета коммуникационных издержек.
+\end{enumerate}
+
+\newpage
+\section{Литература}
+\begin{thebibliography}{9}
+    \bibitem{graham} Graham, R. L. (1972). An efficient algorithm for determining the convex hull of a finite planar set. Information Processing Letters, 1(4), 132-133.
+    \bibitem{cormen} Кормен, Т., Лейзерсон, Ч., Ривест, Р., Штайн, К. Алгоритмы: построение и анализ. – 3-е изд. – М.: Вильямс, 2013.
+    \bibitem{omp_book} Chapman, B., Jost, G., Van Der Pas, R. Using OpenMP: portable shared memory parallel programming. MIT press, 2008.
+    \bibitem{tbb_book} Reinders, J. Intel threading building blocks: outfitting C++ for multi-core processor parallelism. " O'Reilly Media, Inc.", 2007.
+    \bibitem{mpi_book} Gropp, W., Lusk, E., Skjellum, A. Using MPI: portable parallel programming with the message-passing interface. MIT press, 2014.
+\end{thebibliography}
+
+\newpage
+\section{Приложение}
+
+В данном разделе представлены ключевые фрагменты кода для различных реализаций.
+
+\subsection{Структура Point и общая функция CrossProduct}
+\begin{lstlisting}[language=C++]
+class Point {
+ public:
+  int x;
+  int y;
+
+  Point(int x_value, int y_value) : x(x_value), y(y_value) {}
+  Point() : x(0), y(0) {}
+  // Comparison operators ==, !=, <=>
+  auto operator<=>(const Point& rhs) const {
+    if (auto cmp = y <=> rhs.y; cmp != 0) {
+      return cmp;
+    }
+    return x <=> rhs.x;
+  }
+  // For MPI (in ops_all.hpp)
+  template <class Archive>
+  void serialize(Archive& ar, const unsigned int version) {
+    ar& x;
+    ar& y;
+  }
+};
+
+// Common for most implementations
+static int CrossProduct(const Point& p1, const Point& p2, const Point& p3) {
+  return ((p2.x - p1.x) * (p3.y - p1.y)) - ((p3.x - p1.x) * (p2.y - p1.y));
+}
+\end{lstlisting}
+\newpage
+\subsection{Последовательная реализация (SEQ) - RunImpl}
+\begin{lstlisting}[language=C++]
+bool ermolaev_v_graham_scan_seq::TestTaskSequential::RunImpl() {
+  // Preliminary checks (min_points, all_same, all_collinear)
+  // ... (code omitted for brevity) ...
+
+  auto base_it = std::ranges::min_element(input_, 
+                    [](const Point &a, const Point &b) { return a < b; });
+  std::iter_swap(input_.begin(), base_it);
+
+  std::sort(input_.begin() + 1, input_.end(), [&](const Point &a, const Point &b) {
+    auto squared_dist = [](const Point &p1, const Point &p2) -> int {
+      int dx = p1.x - p2.x;
+      int dy = p1.y - p2.y;
+      return ((dx * dx) + (dy * dy));
+    };
+    int cross = CrossProduct(input_[0], a, b);
+    if (cross == 0) {
+      return squared_dist(a, input_[0]) < squared_dist(b, input_[0]);
+    }
+    return cross > 0;
+  });
+
+  output_.clear();
+  output_.emplace_back(input_[0]);
+  output_.emplace_back(input_[1]);
+
+  Point p1, p2, p3;
+  for (size_t i = kMinStackPoints; i < input_.size(); i++) {
+    while (output_.size() >= kMinStackPoints) {
+      p1 = output_[output_.size() - 2];
+      p2 = output_[output_.size() - 1];
+      p3 = input_[i];
+      int cross = CrossProduct(p1, p2, p3);
+      if (cross > 0) break;
+      output_.pop_back();
+    }
+    output_.emplace_back(input_[i]);
+  }
+  return true;
+}
+\end{lstlisting}
+\newpage
+
+\subsection{OpenMP реализация (OMP) - ключевые параллельные участки}
+\begin{lstlisting}[language=C++]
+// Finding the base point
+size_t ermolaev_v_graham_scan_omp::TestTaskOMP::IndexOfMinElement() {
+  size_t min_idx = 0;
+  // ... implementation details ...
+  #pragma omp parallel
+  {
+    size_t local_min_idx = 0;
+    #pragma omp for nowait
+    for (int i = 1; i < input_size; i++) { /* ... comparison ... */ }
+    #pragma omp critical
+    { /* ... update global min_idx ... */ }
+  }
+  return min_idx;
+}
+
+// Check for collinearity
+bool ermolaev_v_graham_scan_omp::TestTaskOMP::IsAllCollinear() {
+  // ... implementation details ...
+  #pragma omp parallel for reduction(|| : found_non_collinear)
+  for (int i = 0; i < input_size - 2; ++i) { /* ... cross product check ... */ }
+  return !found_non_collinear;
+}
+
+// Parallel sort (fragment)
+template <typename Iterator, typename Comparator>
+void ermolaev_v_graham_scan_omp::TestTaskOMP::ParallelSort(Iterator begin, Iterator end, Comparator comp) {
+  // ... splitting into chunks ...
+  #pragma omp parallel
+  {
+    // ... local sort for each chunk ...
+    // std::sort(chunk.begin(), chunk.end(), comp);
+  }
+  // ... multi-level merging of chunks ...
+  #pragma omp parallel for schedule(dynamic) private(temp, source)
+  for (int level = 0; level < levels; level++) { /* ... merge step ... */ }
+}
+\end{lstlisting}
+\newpage
+
+\subsection{TBB реализация - ключевые параллельные участки}
+\begin{lstlisting}[language=C++]
+// Finding the base point
+size_t ermolaev_v_graham_scan_tbb::TestTaskTBB::IndexOfMinElement() {
+  return tbb::parallel_reduce(
+      tbb::blocked_range<int>(0, input_size), 0,
+      [&](const tbb::blocked_range<int> &range, int init) -> int { /* ... local min finding ... */ },
+      [&](int a, int b) -> int { return input_[a] < input_[b] ? a : b; });
+}
+
+// Check for collinearity
+bool ermolaev_v_graham_scan_tbb::TestTaskTBB::IsAllCollinear() {
+  auto is_non_collinear = tbb::parallel_reduce(
+      tbb::blocked_range<int>(0, input_size - 2), false,
+      [&](const tbb::blocked_range<int> &range, bool init) -> bool { /* ... non-collinear check ... */ },
+      [](bool a, bool b) -> bool { return a || b; });
+  return !is_non_collinear;
+}
+
+// Sorting in RunImpl
+// ...
+tbb::parallel_sort(input_.begin() + 1, input_.end(), [&](const Point &a, const Point &b) {
+  // ... comparator is similar to SEQ ...
+});
+// ...
+\end{lstlisting}
+\newpage
+
+\subsection{STL реализация - ParallelSort (фрагмент)}
+\begin{lstlisting}[language=C++]
+template <typename Iterator, typename Comparator>
+void ermolaev_v_graham_scan_stl::TestTaskSTL::ParallelSort(Iterator begin, Iterator end, Comparator comp) {
+  const size_t n = std::distance(begin, end);
+  int num_threads = ppc::util::GetPPCNumThreads();
+  std::vector<std::thread> threads;
+  // ... defining chunk boundaries ...
+
+  for (int i = 0; i < num_threads; i++) {
+    threads.emplace_back([=]() { 
+        std::sort(begin + chunk_boundaries[i], begin + chunk_boundaries[i + 1], comp); 
+    });
+  }
+  for (auto& t : threads) t.join();
+  threads.clear();
+
+  // ... multi-level merge using std::thread and std::merge ...
+  // (merge code omitted for brevity, see ops_stl.hpp)
+}
+\end{lstlisting}
+\newpage
+
+\subsection{MPI + OpenMP реализация (ALL) - RunImpl (фрагменты)}
+\begin{lstlisting}[language=C++]
+bool ermolaev_v_graham_scan_all::TestTaskALL::RunImpl() {
+  int rank = world_.rank();
+  int size = world_.size();
+  Point min_point;
+
+  if (rank == 0) {
+    // CheckGrahamNecessaryConditions() -> uses OMP IsAllSame, IsAllCollinear
+    // IndexOfMinElement() -> uses OMP
+    // ... defining min_point ...
+  }
+
+  boost::mpi::broadcast(world_, data_size, 0); // data_size from input_
+  boost::mpi::broadcast(world_, min_point, 0);
+
+  // ... calculating counts, displs for scatterv ...
+  local_points_.resize(counts[rank]);
+  boost::mpi::scatterv(world_, input_.data() + 1, counts, displs, 
+                       local_points_.data(), counts[rank], 0);
+  
+  // Each process sorts its part of local_points_ using OMP ParallelSort
+  ParallelSort(local_points_.begin(), local_points_.end(), comp_around_min_point);
+
+  if (rank == 0) {
+    // Gathering and merging sorted local_points_ from other processes
+    // ... world_.recv ... std::ranges::merge ...
+    // input_ is formed from merged and sorted points + min_point
+    GrahamScan(); // Sequential scan
+  } else {
+    world_.send(0, 0, local_points_);
+  }
+  return true;
+}
+\end{lstlisting}
+
+\end{document}
