@@ -1,0 +1,759 @@
+\documentclass[12pt,a4paper]{extarticle}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{framed}
+\usepackage{listings}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
+
+\geometry{
+	a4paper,
+	left=30mm,
+	right=15mm,
+	top=20mm,
+	bottom=20mm
+}
+
+\titleformat{\section}[block]
+{\normalfont\fontsize{14}{16}\bfseries\centering}
+{\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries\filcenter}
+{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries\filcenter}
+{\thesubsubsection.}{0.5em}{}
+
+\lstset{
+	basicstyle=\ttfamily\small,
+	keywordstyle=\color{blue},
+	commentstyle=\color{green},
+	stringstyle=\color{red},
+	frame=single,
+	tabsize=4,
+	showstringspaces=false,
+	breaklines=true
+}
+
+\sloppy
+
+\onehalfspacing
+
+\setlength{\parindent}{1.25cm}
+
+\newcommand{\appendixsection}[1]{%
+	\clearpage
+	\section*{\centering Приложение #1}
+	\addcontentsline{toc}{section}{Приложение #1}
+}
+
+\begin{document}
+	
+	\begin{titlepage}
+		\begin{center}
+			
+			\onehalfspacing
+			
+			\begin{center}
+				\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\ 			
+				\vspace{0.5cm}
+				Федеральное государственное автономное образовательное учреждение высшего образования \\ 
+				\vspace{0.5cm}
+				\textbf{«Национальный исследовательский Нижегородский государственный университет имени Н.И. Лобачевского»} \\
+				(ННГУ)\\
+				\vspace{0.5cm}
+				\textbf{Институт информационных технологий, математики и механики}
+			\end{center}
+			\vspace{0.5cm}
+			\begin{center}
+			Направление подготовки: Фундаментальная информатика и информационные технологии
+			
+			
+			Профиль подготовки: «Инженерия программного обеспечения»
+			\end{center}
+			\vspace{2.5cm}
+			\begin{center}
+				\textbf{Отчёт по лабораторной работе}
+
+				на тему: 
+				
+				\textbf{"Поразрядная сортировка для вещественных чисел (тип double) с четно-нечетным слиянием Бэтчера"}
+			\end{center}
+			
+			\vspace{2.5cm}
+			
+			\begin{flushright}
+				\textbf{Выполнила:} \\
+				студентка 3 курса группы 3822Б1ФИ3 \\
+				Кудряшова И.И. \\
+				
+				\vspace{1cm}
+				
+			\noindent\textbf{Преподаватель:} \\
+			к.т.н., доцент кафедры ВВСП \\
+			{Сысоев А.В.}
+			\end{flushright}
+			
+			\vspace{2em}
+			
+			\vfill
+			
+			\begin{center}
+				Нижний Новгород \\
+				2025 г.
+			\end{center}
+			
+		\end{center}
+	\end{titlepage}
+	
+	\newpage
+	
+	
+	\section*{Введение}
+	Сортировка является одной из фундаментальных операций, необходимых для организации данных в различных приложениях, таких как обработка данных, поиск и анализ информации. С ростом объема данных разработка эффективных алгоритмы сортировки становится критически важной задачей. 
+
+	В данном отчёте рассматривается реализация сортировки чисел с плавающей точкой двойной точности (double), основанная на комбинации поразрядной сортировки и чётно-нечётного слияния Бэтчера. Были разработаны последовательная версия и параллельные реализации с использованием технологий OpenMP, Intel Threading Building Blocks (TBB), стандартной библиотеки потоков C++ (STL) и гибридной модели MPI + TBB.
+	
+	\section*{Постановка задачи}	
+	Цель работы — реализовать и сравнить различные подходы к сортировке массива чисел с плавающей точкой алгоритмом, сочетающим поразрядную сортировку и чётно-нечётное слияние Бэтчера, измерить их производительность и оценить ускорение, достигаемое за счёт параллелизации.
+	
+	Выделим следующие задачи:
+		
+	\begin{enumerate}
+		\item Реализовать последовательную версию поразрядной сортировки для чисел с плавающей точкой.
+		\item Разработать параллельные версии с использованием OpenMP, TBB, STL, а также гибридную версию MPI + TBB.
+		\item Измерить производительность каждой реализации на массиве из 3 000 000 элементов.
+		\item Сравнить эффективность всех версий, сделать выводы о преимуществах каждого подхода и выбрать оптимальный подход для данной задачи.
+	\end{enumerate}
+	
+	\section{Поразрядная сортировк для чисел с плавающей точкой}
+	
+	Поразрядная сортировка (Radix Sort) — это алгоритм, который сортирует данные, обрабатывая их по разрядам, битам или байтам, начиная с наименее значимого. Для каждого разряда используется стабильная сортировка подсчётом, что обеспечивает линейную временную сложность O(nk), где n — количество элементов, а k — число разрядов, в нашем случае k = 8 для 64-битных чисел. 
+	
+	Для чисел с плавающей точкой требуется специальная обработка: они преобразуются в целые числа с сохранением порядка сортировки, что позволяет применять этот алгоритм к нецелочисленным данным. В данной реализации числа типа \texttt{double} преобразуются в их 64-битное целочисленное представление с помощью функции \texttt{memcpy}. Более подробное рассмотрение реализации будет представлено в части, описывающей последовательную версию.	
+
+	
+
+	\section{Слияние Бэтчера}
+	Слияние Бэтчера (Batcher’s odd-even merge) — это параллельный алгоритм слияния, который объединяет два отсортированных массива в один отсортированный массив. Он является частью сортировочной сети Бэтчера, известной своей фиксированной схемой сравнений, которая может быть эффективно распараллелена. Алгоритм имеет сложность $O(\log^2n)$ по глубине сети и подходит для параллельных вычислений, что делает его крайне подходящим для использования в многопоточных средах.
+
+	
+	
+	\section{Описание конкретных реализаций}
+	
+	\subsection{Последовательная версия}
+	В последовательной версии функция \texttt{RadixDoubleSort} сортирует весь массив чисел с плавающей точкой.
+		
+	Сначала создаётся вектор \texttt{converted} для хранения представлений double в формате \texttt{uint64\_t}. Каждое число преобразуется в \texttt{uint64\_t}, при этом обрабатывается знак: если старший бит равен 1, число инвертируется, иначе инвертируется только старший бит. 
+	После этого функция выполняет сортировку поразрядно, проходя через каждый байт числа от младшего к старшему. В каждом проходе создаём массив подсчета, который фиксирует количество вхождений каждого байта.
+	
+	Далее получим массив префиксных сумм, который позволяет определить, куда именно нужно разместить каждый элемент в отсортированном массиве. Здесь происходит перераспределение элементов из \texttt{converted} в \texttt{buffer} на основе подсчитанных префиксных сумм. Каждый элемент помещается в соответствующую позицию в \texttt{buffer} на основе значения младшего байта. После завершения прохода содержимое \texttt{buffer} копируется в \texttt{converted}, и процесс повторяется для следующего байта. В конце выводится отсортированный массив, показывающий результат работы функции.
+	
+	Эта реализация проста и не использует параллелизм, она будет служить для сравнения с параллельными версиями.
+	
+	\subsection{OpenMP версия}
+	В версии с OpenMP функция \texttt{RunImpl} в общем и целом организует процесс сортировки входных данных, разбивая их на блоки. \texttt{\#pragma omp parallel for schedule(static)} обеспечивает параллельную сортировку блоков и их последующее слияние, распределяя задачи равномерно между потоками.
+	Каждый поток вызывает RadixDoubleSort для своего блока, где начальный и конечный индексы элементов вычисляются на основе индекса потока. 
+	
+	Рассмотрим функцию подробнее. \texttt{RadixDoubleSort} выполняет поразрядную сортировку подмассива чисел \texttt{double}. Отметим средства OpenMP, которыми пользовались для реализации.
+	
+	\begin{enumerate}
+		\item С помощью директивы \texttt{\#pragma omp parallel for} числа \texttt{double} параллельно преобразуются в 64-битные целые числа. Для отрицательных чисел инвертируются все биты, для положительных --- знаковый бит, чтобы сохранить порядок сортировки.
+		\item Выполняется поразрядная сортировка в 8 проходов по байтам 64-битного числа. На каждом проходе:
+		\begin{itemize}
+		\item Локальный массив \texttt{local\_count} используется для подсчёта частот байтов в каждом потоке с помощью \texttt{\#pragma omp parallel} и \texttt{\#pragma omp for}.
+			\item Частоты агрегируются в глобальный массив \texttt{count} в критической секции \texttt{\#pragma omp critical}.
+			\item Элементы распределяются в \texttt{buffer} с использованием атомарных операций \texttt{std::atomic} через \texttt{\#pragma omp parallel for}.
+		\end{itemize}
+		\item Отсортированные целые числа преобразуются обратно в \texttt{double} параллельно \texttt{\#pragma omp parallel for} с учётом знака.
+	\end{enumerate}
+	
+	Затем, в цикле, происходит итеративное слияние блоков с использованием \texttt{BatcherMerge}, где размер сливаемых блоков увеличивается вдвое на каждом шаге.
+	
+	Функция \texttt{BatcherMerge} выполняет чётно-нечётное слияние двух отсортированных подмассивов. Массив делится на части по количеству потоков с помощью \texttt{\#pragma omp parallel}. Каждый поток обрабатывает свой участок, чередуя выбор элементов:  На чётных итерациях предпочтение отдаётся левой части, если элемент меньше или равен правому. На нечётных — правой части.
+	
+	В результате получаем полностью отсортированный массив.
+
+
+	\subsection{TBB версия}
+	Реализация с использованием Intel TBB следует аналогичному подходу, но использует параллельные конструкции TBB, такие как \texttt{tbb::parallel\_for}, для сортировки блоков и \texttt{tbb::parallel\_invoke} для рекурсивного слияния. 
+		
+	
+	Функция \texttt{RadixDoubleSort} выполняет поразрядную сортировку подмассива \texttt{[first, last)}.
+	
+	\begin{enumerate}
+	\item Параллельно, с использованием \texttt{tbb::parallel\_for}, копирует числа в \texttt{uint64\_t} через \texttt{memcpy}.Для отрицательных чисел инвертирует все биты, для положительных --- знаковый бит.
+
+	Выполняет 8 проходов по байтам:
+	\item Подсчитываем частоты байтов с \texttt{tbb::combinable}.
+	\item Формирование префиксных сумм.
+	\item Параллельное распределение в буфер с использованием \texttt{tbb::parallel\_for} .
+	\item Параллельно, с использованием \texttt{tbb::parallel\_for}, выполняет обратное преобразование с учётом знака.		
+	\end{enumerate}
+	
+	Функция \texttt{BatcherMerge} в этой версии реализована рекурсивно, что соответствует классическому алгоритму слияния Бэтчера, обеспечивая эффективное использование ресурсов многопоточной среды. Функция \texttt{BatcherMerge} выполняет чётно-нечётное слияние двух отсортированных подмассивов.
+	
+	\begin{enumerate}
+		\item Рекурсивно делит подмассивы и вызывает \texttt{BatcherMerge} через \texttt{tbb::parallel\_invoke}.
+		\item Параллельно через \texttt{tbb::parallel\_for} выполняет сравнения и перестановки соседних элементов.
+	\end{enumerate}
+
+	\subsection{STL версия}
+	В версии с использованием STL массив также делится на блоки, которые сортируются параллельно с помощью \texttt{std::thread}. Это обеспечивает более точное управление потоками по сравнению с OpenMP и TBB. Эта реализация требует более сложного управления потоками, но может быть более эффективной в определенных сценариях благодаря отсутствию накладных расходов библиотек.
+	
+
+	Функция \texttt{RunImpl} выполняет полную сортировку массива с параллелизацией:
+	
+	\begin{enumerate}
+		\item Делит массив на блоки по числу потоков.
+		\item Запускает \texttt{std::thread} для параллельной сортировки блоков. Функция \texttt{RadixDoubleSort} повторяет последовательную реализацию.
+		\item Итеративно выполняет слияние блоков с помощью \texttt{BatcherMerge} в параллельных потоках.
+	\end{enumerate}
+	
+	\subsection{Версия \texttt{MPI+TBB}}
+	Реализация объединяет MPI для распределённых вычислений и TBB для параллелизма на уровне потоков, чтобы сортировать большие массивы чисел с плавающей точкой двойной точности. Используется поразрядная сортировка для локальной обработки и чётно-нечётное слияние Бэтчера для глобального объединения.
+	
+	
+	Распараллеливание фнкциии \texttt{RadixDoubleSort} с помощью TBB приведено выше, в данной реализации повторяем его.
+
+	
+	На корневом процессе определяется размер входного массива, который делится на части для каждого процесса. Размеры частей  \texttt{counts\_} и смещения  \texttt{displs\_} рассчитываются с учётом числа процессов: если массив не делится равномерно, остаток распределяется между первыми процессами. Эти параметры передаются всем процессам через  \texttt{mpi::broadcast}. Затем данные распределяются с помощью  \texttt{boost::mpi::scatterv}.
+	Каждый процесс сортирует полученную часть данных с помощью функции  \texttt{RadixDoubleSort}. Параллелизация достигается с использованием TBB:  \texttt{tbb::parallel\_for} применяется для подсчёта частот байтов и распределения элементов по буферу. Например, подсчёт частот выполняется в  \texttt{tbb::combinable}, что позволяет избежать конфликтов при параллельной работе потоков, а затем результаты объединяются в общий массив  \texttt{total\_counts}.
+	
+	После локальной сортировки данные собираются обратно на главном процессе с помощью  \texttt{boost::mpi::gatherv}, где они помещаются в  \texttt{global\_data} в соответствии с ранее рассчитанными смещениями  \texttt{displs\_}. На главном процессе запускается процесс слияния с использованием  \texttt{BatcherMerge}. Этот алгоритм объединяет пары отсортированных блоков, начиная с размера наибольшего локального блока  \texttt{current\_block\_size}, и удваивает размер блока на каждой итерации, пока не обработает весь массив. Параллелизация слияния реализована через TBB: циклы обработки пар блоков могут выполняться одновременно в разных потоках.
+	
+	Если поддвести итог, то реализация MPI+TBB выполняет следующие действия:
+	\begin{enumerate}
+		\item  Корневой процесс загружает данные и вычисляет размеры блоков.
+		\item Данные распределяются между процессами через \texttt{scatterv}.
+		\item  Каждый процесс сортирует свой блок с помощью \texttt{RadixDoubleSort}.
+		\item  Отсортированные подмассивы собираются в корневой процесс через \texttt{gatherv}.
+		\item  Корневой процесс объединяет части с помощью \texttt{BatcherMerge}.
+	\end{enumerate}
+	
+	
+	\section{Экспериментальные результаты}
+	Для оценки производительности были проведены эксперименты на наборе данных из 3 000 000 случайных чисел с плавающей точкой двойной точности. Будем сравнивать последовательную реализацию с параллельными версиями OpenMP, TBB, STL и MPI+TBB. 
+	
+	Эксперименты проводились на устройстве со следующими характеристиками процессора: AMD Ryzen 5 5600H, 6 ядер, 12 потоков, базовая частота 3.30  ГГц.
+	
+	Результаты испытаний приведены в таблице.
+	\begin{table}[H]
+		\centering
+	  \caption{Время выполнения различных реализаций алгоритма}
+	\begin{tabular}{lccc}
+		\toprule
+		Реализация & Потоки & test\_pipeline\_run & test\_task\_run \\
+		\midrule
+		\multirow{1}{*}{Последовательная} & 1 & 2.801 & 2.303  \\
+		\midrule
+		\multirow{3}{*}{OpenMP}
+		& 2 & 2.405 & 1.051 \\
+		& 3 & 2.200 & 0.980 \\
+		& 4 & 2.001 & 0.960 \\
+		\midrule
+		\multirow{3}{*}{TBB}
+		& 2 & 0.731 & 0.503 \\
+		& 3 & 0.628 & 0.478 \\
+		& 4 & 0.440 & 0.333 \\
+		\midrule
+		\multirow{3}{*}{STL}
+		& 2 & 0.44  & 0.380 \\
+		& 3 & 0.43  & 0.358 \\
+		& 4 & 0.441 & 0.357 \\
+		\midrule
+		\multirow{3}{*}{MPI+TBB (4 процесса)}
+		& 2 & 2.278 & 2.365 \\
+		& 3 & 1.823 & 1.725 \\
+		& 4 & 1.627 & 1.536 \\
+		\bottomrule
+	\end{tabular}
+	\end{table}
+	
+	
+	\section{Анализ результатов}
+	Анализируя результаты, полученные путём эксперимента, делаем вывод что версия STL, использующая \texttt{std::thread}, является наиболее эффективной благодаря низким накладным расходам, тогда как TBB и OpenMP предлагают более простые модели программирования и задачу выполняют за большее время. 
+	
+	TBB предлагает высокоуровневую абстракцию с эффективным планированием задач, что делает его масштабируемым для больших систем. 
+	
+	OpenMP является наиболее простым в реализации, и уступает по производительности из-за накладных расходов на управление потоками. Слияние Бэтчера, используемое в параллельных версиях, позволяет эффективно распараллеливать процесс объединения, хотя его реализация в версии OpenMP может быть менее оптимальной из-за упрощенной логики слияния.
+	
+	Гибридная реализация MPI+TBB показала невысокую производительность, так как накладные расходы MPI перевешивают выгоду от параллелизации на одном устройстве. 
+	Высокие накладные расходы на межпроцессное взаимодействие снижают эффективность на одном устройстве.
+		
+	\section*{Заключение}
+	\addcontentsline{toc}{section}{Заключение}
+	В результате проделанной работы были разработаны реализации алгоритма сортировки чисел с плавающей точкой двойной точности, использующего поразрядную сортировку и слияние Бэтчера, в последовательном и параллельных вариантах с использованием OpenMP, TBB, STL и MPI+TBB. Параллельные версии показали значительное ускорение, подчеркивая преимущества параллельной обработки для сортировки больших наборов данных.
+	
+	Версия STL является наиболее эффективной благодаря низким накладным расходам. Для дальнейших исследований можно рассмотреть оптимизацию реализаций, тестирование на больших наборах данных или использование иных гибридных подходов, таких как MPI в сочетании с  STL.
+	
+	\addcontentsline{toc}{section}{Список литературы}
+\begin{thebibliography}{9}
+	% Книга по TBB
+	\bibitem{sysoev}
+	Сысоев А.В., Мееров И.Б., Сиднев А.А. Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks. — Нижний Новгород, 2007.
+	
+	% Книга по OpenMP
+	\bibitem{chapman2008}
+	Чапман, Б. Использование OpenMP: Практическое программирование на языках C/C++ и Fortran для симметричной мультипроцессорной обработки / Б. Чапман, Г. Йост, Р. Ван дер Паас; пер. с англ. — М.: КУДИЦ-ОБРАЗ, 2008. — 432 с. — ISBN 978-5-9579-0167-9.
+	
+	% Книга по TBB
+	\bibitem{reinders2007}
+	Рейндерс, Дж. Intel Threading Building Blocks: Практическое руководство по параллельному программированию / Дж. Рейндерс; пер. с англ. — М.: Вильямс, 2007. — 336 с. — ISBN 978-5-8459-1274-9.
+	
+	% Книга по MPI
+	\bibitem{gropp2014}
+	Гропп, У. Использование MPI: Портативные параллельные программы с интерфейсом передачи сообщений / У. Гропп, Е. Ласк, Э. Ламм, Р. Талер; пер. с англ. — 3-е изд. — М.: ДМК Пресс, 2014. — 432 с. — ISBN 978-5-94074-979-0.
+	
+	% Статья по поразрядной сортировке
+	\bibitem{knuth1998}
+	Кнут, Д. Э. Искусство программирования. Т. 3. Сортировка и поиск / Д. Э. Кнут; пер. с англ. — 2-е изд. — М.: Вильямс, 2000. — 832 с. — ISBN 5-8459-0082-4.
+	
+	% Статья по чётно-нечётному слиянию
+	\bibitem{batcher1968}
+	Бэтчер, К. Сортировочные сети и их применение / К. Бэтчер // Труды весенней объединённой компьютерной конференции AFIPS. — 1968. — Т. 32. — С. 307–314. — DOI: 10.1145/1468075.1468121.
+	
+	% Интернет-ресурс по TBB
+	\bibitem{tbb_web}
+	Intel Threading Building Blocks Documentation [Электронный ресурс]. — Режим доступа: https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html, свободный. — Загл. с экрана. — (Дата обращения: 21.05.2025).[](https://studfile.net/preview/2558498/)
+	
+	% Интернет-ресурс по MPI
+	\bibitem{mpi_web}
+	MPI Forum. MPI: A Message-Passing Interface Standard [Электронный ресурс]. — Режим доступа: https://www.mpi-forum.org/docs/, свободный. — Загл. с экрана. — (Дата обращения: 21.05.2025).
+	
+\end{thebibliography}
+	
+
+\appendixsection{A}
+\subsection*{Последовательная версия}
+	Ключевые фрагменты кода для последовательной реализации.
+
+\begin{lstlisting}[language=C++]
+	void kudryashova_i_radix_batcher_seq::RadixDoubleSort(std::vector<double> &data, int first, int last) {
+	const int sort_size = last - first;
+	std::vector<uint64_t> converted(sort_size);
+	// Convert each double to uint64_t representation
+	for (int i = 0; i < sort_size; ++i) {
+		double value = data[first + i];
+		uint64_t bits = 0;
+		std::memcpy(&bits, &value, sizeof(value));
+		converted[i] = ((bits & (1ULL << 63)) != 0) ? ~bits : bits ^ (1ULL << 63);  // sign of the number
+	}
+	std::vector<uint64_t> buffer(sort_size);
+	int bits_int_byte = 8;
+	int total_passes = sizeof(uint64_t);  // Total number of passes based on uint64_t size
+	int max_byte_value = 255;
+	
+	for (int shift = 0; shift < total_passes; ++shift) {
+		size_t count[256] = {0};                      // Array to count occurrences of each byte
+		const int shift_loc = shift * bits_int_byte;  // Determine shift for the current pass
+		
+		// Count occurrences of each byte in the current shift position
+		for (const auto &num : converted) {
+			++count[(num >> shift_loc) & max_byte_value];
+		}
+		
+		size_t total = 0;
+		// Convert the count array to a prefix sum array
+		for (auto &safe : count) {
+			size_t old = safe;
+			safe = total;
+			total += old;
+		}
+		// Rearrange the elements based on the prefix sums
+		for (const auto &num : converted) {
+			const uint8_t byte = (num >> shift_loc) & max_byte_value;
+			buffer[count[byte]++] = num;
+		}
+		converted.swap(buffer);
+	}
+	// Convert the sorted uint64_t representations back to double
+	for (int i = 0; i < sort_size; ++i) {
+		uint64_t bits = converted[i];
+		bits = ((bits & (1ULL << 63)) != 0) ? (bits ^ (1ULL << 63)) : ~bits;
+		std::memcpy(&data[first + i], &bits, sizeof(double));
+	}
+}
+\end{lstlisting}
+
+\appendixsection{B}
+\subsection*{OpenMP версия}
+Ключевые фрагменты кода для OpenMP реализации.
+
+\begin{lstlisting}[language=C++]
+void kudryashova_i_radix_batcher_omp::RadixDoubleSort(std::vector<double>& data, size_t first, size_t last) {
+	const size_t sort_size = last - first;
+	std::vector<uint64_t> converted(sort_size);
+	
+	#pragma omp parallel for
+	for (int i = 0; i < static_cast<int>(sort_size); ++i) {
+		double value = data[first + i];
+		uint64_t bits = 0;
+		std::memcpy(&bits, &value, sizeof(value));
+		converted[i] = ((bits & (1ULL << 63)) != 0) ? ~bits : bits ^ (1ULL << 63);
+	}
+	
+	std::vector<uint64_t> buffer(sort_size);
+	const int bits_in_byte = 8;
+	const int total_passes = sizeof(uint64_t);
+	const int max_byte_value = 255;
+	
+	for (int shift = 0; shift < total_passes; ++shift) {
+		std::vector<size_t> count(256, 0);
+		const int shift_loc = shift * bits_in_byte;
+		
+		#pragma omp parallel
+		{
+			std::vector<size_t> local_count(256, 0);
+			#pragma omp for
+			for (int i = 0; i < static_cast<int>(sort_size); ++i) {
+				++local_count[(converted[i] >> shift_loc) & max_byte_value];
+			}
+			#pragma omp critical
+			{
+				for (int j = 0; j < 256; ++j) {
+					count[j] += local_count[j];
+				}
+			}
+		}
+		
+		size_t total = 0;
+		for (int j = 0; j < 256; ++j) {
+			size_t old = count[j];
+			count[j] = total;
+			total += old;
+		}
+		
+		std::vector<std::atomic<size_t>> atomic_count(256);
+		for (int j = 0; j < 256; ++j) {
+			atomic_count[j] = count[j];
+		}
+		#pragma omp parallel for
+		for (int i = 0; i < static_cast<int>(sort_size); ++i) {
+			const uint8_t byte = (converted[i] >> shift_loc) & max_byte_value;
+			size_t pos = atomic_count[byte].fetch_add(1, std::memory_order_seq_cst);
+			buffer[pos] = converted[i];
+		}
+		
+		converted.swap(buffer);
+	}
+	
+	#pragma omp parallel for
+	for (int i = 0; i < static_cast<int>(sort_size); ++i) {
+		uint64_t bits = converted[i];
+		bits = ((bits & (1ULL << 63)) != 0) ? (bits ^ (1ULL << 63)) : ~bits;
+		std::memcpy(&data[first + i], &bits, sizeof(double));
+	}
+}
+
+void kudryashova_i_radix_batcher_omp::BatcherMerge(std::vector<double>& target_array, size_t merge_start,
+size_t mid_point, size_t merge_end) {
+	const size_t total_elements = merge_end - merge_start;
+	std::vector<double> merge_buffer(total_elements);
+	const size_t left_size = mid_point - merge_start;
+	const size_t right_size = merge_end - mid_point;
+	std::vector<double> left_array(target_array.begin() + static_cast<std::ptrdiff_t>(merge_start),
+	target_array.begin() + static_cast<std::ptrdiff_t>(mid_point));
+	
+	std::vector<double> right_array(target_array.begin() + static_cast<std::ptrdiff_t>(mid_point),
+	target_array.begin() + static_cast<std::ptrdiff_t>(merge_end));
+	size_t left_ptr = 0;
+	size_t right_ptr = 0;
+	size_t merge_ptr = merge_start;
+	#pragma omp parallel
+	{
+		const int num_threads = omp_get_num_threads();
+		const int thread_id = omp_get_thread_num();
+		const size_t chunk = (total_elements + num_threads - 1) / num_threads;
+		const size_t start = std::min(thread_id * chunk, total_elements);
+		const size_t end = std::min((thread_id + 1) * chunk, total_elements);
+		
+		for (size_t i = start; i < end; ++i) {
+			if (i % 2 == 0) {
+				if (left_ptr < left_size && (right_ptr >= right_size || left_array[left_ptr] <= right_array[right_ptr])) {
+					target_array[merge_ptr++] = left_array[left_ptr++];
+				} else {
+					target_array[merge_ptr++] = right_array[right_ptr++];
+				}
+			} else {
+				if (right_ptr < right_size && (left_ptr >= left_size || right_array[right_ptr] <= left_array[left_ptr])) {
+					target_array[merge_ptr++] = right_array[right_ptr++];
+				} else {
+					target_array[merge_ptr++] = left_array[left_ptr++];
+				}
+			}
+		}
+	}
+}
+
+
+bool kudryashova_i_radix_batcher_omp::TestTaskOpenMP::RunImpl() {
+	size_t n = input_data_.size();
+	const int num_threads = omp_get_max_threads();
+	const size_t block_size = (n + num_threads - 1) / num_threads;
+	
+	#pragma omp parallel for schedule(static)
+	for (int i = 0; i < num_threads; ++i) {
+		const size_t start = i * block_size;
+		const size_t end = std::min(start + block_size, n);
+		if (start < n) {
+			RadixDoubleSort(input_data_, start, end);
+		}
+	}
+	
+	for (size_t merge_size = block_size; merge_size < n; merge_size *= 2) {
+		#pragma omp parallel for schedule(static)
+		for (int i = 0; i < static_cast<int>(n); i += static_cast<int>(2 * merge_size)) {
+			const size_t mid = std::min(i + merge_size, n);
+			const size_t end = std::min(i + (2 * merge_size), n);
+			if (mid < end) {
+				BatcherMerge(input_data_, i, mid, end);
+			}
+		}
+	}
+	return true;
+}
+\end{lstlisting}
+
+\appendixsection{C}
+\subsection*{TBB версия}
+Ключевые фрагменты кода для TBB реализации.
+
+\begin{lstlisting}[language=C++]
+	void kudryashova_i_radix_batcher_tbb::ConvertDoublesToUint64(const std::vector<double>& data,
+	std::vector<uint64_t>& converted, size_t first) {
+		tbb::parallel_for(
+		tbb::blocked_range<size_t>(0, converted.size()),
+		[&](const auto& range) {
+			for (size_t i = range.begin(); i != range.end(); ++i) {
+				uint64_t bits = 0;
+				memcpy(&bits, &data[first + i], sizeof(double));
+				converted[i] = ((bits & (1ULL << 63)) != 0) ? ~bits : bits ^ (1ULL << 63);
+			}
+		},
+		tbb::auto_partitioner());
+	}
+	
+	void kudryashova_i_radix_batcher_tbb::ConvertUint64ToDoubles(std::vector<double>& data,
+	const std::vector<uint64_t>& converted, size_t first) {
+		tbb::parallel_for(
+		tbb::blocked_range<size_t>(0, converted.size()),
+		[&](const auto& range) {
+			for (size_t i = range.begin(); i != range.end(); ++i) {
+				uint64_t bits = converted[i];
+				bits = ((bits & (1ULL << 63)) != 0) ? (bits ^ (1ULL << 63)) : ~bits;
+				memcpy(&data[first + i], &bits, sizeof(double));
+			}
+		},
+		tbb::auto_partitioner());
+	}
+	
+	void kudryashova_i_radix_batcher_tbb::RadixDoubleSort(std::vector<double>& data, size_t first, size_t last) {
+		const size_t sort_size = last - first;
+		std::vector<uint64_t> converted(sort_size);
+		// Convert each double to uint64_t representation
+		ConvertDoublesToUint64(data, converted, first);
+		
+		std::vector<uint64_t> buffer(sort_size);
+		int bits_int_byte = 8;
+		int max_byte_value = 255;
+		size_t total_bits = sizeof(uint64_t) * CHAR_BIT;
+		for (size_t shift = 0; shift < total_bits; shift += bits_int_byte) {
+			tbb::combinable<std::array<size_t, 256>> local_counts;
+			tbb::parallel_for(tbb::blocked_range<size_t>(0, sort_size), [&](const auto& range) {
+				auto& counts = local_counts.local();
+				for (size_t i = range.begin(); i != range.end(); ++i) {
+					++counts[(converted[i] >> shift) & max_byte_value];
+				}
+			});
+			
+			std::array<size_t, 256> total_counts{};
+			local_counts.combine_each([&](const auto& local_count) {
+				for (size_t i = 0; i < 256; ++i) {
+					total_counts[i] += local_count[i];
+				}
+			});
+			// Convert the count array to a prefix sum array
+			size_t total = 0;
+			for (auto& safe : total_counts) {
+				size_t old = safe;
+				safe = total;
+				total += old;
+			}
+			
+			tbb::parallel_for(tbb::blocked_range<size_t>(0, 256), [&](const auto& range) {
+				for (size_t j = range.begin(); j != range.end(); ++j) {
+					size_t count = total_counts[j];
+					for (size_t i = 0; i < sort_size; ++i) {
+						if (((converted[i] >> shift) & max_byte_value) == j) {
+							buffer[count++] = converted[i];
+						}
+					}
+				}
+			});
+			
+			converted.swap(buffer);
+		}
+		ConvertUint64ToDoubles(data, converted, first);
+	}
+	
+	void kudryashova_i_radix_batcher_tbb::BatcherMerge(std::vector<double>& target_array, size_t merge_start,
+	size_t mid_point, size_t merge_end) {
+		const size_t n = merge_end - merge_start;
+		if (n <= 1) {
+			return;
+		}
+		tbb::parallel_invoke([&] { BatcherMerge(target_array, merge_start, (merge_start + mid_point) / 2, mid_point); },
+		[&] { BatcherMerge(target_array, mid_point, (mid_point + merge_end) / 2, merge_end); });
+		
+		for (size_t step = 1; step < n; step *= 2) {
+			tbb::parallel_for(tbb::blocked_range<size_t>(0, n / (2 * step)), [&](const auto& batch_range) {
+				for (size_t i = batch_range.begin(); i != batch_range.end(); ++i) {
+					const size_t left = merge_start + (2 * step * i);
+					const size_t block_end = std::min(left + (2 * step), merge_end);
+					for (size_t j = left + 1; j < block_end; j += 2) {
+						if (target_array[j - 1] > target_array[j]) {
+							std::swap(target_array[j - 1], target_array[j]);
+						}
+					}
+				}
+			});
+		}
+	}
+	
+\end{lstlisting}
+
+\appendixsection{D}
+\subsection*{STL версия}
+Ключевые фрагменты кода для STL реализации.
+\begin{lstlisting}[language=C++]
+bool kudryashova_i_radix_batcher_stl::TestTaskSTL::RunImpl() {
+	const size_t input_size = input_data_.size();
+	if (input_size <= 1) {
+		return true;
+	}
+	
+	const size_t num_threads = ppc::util::GetPPCNumThreads();
+	const size_t sort_block_size = (input_size + num_threads - 1) / num_threads;
+	
+	std::vector<std::thread> sort_threads;
+	for (size_t thread_idx = 0; thread_idx < num_threads; ++thread_idx) {
+		const size_t block_start = thread_idx * sort_block_size;
+		const size_t block_end = std::min(block_start + sort_block_size, input_size);
+		
+		if (block_start >= input_size) {
+			break;
+		}
+		
+		sort_threads.emplace_back([this, block_start, block_end] { RadixDoubleSort(input_data_, block_start, block_end); });
+	}
+	for (auto &thread : sort_threads) {
+		thread.join();
+	}
+	
+	for (size_t current_merge_size = sort_block_size; current_merge_size < input_size; current_merge_size *= 2) {
+		const size_t merge_group_size = 2 * current_merge_size;
+		const size_t total_merge_groups = (input_size + merge_group_size - 1) / merge_group_size;
+		
+		std::vector<std::thread> merge_threads;
+		const size_t merge_groups_per_thread = (total_merge_groups + num_threads - 1) / num_threads;
+		
+		for (size_t thread_idx = 0; thread_idx < num_threads; ++thread_idx) {
+			const size_t group_range_start = thread_idx * merge_groups_per_thread;
+			const size_t group_range_end = std::min(group_range_start + merge_groups_per_thread, total_merge_groups);
+			
+			if (group_range_start >= group_range_end) {
+				break;
+			}
+			merge_threads.emplace_back([&, group_range_start, group_range_end, current_merge_size, merge_group_size] {
+				for (size_t group_index = group_range_start; group_index < group_range_end; ++group_index) {
+					const size_t merge_start = group_index * merge_group_size;
+					const size_t merge_mid = std::min(merge_start + current_merge_size, input_size);
+					const size_t merge_end = std::min(merge_start + merge_group_size, input_size);
+					if (merge_mid < merge_end) {
+						BatcherMerge(input_data_, merge_start, merge_mid, merge_end);
+					}
+				}
+			});
+		}
+		for (auto &thread : merge_threads) {
+			thread.join();
+		}
+	}
+	return true;
+}
+
+
+\end{lstlisting}
+\appendixsection{E}
+\subsection*{MPI+TBB версия}
+Ключевые фрагменты кода для MPI+TBB реализации.
+\begin{lstlisting}[language=C++]
+	bool kudryashova_i_radix_batcher_all::TestTaskALL::RunImpl() {
+		if (world_.rank() == 0) {
+			n_ = input_data_.size();
+			size_t base_chunk = n_ / world_.size();
+			size_t remainder = n_ % world_.size();
+			
+			counts_.resize(world_.size());
+			displs_.resize(world_.size());
+			
+			for (size_t i = 0; i < static_cast<size_t>(world_.size()); ++i) {
+				size_t chunk_size = (i < remainder) ? base_chunk + 1 : base_chunk;
+				counts_[i] = static_cast<int>(chunk_size);
+				displs_[i] = (i == 0) ? 0 : displs_[i - 1] + counts_[i - 1];
+			}
+		}
+		
+		mpi::broadcast(world_, n_, 0);
+		mpi::broadcast(world_, counts_, 0);
+		mpi::broadcast(world_, displs_, 0);
+		
+		int local_size = counts_[world_.rank()];
+		std::vector<double> local_data(local_size);
+		boost::mpi::scatterv(world_, world_.rank() == 0 ? input_data_.data() : nullptr, counts_, displs_, local_data.data(),
+		local_size, 0);
+		
+		RadixDoubleSort(local_data, 0, local_data.size());
+		
+		std::vector<double> global_data;
+		if (world_.rank() == 0) {
+			global_data.resize(n_);
+		}
+		boost::mpi::gatherv(world_, local_data.data(), local_size, world_.rank() == 0 ? global_data.data() : nullptr, counts_,
+		displs_, 0);
+		
+		if (world_.rank() == 0) {
+			input_data_ = global_data;
+			size_t current_block_size = *std::ranges::max_element(counts_);
+			while (current_block_size < n_) {
+				size_t next_block_size = std::min(2 * current_block_size, n_);
+				for (size_t start = 0; start < n_; start += next_block_size) {
+					size_t mid = std::min(start + current_block_size, n_);
+					size_t end = std::min(start + next_block_size, n_);
+					if (mid < end) {
+						BatcherMerge(input_data_, start, mid, end);
+					}
+				}
+				current_block_size = next_block_size;
+			}
+			all_data_ = input_data_;
+		}
+		return true;
+	}
+	
+\end{lstlisting}
+
+
+\end{document}
