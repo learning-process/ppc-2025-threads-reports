@@ -165,9 +165,9 @@ for (int iter = 0; iter < max_iters; ++iter) {
     \item \textbf{Локальная QuickSort с параллельными секциями}:
     \begin{itemize}
         \item Вычисляется \verb|max_depth = log2(omp_get_num_threads()) + 1|.
-        \item Если \verb|depth < max_depth|, рекурсивные вызовы выполняются в \verb|#pragma omp parallel sections|.
+        \item Если \verb|depth < max_depth|, рекурсивные вызовы выполняются в \verb|\#pragma omp parallel sections|.
     \end{itemize}
-    \item \textbf{Объединение блоков через #pragma omp parallel for}:
+    \item \textbf{Объединение блоков через \#pragma omp parallel for}:
     \begin{itemize}
         \item Итеративное четно-нечетное слияние распараллеливается по индексам блоков.
         \item Используется \verb|reduction(||:changed)| для объединения флагов изменений.
