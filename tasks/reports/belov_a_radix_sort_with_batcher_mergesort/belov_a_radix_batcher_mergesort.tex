@@ -5,14 +5,16 @@
 \usepackage{amsmath}
 \usepackage{amsfonts}
 \usepackage{enumitem}
+\usepackage{float}
 \usepackage{geometry}
-\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage[expansion=false]{microtype}
 \usepackage{multirow}
 \usepackage{titlesec}
 \usepackage{tocloft}
 \usepackage{xcolor} 
-\usepackage{listings}
-\usepackage{float}
+
 \geometry{a4paper, margin=1in}
 
 \lstset{
@@ -53,9 +55,9 @@
     \vfill
     
     \textbf{\Large Отчет по практическим работам по курсу параллельного программирования на тему:\\[20pt]
-    «Поразрядная сортировка для целых чисел с четно-нечетным слиянием Бэтчера»}\\[50pt]
+    «Поразрядная сортировка для целых чисел с четно-нечетным слиянием Бэтчера»}\\[70pt]
     
-    \hfill\parbox{0.4\textwidth}{
+    \hfill\parbox{0.35\textwidth}{
         \textbf{Выполнил:}\\
         студент группы 3822Б1ПР1,\\
         Белов А.А.\\[10pt]
@@ -108,38 +110,28 @@
     \item Сборка итогового отсортированного массива с учетом синхронизации.
 \end{enumerate}
 
-
 \section*{Схема реализации OpenMP алгоритма и использованных функций, технологий}
-Реализация с OpenMP использует директивы для многопоточной обработки. Метод \texttt{SortParallel} делит массив на чанки размером \(arr.size() / num\_threads\), где \texttt{num\_threads} определяется через \texttt{ppc::util::GetPPCNumThreads()}. Директива \texttt{\#pragma omp parallel} создает потоки, каждый из которых сортирует свой чанк с помощью \texttt{Sort}. Метод \texttt{BatcherMergeParallel} выполняет слияние с шагом \texttt{step}, используя \texttt{\#pragma omp parallel for} для параллельного объединения блоков с помощью \texttt{std::inplace\_merge}. 
-OpenMP обеспечивает простоту параллелизации с минимальной синхронизацией.
-
+Реализация с OpenMP использует директивы для многопоточной обработки. Метод \texttt{SortParallel} делит массив на чанки размером \(arr.size() / num\_threads\), где \texttt{num\_threads} определяется через \texttt{ppc::util::GetPPCNumThreads()}. Директива \texttt{\#pragma omp parallel} создает потоки, каждый из которых сортирует свой чанк с помощью \texttt{Sort}. Метод \texttt{BatcherMergeParallel} выполняет слияние с шагом \texttt{step}, используя \texttt{\#pragma omp parallel for} для параллельного объединения блоков с помощью \texttt{std::inplace\_merge}. OpenMP обеспечивает простоту параллелизации с минимальной синхронизацией.
 
 \section*{Схема реализации TBB алгоритма и использованных функций, технологий}
-TBB-версия использует Intel Threading Building Blocks. Метод \texttt{SortParallel} применяет \texttt{oneapi::tbb::parallel\_for} с порогом \texttt{kSortThreshold = 1000}, переключаясь на последовательную сортировку для малых массивов. Чанки определяются как \(chunk\_size = (n + num\_threads - 1) / num\_threads\). Слияние в \texttt{BatcherMergeParallel} использует \texttt{blocked\_range} с порогом \texttt{kMergeThreshold = 32} для оптимального распределения задач. 
-TBB обеспечивает автоматическую балансировку нагрузки.
-
+TBB-версия использует Intel Threading Building Blocks. Метод \texttt{SortParallel} применяет \texttt{oneapi::tbb::parallel\_for} с порогом \texttt{kSortThreshold = 1000}, переключаясь на последовательную сортировку для малых массивов. Чанки определяются как \(chunk\_size = (n + num\_threads - 1) / num\_threads\). Слияние в \texttt{BatcherMergeParallel} использует \texttt{blocked\_range} с порогом \texttt{kMergeThreshold = 32} для оптимального распределения задач. TBB обеспечивает автоматическую балансировку нагрузки.
 
 \section*{Схема реализации STL алгоритма и использованных функций, технологий}
-STL-версия использует \texttt{std::thread}. Метод \texttt{SortParallel} делит массив на чанки размером \(chunk\_size = (n + num\_threads - 1) / num\_threads\), создавая потоки для каждого сегмента. Слияние в \texttt{BatcherMergeParallel} запускает потоки с порогом \texttt{kMergeThreshold = 32}, переключаясь на последовательное выполнение для малых блоков. 
-STL требует ручного управления потоками, что усложняет синхронизацию.
-
+STL-версия использует \texttt{std::thread}. Метод \texttt{SortParallel} делит массив на чанки размером \(chunk\_size = (n + num\_threads - 1) / num\_threads\), создавая потоки для каждого сегмента. Слияние в \texttt{BatcherMergeParallel} запускает потоки с порогом \texttt{kMergeThreshold = 32}, переключаясь на последовательное выполнение для малых блоков. STL требует ручного управления потоками, что усложняет синхронизацию.
 
 \section*{Схема реализации MPI + OpenMP алгоритма и использованных функций, технологий}
-MPI+OMP-версия совмещает в себе использование Boost.MPI и OpenMP. Метод \texttt{SortParallel} разбивает массив на подмассивы через \texttt{PartitionArray}, распределяя их между процессами MPI. Локальная сортировка выполняется с OpenMP (\texttt{\#pragma omp parallel for}). Слияние реализовано в \texttt{BatcherMergeParallel} (внутри процесса) и \texttt{MergeAcross} (между процессами), используя \texttt{group.send()} и \texttt{group.recv()} для обмена данными. 
-Преимущество гибридного подхода заключается в обеспечении возможностей масштабирования на кластерах.
-
+MPI+OMP-версия совмещает в себе использование Boost.MPI и OpenMP. Метод \texttt{SortParallel} разбивает массив на подмассивы через \texttt{PartitionArray}, распределяя их между процессами MPI. Локальная сортировка выполняется с OpenMP (\texttt{\#pragma omp parallel for}). Слияние реализовано в \texttt{BatcherMergeParallel} (внутри процесса) и \texttt{MergeAcross} (между процессами), используя \texttt{group.send()} и \texttt{group.recv()} для обмена данными. Преимущество гибридного подхода заключается в обеспечении возможностей масштабирования на кластерах.
 
 \section*{Результаты экспериментов}
 Для оценки производительности реализованных версий алгоритма были проведены измерения времени выполнения программы на входном массиве из 4 194 304 случайных чисел (2 в степени 22). 
 Для каждой представленной конфигурации производилось по 10 запусков, после чего было зафиксировано среднее арифметическое значение для каждой временной характеристики (\texttt{PipelineRun}, \texttt{TaskRun}), а также высчитано ускорение относительно \texttt{PipelineRun} показателя последовательной реализации.
-
 
 \begin{center}
 \begin{tabular}{|c|c|c|c|c|}
 \hline
 \textbf{Версия} & \textbf{Конфигурация} & \textbf{PipelineRun (с)} & \textbf{TaskRun (с)} & \textbf{Ускорение (раз)} \\
 \hline
-SEQ & — & 5.2033 & 5.0907 & 1.00 \\
+SEQ & — & 5.3222 & 5.2229 & 1.00 \\
 \hline
 \multirow{3}{*}{OpenMP} 
  & 2 потока & 3.0454 & 2.9077 & 1.71 \\
