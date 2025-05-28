@@ -1,0 +1,559 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{titlesec}
+
+\begin{document}
+
+\begin{titlepage}
+\centering
+{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ\\
+РОССИЙСКОЙ ФЕДЕРАЦИИ}
+
+\vspace{1em}
+
+Федеральное государственное автономное образовательное учреждение высшего образования\\
+\textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»}\\
+\textbf{(ННГУ)}
+
+\vspace{2em}
+
+\textbf{Институт информационных технологий, математики и механики}
+
+\vspace{1em}
+
+\textbf{Кафедра высокопроизводительных вычислений и системного программирования}
+
+\vspace{2em}
+
+Направление подготовки: "Прикладная математика и информатика"\\
+Профиль подготовки: "общий профиль" \\
+
+\vspace{4em}
+
+
+\textbf{\Large ОТЧЕТ}\\
+по третьей лабораторной работе:\\
+\vspace{1em}
+\textbf{«Сортировка Шелла с простым слиянием»}
+
+\begin{flushright}
+\textbf{Выполнил}:\\[5pt]
+студент группы {3822Б1ПМоп3} \\[1em]
+{Шляков Максим Сергеевич}
+\end{flushright}
+
+\vspace{1em}
+
+\begin{flushright}
+
+\noindent\textbf{Проверил:} \\[5pt]
+к. т. н., доцент кафедры ВВСП \\[5pt]
+{Сысоев Александр Владимирович}
+\end{flushright}
+
+\vspace{1em}
+
+\vfill
+\textbf{Нижний Новгород}\\
+2025
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section*{Введение}
+
+Сортировка данных является одной из фундаментальных задач в информатике и программировании. Алгоритм Шелла представляет собой обобщение сортировки вставками, обладающее улучшенными характеристиками производительности на практике. Однако в условиях современных вычислительных систем, содержащих множество ядер и даже узлов, важной задачей становится адаптация таких алгоритмов к параллельному исполнению.
+
+Цель данной работы — реализовать алгоритм сортировки Шелла с использованием различных технологий параллельного программирования, провести сравнительный анализ производительности, выявить преимущества и недостатки каждого подхода и оценить их применимость на практике.
+
+\newpage
+
+\section{Описание реализаций}
+
+В ходе лабораторной работы были реализованы пять версий алгоритма:
+
+\begin{itemize}
+  \item Последовательная (Seq)
+  \item С использованием OpenMP
+  \item С использованием TBB
+  \item С использованием std::thread (STL)
+  \item Гибридная реализация MPI + TBB
+\end{itemize}
+
+\subsection*{Последовательная реализация}
+
+В данной версии сортировка выполняется в один поток без использования средств параллелизации. Используется схема убывающих шагов $gap = n / 2^i$. На каждом шаге применяется сортировка вставками с заданным интервалом. Реализация служит базовой для оценки ускорения.
+
+\textbf{Преимущества:}
+\begin{itemize}
+  \item Простота реализации
+  \item Отсутствие накладных расходов
+\end{itemize}
+
+\textbf{Недостатки:}
+\begin{itemize}
+  \item Низкая производительность на больших объёмах данных
+  \item Не использует ресурсы многоядерных систем
+\end{itemize}
+
+\newpage
+
+\subsection*{OpenMP}
+
+\textbf{Особенности реализации:}
+\begin{enumerate}
+  \item \textbf{OpenMP для параллелизации:} Использует OpenMP для распараллеливания этапов сортировки и слияния.
+  \item \textbf{Динамическое распределение задач:} На этапе слияния применяется динамическое распределение задач (\texttt{schedule(dynamic)} в OpenMP). Это позволяет более эффективно использовать процессорные ресурсы, так как потоки берут на себя новые задачи по мере освобождения, что особенно важно при неравномерных размерах сегментов. Это минимизирует время простоя потоков и максимизирует общую производительность.
+\end{enumerate}
+\textbf{Преимущества:}
+\begin{itemize}
+  \item Простая интеграция в существующий код
+  \item Хорошее ускорение на многоядерных системах
+\end{itemize}
+
+\subsection*{TBB}
+
+\textbf{Особенности реализации:}
+\begin{enumerate}
+  \item \textbf{Разделение массива} — исходный вектор делится на непересекающиеся отрезки одинакового размера.
+  \item \textbf{Параллельная сортировка Шелла} — для каждого отрезка запускается своя TBB‑задача, где выполняется обычная сортировка Шелла.
+  \item \textbf{Синхронизация} — \texttt{task\_group::wait()} блокирует поток, пока все локальные сортировки не закончат работу.
+  \item \textbf{Последовательное слияние} — сегменты попарно добавляются к уже отсортированному префиксу через merge‑функцию с общим временным буфером.
+  \item \textbf{Запись результата} — по окончании слияний копируем итоговый массив в выходной буфер задачи, после чего задача завершается.
+\end{enumerate}
+
+
+\textbf{Преимущества:}
+\begin{itemize}
+  \item Высокая масштабируемость
+  \item Эффективное использование ресурсов
+\end{itemize}
+
+\newpage
+
+\subsection*{STL (std::thread)}
+
+\textbf{Особенности реализации:}
+\begin{enumerate}
+  \item \textbf{Разделение массива на сегменты:} массив делится на несколько подмассивов, количество которых зависит от числа доступных потоков.
+  
+  \item \textbf{Параллельная сортировка сегментов:} для каждого сегмента создаётся отдельный поток, который выполняет сортировку этого сегмента с использованием алгоритма Шелла.
+  
+  \item \textbf{Ожидание завершения потоков:} после запуска всех потоков программа ожидает их завершения с помощью метода \texttt{join}, чтобы убедиться, что все сегменты отсортированы.
+  
+  \item \textbf{Параллельное слияние сегментов:} после сортировки сегменты объединяются в один массив. Для этого повторно создаются потоки, каждый из которых выполняет слияние двух соседних подмассивов.
+  
+  \item \textbf{Повторное слияние до полного объединения:} процесс слияния выполняется в несколько этапов, пока все подмассивы не будут объединены в один. На каждом этапе количество потоков уменьшается вдвое, так как сегменты объединяются попарно.
+\end{enumerate}
+
+
+\textbf{Преимущества:}
+\begin{itemize}
+  \item Полный контроль над потоками
+  \item Нет зависимости от внешних библиотек
+\end{itemize}
+
+\textbf{Недостатки:}
+\begin{itemize}
+  \item Сложность реализации и отладки
+  \item Риски гонок и утечек ресурсов при ошибках
+\end{itemize}
+
+\newpage
+
+\subsection*{MPI + TBB}
+
+\textbf{Особенности реализации:}
+\begin{enumerate}
+  \item \textbf{Распределение данных между процессами:} корневой процесс вычисляет размер данных для каждого участника. Исходный массив разбивается на порции, которые распределяются между процессами с помощью операции \texttt{scatter}.
+  
+  \item \textbf{Сортировка одним процессом с использованием TBB:} каждый процесс разбивает полученные локальные данные на сегменты, количество которых соответствует числу потоков. Внутри \texttt{tbb::task\_arena} создаются задачи сортировки, и параллельно выполняется сортировка Шелла для каждого сегмента с помощью \texttt{task\_group}.
+  
+  \item \textbf{Слияние данных внутри процесса:} после завершения сортировки сегменты внутри процесса последовательно объединяются в один отсортированный массив с использованием функции \texttt{Merge}.
+  
+  \item \textbf{Сбор данных с процессов и межпроцессорное слияние:} каждый процесс отправляет свой отсортированный фрагмент на процесс с рангом 0 с помощью операции \texttt{gather}. На корневом процессе все полученные фрагменты собираются в один массив.
+  
+  \item \textbf{Финальное слияние на корневом процессе:} полученные части массива объединяются последовательно с использованием \texttt{Merge}, формируя окончательный отсортированный результат в массиве \texttt{output\_}.
+\end{enumerate}
+
+
+\textbf{Преимущества:}
+\begin{itemize}
+  \item Поддержка кластерных систем
+  \item Масштабируемость и высокая эффективность
+\end{itemize}
+
+\newpage
+
+\section{Эксперименты}
+
+\subsection{Условия проведения экспериментов}
+
+\begin{itemize}
+    \item \textbf{Аппаратная конфигурация}: 
+    \begin{itemize}
+        \item CPU: Intel Core i7
+        \item RAM: 32 GB
+        \item ОС: Windows 11
+    \end{itemize}
+    \item \textbf{Тестовые размеры}: 
+    \begin{itemize}
+        \item Размер тестового массива: 100000 случайных чисел
+    \end{itemize}
+\end{itemize}
+
+\subsection{Пример замера времени}
+Для сравнения взяты:
+\begin{itemize}
+    \item \textbf{Последовательная (seq) версия}: число повторений 5
+    \item \textbf{OMP версия}: число повторений 99
+    \item \textbf{TBB версия}: число повторений 1000
+    \item \textbf{STL версия}: число повторений 1000
+    \item \textbf{MPI + TBB}: число повторений 99
+\end{itemize}
+
+Число потоков в каждом тесте одинаковое = 14, число процессов в MPI = 4.
+
+Ниже приведены выдержки из протокола тестов:
+
+\begin{itemize}
+    \item \textbf{SEQ (последовательная версия)}: 
+    \begin{verbatim}
+[ RUN      ] shlyakov_m_shell_sort_seq.test_pipeline_run
+.../tasks/seq/shlyakov_m_shell_sort:pipeline:7.7878435860
+[       OK ] shlyakov_m_shell_sort_seq.test_pipeline_run (7791 ms)
+[ RUN      ] shlyakov_m_shell_sort_seq.test_task_run
+.../tasks/seq/shlyakov_m_shell_sort:task_run:1.5749297160
+[       OK ] shlyakov_m_shell_sort_seq.test_task_run (3140 ms)
+    \end{verbatim}
+
+    \item \textbf{OMP версия}:
+    \begin{verbatim}
+[ RUN      ] shlyakov_m_shell_sort_omp.test_pipeline_run
+.../tasks/omp/shlyakov_m_shell_sort:pipeline:0.4194057320
+[       OK ] shlyakov_m_shell_sort_omp.test_pipeline_run (424 ms)
+[ RUN      ] shlyakov_m_shell_sort_omp.test_task_run
+.../tasks/omp/shlyakov_m_shell_sort:task_run:0.0750063540
+[       OK ] shlyakov_m_shell_sort_omp.test_task_run (83 ms)
+
+    \end{verbatim}
+
+    \item \textbf{TBB версия}:
+    \begin{verbatim}
+[ RUN      ] shlyakov_m_shell_sort_tbb.test_pipeline_run
+.../tasks/tbb/shlyakov_m_shell_sort:pipeline:3.7364310490
+[       OK ] shlyakov_m_shell_sort_tbb.test_pipeline_run (3741 ms)
+[ RUN      ] shlyakov_m_shell_sort_tbb.test_task_run
+.../tasks/tbb/shlyakov_m_shell_sort:task_run:0.5184309480
+[       OK ] ... (525 ms)
+    \end{verbatim}
+
+        \item \textbf{STL версия}:
+    \begin{verbatim}
+[ RUN      ] shlyakov_m_shell_sort_stl.test_pipeline_run
+.../tasks/stl/shlyakov_m_shell_sort:pipeline:3.9428655110
+[       OK ] shlyakov_m_shell_sort_stl.test_pipeline_run (3947 ms)
+[ RUN      ] shlyakov_m_shell_sort_stl.test_task_run
+.../stl/shlyakov_m_shell_sort:task_run:0.7316999620
+[       OK ] shlyakov_m_shell_sort_stl.test_task_run (739 ms)
+    \end{verbatim}
+
+        \item \textbf{MPI + TBB}:
+    \begin{verbatim}
+[ RUN      ] shlyakov_m_shell_sort_all.test_pipeline_run
+threads/ppc-2025-threads/tasks/all/shlyakov_m_shell_sort:pipeline:0.5070717200
+[       OK ] shlyakov_m_shell_sort_all.test_pipeline_run (512 ms)
+[ RUN      ] shlyakov_m_shell_sort_all.test_task_run
+threads/ppc-2025-threads/tasks/all/shlyakov_m_shell_sort:task_run:0.4585620610
+[       OK ] shlyakov_m_shell_sort_all.test_task_run (469 ms)
+    \end{verbatim}
+\end{itemize}
+
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+Версия & Повторений & Среднее время, с & Потоков / процессов & Эффективность, \% \\
+\hline
+Последовательная & 5    & 0.3150  & 1   & 100.0 \\
+OpenMP           & 99   & 0.0007576 & 14/1  & 297.3 \\
+TBB              & 1000 & 0.0005184 & 14/1  & 433.3 \\
+STL              & 1000 & 0.0007317 & 14/1  & 308.4 \\
+MPI + TBB        & 99   & 0.004633  & 14/4  & 121.0 \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection*{Анализ}
+
+Проведённые эксперименты показали, что все параллельные реализации обеспечивают существенное ускорение по сравнению с последовательной версией. Наиболее эффективной оказалась версия с использованием Intel TBB, достигшая наивысшей нормированной эффективности (около 433\%), что обусловлено низкими накладными расходами на создание и управление задачами.
+
+OpenMP и STL-версии показали схожие результаты (около 297–308\%), подтверждая, что даже при сравнительно простой реализации можно добиться устойчивого ускорения.
+
+Гибридная реализация MPI+TBB достигла эффективности около 121\%, что считается хорошим результатом с учётом межпроцессного взаимодействия и дополнительных затрат на передачу данных. Несмотря на больший масштаб, эффективность MPI+TBB ограничена необходимостью синхронизации и копирования данных между процессами.
+
+Таким образом, наиболее эффективно ресурсы использовались в OpenMP и TBB, особенно на системах с ограниченным числом физических ядер, а MPI+TBB остаётся конкурентоспособным решением в условиях распределённой обработки.
+
+\newpage
+
+\section{Выводы}
+
+В рамках лабораторной работы были реализованы и протестированы пять версий алгоритма сортировки Шелла с применением различных технологий параллельного программирования. Результаты экспериментов позволяют сделать следующие выводы:
+
+\begin{itemize}
+  \item Последовательная реализация служит базовым ориентиром и демонстрирует наименьшую производительность.
+  \item OpenMP показывает высокое ускорение при минимальных затратах на реализацию и хорошо масштабируется.
+  \item TBB обеспечивает наилучшую эффективность среди протестированных подходов благодаря динамическому управлению задачами.
+  \item STL-реализация даёт стабильное ускорение, но менее эффективна, чем OpenMP и TBB, из-за ручного управления потоками.
+  \item MPI+TBB даёт уверенное ускорение в многопроцессной среде, несмотря на накладные расходы, и подходит для задач, требующих распределённого исполнения.
+\end{itemize}
+
+Таким образом, для локальных многопоточных вычислений оптимальными являются подходы на базе OpenMP и TBB, в то время как для распределённых систем и кластеров рекомендуется использовать гибридные решения, такие как MPI в сочетании с TBB.
+
+\newpage
+
+\section{Литература}
+
+\begin{enumerate}
+    \item OpenMP Architecture Review Board. "OpenMP Application Programming Interface." (2021).
+    \item Гергель В.П. Теория и практика параллельных вычислений. М.: Интернет-Университет Информационных технологий; БИНОМ. Лаборатория знаний, 2007.
+    \item Intel. "Threading Building Blocks Documentation." (2023).
+    \item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks}. — Нижний Новгород, 2007.
+\end{enumerate}
+
+\newpage
+
+\section{Приложение}
+\subsection{Последовательная версия}
+\begin{lstlisting}[language=C++]
+bool RunImpl() {
+  int n = static_cast<int>(input_.size());
+
+  std::vector<int> gaps;
+  for (int i = 1; i <= static_cast<int>(std::sqrt(n)) + 1; ++i) {
+    int gap = static_cast<int>(n / std::pow(2.0, i));
+    if (gap > 0) {
+      gaps.push_back(gap);
+    }
+  }
+
+  for (int k = static_cast<int>(gaps.size()) - 1; k >= 0; --k) {
+    int gap = gaps[k];
+    for (int start = 0; start < gap; ++start) {
+      for (int i = start + gap; i < n; i += gap) {
+        int key = output_[i];
+        int j = i - gap;
+        while (j >= start && output_[j] > key) {
+          output_[j + gap] = output_[j];
+          j -= gap;
+        }
+        output_[j + gap] = key;
+      }
+    }
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection{OpenMP}
+\begin{lstlisting}[language=C++]
+bool RunImpl() {
+  int array_size = static_cast<int>(input_.size());
+  int num_threads = omp_get_max_threads();
+  int sub_arr_size = (array_size + num_threads - 1) / num_threads;
+
+#pragma omp parallel
+  {
+    std::vector<int> buffer;
+
+#pragma omp for schedule(dynamic)
+    for (int i = 0; i < num_threads; ++i) {
+      int left = i * sub_arr_size;
+      int right = std::min(left + sub_arr_size - 1, array_size - 1);
+      if (left < right) {
+        ShellSort(left, right, input_);
+      }
+    }
+
+    for (int size = sub_arr_size; size < array_size; size *= 2) {
+#pragma omp for schedule(dynamic)
+      for (int left = 0; left < array_size; left += 2 * size) {
+        int mid = std::min(left + size - 1, array_size - 1);
+        int right = std::min(left + 2 * size - 1, array_size - 1);
+        if (mid < right) {
+          Merge(left, mid, right, input_, buffer);
+        }
+      }
+    }
+  }
+
+  output_ = input_;
+  return true;
+}
+\end{lstlisting}
+
+\subsection{TBB}
+\begin{lstlisting}[language=C++]
+bool RunImpl() {
+  const int n = static_cast<int>(input_.size());
+  if (n < 2) return true;
+
+  const int max_threads = ppc::util::GetPPCNumThreads();
+  int threads = std::min(max_threads, n);
+  const int seg_size = (n + threads - 1) / threads;
+
+  std::vector<std::pair<int, int>> segs;
+  for (int idx = 0; idx < threads; ++idx) {
+    int l = idx * seg_size;
+    int r = std::min(n - 1, l + seg_size - 1);
+    segs.emplace_back(l, r);
+  }
+
+  tbb::task_arena arena(threads);
+  arena.execute([&] {
+    tbb::task_group tg;
+    for (const auto& [l, r] : segs) {
+      tg.run([this, l, r] { ShellSort(l, r, input_); });
+    }
+    tg.wait();
+  });
+
+  std::vector<int> buf;
+  int end = segs.front().second;
+  for (size_t i = 1; i < segs.size(); ++i) {
+    Merge(0, end, segs[i].second, input_, buf);
+    end = segs[i].second;
+  }
+
+  output_ = input_;
+  return true;
+}
+\end{lstlisting}
+
+\subsection{STL (std::thread)}
+\begin{lstlisting}[language=C++]
+bool RunImpl() {
+  int array_size = static_cast<int>(input_.size());
+  if (array_size < 2) return true;
+
+  int num_threads = std::min(ppc::util::GetPPCNumThreads(), array_size);
+  int sub_arr_size = (array_size + num_threads - 1) / num_threads;
+
+  std::vector<std::thread> threads;
+
+  for (int i = 0; i < num_threads; ++i) {
+    int left = i * sub_arr_size;
+    int right = std::min(left + sub_arr_size - 1, array_size - 1);
+    if (left < right) {
+      threads.emplace_back([this, left, right]() { ShellSort(left, right, input_); });
+    }
+  }
+
+  for (auto& t : threads) t.join();
+
+  std::vector<int> buffer;
+  while (num_threads > 1) {
+    int new_threads = (num_threads + 1) / 2;
+    threads.clear();
+
+    for (int i = 0; i < new_threads; ++i) {
+      int left = i * 2 * sub_arr_size;
+      int mid = std::min(left + sub_arr_size - 1, array_size - 1);
+      int right = std::min(left + 2 * sub_arr_size - 1, array_size - 1);
+      if (mid < right) {
+        threads.emplace_back([this, left, mid, right]() {
+          std::vector<int> local_buffer;
+          Merge(left, mid, right, input_, local_buffer);
+        });
+      }
+    }
+
+    for (auto& t : threads) t.join();
+    sub_arr_size *= 2;
+    num_threads = new_threads;
+  }
+
+  output_ = input_;
+  return true;
+}
+\end{lstlisting}
+
+\subsection{MPI + TBB}
+\begin{lstlisting}[language=C++]
+bool RunImpl() {
+  int size = static_cast<int>(input_.size());
+  boost::mpi::broadcast(world_, size, 0);
+
+  int nprocs = world_.size();
+  int delta = size / nprocs;
+  int extra = size % nprocs;
+  std::vector<int> local_sizes(nprocs, delta);
+  if (world_.rank() == 0) {
+    for (int i = 0; i < extra; ++i) local_sizes[i]++;
+  }
+
+  std::vector<int> local_data;
+  if (world_.rank() == 0) {
+    std::vector<std::vector<int>> chunks;
+    int offset = 0;
+    for (int i = 0; i < nprocs; ++i) {
+      chunks.emplace_back(input_.begin() + offset, input_.begin() + offset + local_sizes[i]);
+      offset += local_sizes[i];
+    }
+    boost::mpi::scatter(world_, chunks, local_data, 0);
+  } else {
+    boost::mpi::scatter(world_, local_data, 0);
+  }
+
+  int n = static_cast<int>(local_data.size());
+  if (n > 1) {
+    int threads = std::min(ppc::util::GetPPCNumThreads(), n);
+    int seg_size = (n + threads - 1) / threads;
+    std::vector<int> buffer;
+
+    tbb::task_arena arena(threads);
+    arena.execute([&]() {
+      tbb::task_group tg;
+      for (int t = 0; t < threads; ++t) {
+        int l = t * seg_size;
+        int r = std::min(n - 1, ((t + 1) * seg_size) - 1);
+        tg.run([l, r, &local_data]() { ShellSort(l, r, local_data); });
+      }
+      tg.wait();
+
+      int end = seg_size - 1;
+      for (int t = 1; t < threads; ++t) {
+        int r = std::min(n - 1, ((t + 1) * seg_size) - 1);
+        Merge(0, end, r, local_data, buffer);
+        end = r;
+      }
+    });
+  }
+
+  std::vector<std::vector<int>> gathered;
+  boost::mpi::gather(world_, local_data, gathered, 0);
+
+  if (world_.rank() == 0) {
+    output_.clear();
+    std::vector<int> buffer;
+    for (const auto& chunk : gathered) {
+      int mid = static_cast<int>(output_.size()) - 1;
+      output_.insert(output_.end(), chunk.begin(), chunk.end());
+      int right = static_cast<int>(output_.size()) - 1;
+      if (mid >= 0 && right > mid) {
+        Merge(0, mid, right, output_, buffer);
+      }
+    }
+  }
+
+  return true;
+}
+\end{lstlisting}
+
+\end{document}
