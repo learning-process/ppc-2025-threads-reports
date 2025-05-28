@@ -128,7 +128,7 @@
 Пусть даны две матрицы: A размера M×K и B размера K×N. Результирующая матрица C будет иметь размер M×N.
 Классическая формула умножения матриц:
 \begin{lstlisting}
-C[i][j] = Σ(k=0 to K-1) A[i][k] × B[k][j]
+C[i][j] = sum(k=0 to K-1) A[i][k] * B[k][j]
 \end{lstlisting}
 где:
 \begin{enumerate}
@@ -308,7 +308,6 @@ int j = 0;
 while ((j = next_j.fetch_add(1, std::memory_order_relaxed)) < n) {
 std::vector<double> temp_values(m, 0.0);
 std::vector<char> temp_used(m, 0);
-// Вычисление значений для столбца j
 }
 };
 \end{lstlisting}
@@ -356,7 +355,6 @@ local_nnz[j_local]++;
 for (int j = 0; j < local_cols; ++j) {
 std::vector<double> temp_values(m, 0.0);
 std::vector<bool> temp_used(m, false);
-// Вычисление значений для локального столбца
 }
 \end{lstlisting}
 \end{enumerate}
