@@ -1,0 +1,971 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{geometry}
+\usepackage{multirow}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{tocloft}
+\usepackage{xcolor} 
+\usepackage{listings}
+\usepackage{float}
+
+\geometry{a4paper, left=25mm, right=15mm, top=20mm, bottom=20mm}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=black,
+    pdftitle={Отчет по проекту},
+    pdfauthor={Сорокин Андрей},
+    pdfsubject={Умножение разреженных матриц. Элементы типа double. Формат хранения матрицы – столбцовый (CCS).}
+}
+
+\lstset{
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{blue},
+  commentstyle=\itshape\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=8pt,
+  backgroundcolor=\color{gray!10},
+  showspaces=false,
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  captionpos=b
+}
+
+\renewcommand{\cftsecaftersnum}{.}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\titleformat{\section}{\large\bfseries}{\thesection.}{1em}{}
+
+\begin{document}
+\begin{titlepage}
+    \centering
+    \large
+    Министерство науки и высшего образования Российской Федерации\\[0.5cm]
+    Федеральное государственное автономное образовательное учреждение высшего образования\\[0.5cm]
+    \textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»}\\
+    (ННГУ)\\[1cm]
+    Институт информационных технологий, математики и механики\\[0.5cm]
+    Направление подготовки: \textbf{«Программная инженерия»}\\[2cm]
+
+    \vfill
+    {\LARGE \textbf{ОТЧЕТ}}\\[0.5cm]
+    {\Large по задаче}\\[0.5cm]
+    {\LARGE \textbf{«Умножение разреженных матриц. Элементы типа double. Формат хранения матрицы – столбцовый (CCS)»}}\\[0.5cm]
+    {\Large \textbf{Вариант №5}}\\[2.5cm]
+
+    \hfill\parbox{0.5\textwidth}{
+        \textbf{Выполнил:} \\
+        студент группы 3822Б1ПР2 \\
+        \textbf{Сорокин Андрей}
+    }\\[0.5cm]
+
+    \hfill\parbox{0.5\textwidth}{
+        \textbf{Преподаватели:} \\
+        Нестеров А.Ю.
+        Оболенский А.А.
+        
+    }\\[2cm]
+
+    Нижний Новгород\\
+    2025
+\end{titlepage}
+
+
+\thispagestyle{empty}
+\clearpage
+\pagenumbering{arabic} 
+\setcounter{page}{2} 
+\tableofcontents
+\clearpage
+\setcounter{page}{3} 
+\section{Введение}
+
+\hspace*{1.25em}Умножение разреженных матриц является одной из фундаментальных операций в вычислительной математике и имеет широкий спектр практических применений. Особую актуальность данная операция приобретает при работе с большими массивами данных, где большинство элементов матрицы равны нулю. Формат CCS (Compressed Column Storage) представляет собой эффективный метод хранения разреженных матриц, предложенный в начале 1970-х годов и получивший широкое распространение благодаря своей компактности и удобству выполнения матричных операций.
+
+В современных реалиях операции с разреженными матрицами находят применение в различных областях, включая численное моделирование, машинное обучение, анализ социальных сетей, компьютерную графику и решение систем линейных уравнений. Особенно важную роль эти операции играют в методе конечных элементов, при моделировании физических процессов и в задачах оптимизации. Использование типа данных double обеспечивает необходимую точность вычислений, что критично для многих научных и инженерных приложений.
+
+Несмотря на эффективность формата CCS, операция умножения разреженных матриц остается вычислительно сложной задачей, особенно при работе с матрицами большой размерности. В связи с этим особую актуальность приобретает разработка параллельных алгоритмов, способных эффективно использовать возможности современных многоядерных и распределенных вычислительных систем.
+
+В рамках данной работы представлено исследование различных подходов к параллельной реализации алгоритма умножения разреженных матриц с использованием современных технологий параллельного программирования: OpenMP, Intel Threading Building Blocks (TBB), стандартной библиотеки потоков C++ и гибридной модели MPI + OpenMP. Каждый из этих подходов имеет свои особенности и преимущества, которые будут подробно рассмотрены в последующих разделах работы. Особое внимание будет уделено анализу эффективности различных параллельных реализаций и их сравнительной характеристике.
+
+\section{Постановка задачи}
+
+\hspace*{1.25em}Цель практической работы — разработка и исследование различных параллельных реализаций алгоритма умножения разреженных матриц в формате CCS с элементами типа double.
+
+Для достижения поставленной цели необходимо выполнить следующие задачи:
+
+\begin{itemize}
+\item Реализовать последовательный вариант алгоритма умножения разреженных матриц в формате CCS;
+\item Разработать параллельные версии с использованием следующих технологий:
+\begin{itemize}
+\item OpenMP — для эффективного использования систем с общей памятью;
+\item Intel TBB — для реализации потокового параллелизма с динамической балансировкой нагрузки;
+\item std::thread — для создания версии с явным управлением потоками;
+\item MPI + OpenMP — для построения гибридной модели, сочетающей межпроцессорное взаимодействие с многопоточностью.
+\end{itemize}
+\item Провести тестирование и проверку корректности всех реализаций алгоритма;
+\item Сравнить производительность последовательной и параллельных версий.
+\begin{itemize}
+\item Время выполнения на различных размерах матриц;
+\item Масштабируемость при увеличении числа процессоров/потоков;
+\end{itemize}
+\end{itemize}
+
+Ожидаемые результаты включают в себя определение наиболее эффективных подходов к распараллеливанию алгоритма умножения разреженных матриц, выявление факторов, влияющих на производительность различных реализаций.
+
+\section{Описание алгоритма}
+
+Пусть даны две матрицы: A размера M×K и B размера K×N. Результирующая матрица C будет иметь размер M×N.
+Классическая формула умножения матриц:
+\begin{lstlisting}
+C[i][j] = sum(k=0 to K-1) A[i][k] * B[k][j]
+\end{lstlisting}
+где:
+\begin{enumerate}
+\item i изменяется от 0 до M-1 (строки матрицы A)
+\item j изменяется от 0 до N-1 (столбцы матрицы B)
+\item k изменяется от 0 до K-1 (столбцы матрицы A / строки матрицы B)
+\end{enumerate}
+Каждый элемент результирующей матрицы C[i][j] получается как скалярное произведение i-й строки матрицы A на j-й столбец матрицы B.
+
+Модификация для разреженных матриц в формате CCS:
+
+При работе с разреженными матрицами классический алгоритм становится неэффективным, так как большинство операций производится с нулевыми элементами. Поэтому в представленной реализации используются следующие ключевые модификации:
+
+Вместо работы со всеми элементами обрабатываются только ненулевые значения, хранящиеся в формате CCS.
+
+Для каждого столбца результирующей матрицы:
+\begin{enumerate}
+\item Рассматриваются только ненулевые элементы соответствующего столбца матрицы B
+\item Для каждого такого элемента берутся ненулевые элементы соответствующего столбца матрицы A
+\item Результаты накапливаются во временном массиве
+\end{enumerate}
+
+Формат CCS позволяет эффективно получать доступ к элементам по столбцам, что учитывается в алгоритме при организации циклов обработки данных.
+
+Представленная в коде реализация следует этим принципам, оптимизируя классический алгоритм для работы с разреженными структурами данных. Основное отличие от классического подхода заключается в том, что вместо перебора всех возможных комбинаций индексов обрабатываются только существующие ненулевые элементы, что существенно сокращает количество необходимых операций при работе с разреженными матрицами.
+
+Такой подход особенно эффективен, когда большая часть элементов матриц равна нулю, что часто встречается в практических задачах, например, при решении систем линейных уравнений, в задачах оптимизации или при моделировании физических процессов.
+
+\section{Описание параллельных реализаций алгоритма}
+
+\subsection{OpenMP}
+
+Алгоритм разделен на два основных параллельных этапа:
+
+\begin{enumerate}
+\item Первый проход - анализ структуры:
+\begin{lstlisting}
+#pragma omp parallel for
+for (int j = 0; j < n; ++j) {
+  std::vector<bool> temp_used(m, false);
+  for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+    int row_b = b_row_indices[t];
+    for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+      int row_a = a_row_indices[i];
+      if (!temp_used[row_a]) {
+        temp_used[row_a] = true;
+        nnz_per_column[j]++;
+      }
+    }
+  }
+}
+\end{lstlisting}
+На этом этапе каждый поток:
+\begin{enumerate}
+\item Работает со своим столбцом результирующей матрицы
+\item Использует локальный массив temp used для отслеживания уникальных строк
+\item Подсчитывает количество ненулевых элементов в своём столбце
+\item Не требует синхронизации с другими потоками
+\end{enumerate}
+
+\item Второй проход - вычисление значений:
+\begin{lstlisting}
+#pragma omp parallel for
+for (int j = 0; j < n; ++j) {
+  std::vector<double> temp_values(m, 0.0);
+  std::vector<bool> temp_used(m, false);
+
+  for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+    int row_b = b_row_indices[t];
+    double val_b = b_values[t];
+    for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+      int row_a = a_row_indices[i];
+      temp_values[row_a] += a_values[i] * val_b;
+      temp_used[row_a] = true;
+    }
+  }
+\end{lstlisting}
+\end{enumerate}
+
+Особенности реализации:
+\begin{enumerate}
+\item Каждый поток имеет собственные буферные массивы
+\item Отсутствие блокировок и критических секций
+\item Эффективное использование кэша благодаря локальности данных
+\item Результаты сразу записываются в финальные массивы без промежуточного хранения
+\end{enumerate}
+
+\subsection{Intel TBB}
+Алгоритм разделен на два основных параллельных этапа:
+\begin{enumerate}
+\item Первый проход - анализ структуры:
+\begin{lstlisting}
+tbb::parallel_for(tbb::blocked_range<int>(0, n), & {
+for (int j = range.begin(); j < range.end(); ++j) {
+std::vector<bool> temp_used(m, false);
+for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+const int row_b = b_row_indices[t];
+for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+const int row_a = a_row_indices[i];
+if (!temp_used[row_a]) {
+temp_used[row_a] = true;
+col_sizes[j]++;
+}
+}
+}
+}
+});
+\end{lstlisting}
+На этом этапе каждый поток:
+\begin{enumerate}
+\item Обрабатывает блок столбцов результирующей матрицы
+\item Использует локальный массив temp used для отслеживания уникальных строк
+\item Подсчитывает количество ненулевых элементов для каждого столбца в своём блоке
+\item Автоматически балансирует нагрузку через механизм work stealing
+\end{enumerate}
+\item Второй проход - вычисление значений:
+\begin{lstlisting}
+tbb::parallel_for(tbb::blocked_range<int>(0, n), & {
+for (int j = range.begin(); j < range.end(); ++j) {
+std::vector<double> temp_values(m, 0.0);
+std::vector<bool> temp_used(m, false);
+for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+const int row_b = b_row_indices[t];
+const double val_b = b_values[t];
+for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+const int row_a = a_row_indices[i];
+temp_values[row_a] += a_values[i] * val_b;
+temp_used[row_a] = true;
+}
+}
+}
+});
+\end{lstlisting}
+\end{enumerate}
+Особенности реализации:
+\begin{enumerate}
+\item Блочное разделение работы с динамической балансировкой нагрузки
+\item Каждый поток работает с независимым набором данных
+\item Эффективное использование кэша благодаря обработке смежных столбцов
+\item Отсутствие необходимости в явной синхронизации между потоками
+\end{enumerate}
+\subsection{STL Threads}
+Алгоритм разделен на два основных параллельных этапа:
+\begin{enumerate}
+\item Первый проход - анализ структуры:
+\begin{lstlisting}
+std::atomic<int> next_j(0);
+auto first_pass_worker = & {
+int j = 0;
+while ((j = next_j.fetch_add(1, std::memory_order_relaxed)) < n) {
+std::vector<char> temp_used(m, 0);
+for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+const int row_b = b_row_indices[t];
+for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+const int row_a = a_row_indices[i];
+if (temp_used[row_a] == 0) {
+temp_used[row_a] = 1;
+col_sizes[j]++;
+}
+}
+}
+}
+};
+\end{lstlisting}
+На этом этапе каждый поток:
+\begin{enumerate}
+\item Динамически получает следующий столбец через атомарный счетчик
+\item Использует оптимизированный массив char вместо bool
+\item Подсчитывает количество ненулевых элементов в полученном столбце
+\item Работает независимо до исчерпания всех столбцов
+\end{enumerate}
+\item Второй проход - вычисление значений:
+\begin{lstlisting}
+next_j.store(0);
+auto second_pass_worker = & {
+int j = 0;
+while ((j = next_j.fetch_add(1, std::memory_order_relaxed)) < n) {
+std::vector<double> temp_values(m, 0.0);
+std::vector<char> temp_used(m, 0);
+}
+};
+\end{lstlisting}
+\end{enumerate}
+Особенности реализации:
+\begin{enumerate}
+\item Динамическое распределение работы через атомарные операции
+\item Оптимизация памяти через использование типа char
+\item Эффективная балансировка нагрузки между потоками
+\item Минимальные накладные расходы на синхронизацию
+\end{enumerate}
+\subsection{MPI + OpenMP}
+Алгоритм сочетает распределенные вычисления с локальным параллелизмом:
+\begin{enumerate}
+\item Первый проход - анализ структуры:
+\begin{lstlisting}
+int local_cols = end_col - start_col;
+std::vector<int> local_nnz(local_cols, 0);
+#pragma omp parallel for
+for (int j_local = 0; j_local < local_cols; ++j_local) {
+int j = start_col + j_local;
+std::vector<bool> temp_used(m, false);
+for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+int row_b = b_row_indices[t];
+for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+int row_a = a_row_indices[i];
+if (!temp_used[row_a]) {
+temp_used[row_a] = true;
+local_nnz[j_local]++;
+}
+}
+}
+}
+\end{lstlisting}
+На этом этапе:
+\begin{enumerate}
+\item Матрица разделяется на вертикальные полосы между процессами
+\item Каждый процесс параллельно обрабатывает свои столбцы через OpenMP
+\item Локальные результаты собираются через MPI-операции
+\item Обеспечивается двухуровневый параллелизм
+\end{enumerate}
+\item Второй проход - вычисление значений:
+\begin{lstlisting}
+#pragma omp parallel for
+for (int j = 0; j < local_cols; ++j) {
+std::vector<double> temp_values(m, 0.0);
+std::vector<bool> temp_used(m, false);
+}
+\end{lstlisting}
+\end{enumerate}
+Особенности реализации:
+\begin{enumerate}
+\item Эффективное распределение данных между процессами
+\item Использование общей памяти внутри узла через OpenMP
+\item Минимизация межпроцессных коммуникаций
+\item Масштабируемость на кластерных системах
+\end{enumerate}
+
+\subsection{Сравнительный анализ реализаций}
+В ходе работы были реализованы и исследованы четыре различных подхода к параллельному умножению разреженных матриц в формате CCS:
+\begin{enumerate}
+\item OpenMP реализация отличается:
+\begin{itemize}
+\item Простотой реализации и поддержки кода
+\item Эффективным использованием систем с общей памятью
+\item Минимальными накладными расходами на синхронизацию
+\end{itemize}
+\item Intel TBB реализация обеспечивает:
+\begin{itemize}
+\item Автоматическую балансировку нагрузки через механизм work stealing
+\item Эффективную работу с неравномерным распределением данных
+\item Гибкое управление размером блоков обработки
+\end{itemize}
+\item STL Threads реализация предоставляет:
+\begin{itemize}
+\item Точный контроль над распределением работы между потоками
+\item Оптимизацию использования памяти
+\item Эффективную динамическую балансировку через атомарные операции
+\end{itemize}
+\item Гибридная MPI + OpenMP реализация обеспечивает:
+\begin{itemize}
+\item Масштабируемость на распределенных системах
+\item Эффективное использование иерархии памяти
+\item Возможность обработки матриц большого размера
+\end{itemize}
+\end{enumerate}
+Каждая реализация имеет свою оптимальную область применения:
+\begin{itemize}
+\item OpenMP лучше всего подходит для систем с общей памятью и равномерным распределением ненулевых элементов
+\item Intel TBB эффективна для задач с неравномерной вычислительной нагрузкой
+\item STL Threads оптимальна при необходимости тонкой настройки параллельной обработки
+\item MPI + OpenMP незаменима для больших задач, требующих распределенных вычислений
+\end{itemize}
+Все реализации следуют общему принципу двухпроходного алгоритма:
+\begin{enumerate}
+\item Первый проход для анализа структуры и определения размеров результата
+\item Второй проход для вычисления значений элементов
+\end{enumerate}
+Такой подход позволяет эффективно организовать параллельные вычисления, минимизировать накладные расходы на синхронизацию и оптимально использовать доступные вычислительные ресурсы.
+
+\section{Результаты экспериментов}
+
+\hspace*{1.25em}Для оценки производительности реализованных версий алгоритма умножения разреженных матриц были проведены замеры времени выполнения в конфигурациях с различным числом потоков и процессов. В таблице ниже представлены усреднённые значения времени выполнения (в секундах) для двух режимов тестирования — \texttt{PipelineRun} и \texttt{TaskRun}.
+
+\subsection{Таблица производительности}
+
+\renewcommand{\arraystretch}{1.4}
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Версия} & \textbf{Конфигурация} & \textbf{PipelineRun (с)} & \textbf{TaskRun (с)} \\
+\hline
+\textbf{Последовательная} & 1 поток & \centering 2.6001 & 2.5978 \\
+\hline
+\multirow{3}{*}{OpenMP} 
+  & 2 потока & 1.3471 & 1.3437 \\
+  & 3 потока & 0.8977 & 0.8818 \\
+  & 4 потоков & 0.7204 & 0.7045 \\
+\hline
+\multirow{3}{*}{TBB} 
+  & 2 потока & 1.1095 & 1.1339 \\
+  & 3 потока & 0.7622 & 0.7620 \\
+  & 4 потоков & 0.5968 & 0.5875 \\
+\hline
+\multirow{3}{*}{STL (std::thread)} 
+  & 2 потока & 0.8588 & 0.8009 \\
+  & 3 потока & 1.0681 & 0.9115 \\
+  & 4 потоков & 0.9629 & 0.9080 \\
+\hline
+\multirow{3}{*}{MPI and OMP} 
+  & 2 и 2 & 1.4504 & 1.4602 \\
+  & 3 и 3 & 1.3268 & 1.2527 \\
+  & 4 и 4 & 1.3045 & 1.3868 \\
+\hline
+\end{tabular}
+\label{tab:parallel_perf}
+\end{table}
+\subsection{Анализ результатов тестирования}
+На основе полученных экспериментальных данных можно сделать следующие выводы:
+\begin{enumerate}
+\item \textbf{Последовательная реализация} показывает стабильное время выполнения около 2.6 секунд, что служит базовым значением для оценки эффективности параллельных реализаций.
+\item \textbf{OpenMP реализация} демонстрирует:
+\begin{itemize}
+\item Хорошую масштабируемость с увеличением числа потоков
+\item Почти линейное ускорение: в 1.93 раза на 2 потоках, в 2.89 раза на 3 потоках и в 3.61 раза на 4 потоках
+\item Стабильные результаты между запусками, что говорит о надежности реализации
+\end{itemize}
+\item \textbf{Intel TBB реализация} показывает:
+\begin{itemize}
+\item Наилучшую производительность среди всех реализаций
+\item Отличную масштабируемость: ускорение в 2.34 раза на 2 потоках, в 3.41 раза на 3 потоках и в 4.36 раза на 4 потоках
+\item Стабильные результаты между тестовыми запусками
+\end{itemize}
+\item \textbf{STL Threads реализация} демонстрирует:
+\begin{itemize}
+\item Хорошую производительность на всех потоках
+\item Неожиданное падение производительности при увеличении числа потоков
+\item Нестабильность результатов между запусками, что может указывать на проблемы с балансировкой нагрузки
+\end{itemize}
+\item \textbf{Гибридная реализация MPI + OpenMP} показывает:
+\begin{itemize}
+\item Меньшую эффективность по сравнению с другими параллельными реализациями
+\item Слабую масштабируемость при увеличении числа процессов и потоков
+\item Дополнительные накладные расходы на межпроцессное взаимодействие
+\end{itemize}
+\end{enumerate}
+\textbf{Общие выводы:}
+\begin{itemize}
+\item Intel TBB демонстрирует наилучшую производительность и масштабируемость
+\item OpenMP обеспечивает хороший баланс между простотой реализации и производительностью
+\item STL Threads показывает относительно хорошие результаты
+\item Гибридный подход MPI + OpenMP оказался менее эффективным для данной задачи
+\end{itemize}
+Для данной задачи умножения разреженных матриц оптимальным выбором является использование Intel TBB или OpenMP, в зависимости от требований к простоте реализации и максимальной производительности.
+\section{Заключение}
+
+В данной работе была реализована и проанализирована модифицированная версия алгоритма умножения разреженных матриц в формате CCS с элементами типа double. Базовая (последовательная) реализация была расширена четырьмя параллельными версиями с использованием современных технологий: OpenMP, Intel TBB, стандартной библиотеки потоков C++ и гибридной модели MPI + OpenMP.
+\begin{enumerate}
+\item \textbf{Реализация алгоритмов:}
+\begin{itemize}
+\item Разработан базовый алгоритм умножения разреженных матриц в формате CCS
+\item Созданы четыре параллельные версии с использованием различных технологий
+\item Обеспечена корректность работы всех реализаций через систему тестов
+\end{itemize}
+\item \textbf{Экспериментальные результаты:}
+\begin{itemize}
+\item Intel TBB показала наилучшую производительность с ускорением в 4.36 раза на 4 потоках
+\item OpenMP продемонстрировала стабильную масштабируемость с ускорением в 3.61 раза
+\item STL Threads выявила особенности при масштабировании на большее число потоков
+\item Гибридный подход MPI + OpenMP показал дополнительные накладные расходы на коммуникации
+\end{itemize}
+\item \textbf{Достигнутые результаты:}
+\begin{itemize}
+\item Реализованы и протестированы все запланированные версии алгоритма
+\item Проведен детальный анализ производительности каждой реализации
+\item Выявлены сильные и слабые стороны различных подходов к параллелизации
+\item Определены оптимальные сценарии использования каждой технологии
+\end{itemize}
+\end{enumerate}
+Результаты работы демонстрируют эффективность применения параллельных вычислений для задачи умножения разреженных матриц и предоставляют основу для дальнейших исследований в области оптимизации подобных алгоритмов.
+\newpage
+\section{Список литературы}
+\begin{enumerate}
+\item Статья: \textit{Разреженные матрицы и форматы их хранения}
+\item Мещеряков И.Н. \textit{Набор и вёрстка в системе \LaTeX}
+\item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks}. — Нижний Новгород, 2007.
+\item Статья: \textit{Технологии параллельного программирования. Message Passing Interface (MPI)}
+\item Шилдт Г. \textit{Язык программирования C++. Полное руководство}. — М.: Вильямс, 2020. — 1200 с.
+\item Reinders J. \textit{Intel Threading Building Blocks: Outfitting C++ for Multi-core Processor Parallelism}. — O'Reilly Media, 2007.
+\item OpenMP Architecture Review Board. \textit{OpenMP Application Program Interface Version 5.1}. — 2020. \url{https://www.openmp.org}
+\item Gropp W., Lusk E., Skjellum A. \textit{Using MPI: Portable Parallel Programming with the Message Passing Interface}. — MIT Press, 2014.
+\item Saad Y. \textit{Iterative Methods for Sparse Linear Systems}. — SIAM, 2003.
+\item Habr. \textit{Параллельное программирование с использованием OpenMP}. — \url{https://habr.com/ru/companies/intel/articles/82486/}
+\end{enumerate}
+\appendix
+\newpage
+\section*{Приложение}
+\addcontentsline{toc}{section}{Приложение}
+
+Полные методы включающие в себя параллелизм.
+
+\subsection*{Seq}
+\begin{lstlisting}[language=C++]
+namespace sorokin_a_multiplication_sparse_matrices_double_ccs_seq {
+void MultiplyCCS(const std::vector<double> &a_values, const std::vector<int> &a_row_indices, int m,
+                 const std::vector<int> &a_col_ptr, const std::vector<double> &b_values,
+                 const std::vector<int> &b_row_indices, int k, const std::vector<int> &b_col_ptr,
+                 std::vector<double> &c_values, std::vector<int> &c_row_indices, int n, std::vector<int> &c_col_ptr) {
+  if (static_cast<int>(a_values.size()) > m * k || static_cast<int>(b_values.size()) > k * n) {
+    throw std::invalid_argument("Invalid val pointer size");
+  }
+  c_values.clear();
+  c_row_indices.clear();
+  c_col_ptr.assign(n + 1, 0);
+
+  std::vector<double> temp_values(m, 0.0);
+  std::vector<bool> temp_used(m, false);
+
+  for (int j = 0; j < n; ++j) {
+    for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+      int row_b = b_row_indices[t];
+      double val_b = b_values[t];
+
+      for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+        int row_a = a_row_indices[i];
+        temp_values[row_a] += a_values[i] * val_b;
+        temp_used[row_a] = true;
+      }
+    }
+
+    c_col_ptr[j] = static_cast<int>(c_values.size());
+
+    for (int i = 0; i < m; ++i) {
+      if (temp_used[i]) {
+        c_values.emplace_back(temp_values[i]);
+        c_row_indices.emplace_back(i);
+        temp_values[i] = 0.0;
+        temp_used[i] = false;
+      }
+    }
+  }
+  c_col_ptr[n] = static_cast<int>(c_values.size());
+}
+}  // namespace sorokin_a_multiplication_sparse_matrices_double_ccs_seq
+\end{lstlisting}
+
+\subsection*{OpenMP}
+\begin{lstlisting}[language=C++]
+namespace sorokin_a_multiplication_sparse_matrices_double_ccs_omp {
+void MultiplyCCS(const std::vector<double> &a_values, const std::vector<int> &a_row_indices, int m,
+                 const std::vector<int> &a_col_ptr, const std::vector<double> &b_values,
+                 const std::vector<int> &b_row_indices, int k, const std::vector<int> &b_col_ptr,
+                 std::vector<double> &c_values, std::vector<int> &c_row_indices, int n, std::vector<int> &c_col_ptr) {
+  if (static_cast<int>(a_values.size()) > m * k || static_cast<int>(b_values.size()) > k * n) {
+    throw std::invalid_argument("Invalid val pointer size");
+  }
+
+  c_col_ptr.resize(n + 1);
+  std::vector<int> nnz_per_column(n, 0);
+
+#pragma omp parallel for
+  for (int j = 0; j < n; ++j) {
+    std::vector<bool> temp_used(m, false);
+    for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+      int row_b = b_row_indices[t];
+      for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+        int row_a = a_row_indices[i];
+        if (!temp_used[row_a]) {
+          temp_used[row_a] = true;
+          nnz_per_column[j]++;
+        }
+      }
+    }
+  }
+
+  c_col_ptr[0] = 0;
+  for (int j = 0; j < n; ++j) {
+    c_col_ptr[j + 1] = c_col_ptr[j] + nnz_per_column[j];
+  }
+
+  int total_nnz = c_col_ptr[n];
+  c_values.resize(total_nnz);
+  c_row_indices.resize(total_nnz);
+#pragma omp parallel for
+  for (int j = 0; j < n; ++j) {
+    std::vector<double> temp_values(m, 0.0);
+    std::vector<bool> temp_used(m, false);
+
+    for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+      int row_b = b_row_indices[t];
+      double val_b = b_values[t];
+      for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+        int row_a = a_row_indices[i];
+        temp_values[row_a] += a_values[i] * val_b;
+        temp_used[row_a] = true;
+      }
+    }
+    int pos = c_col_ptr[j];
+    for (int i = 0; i < m; ++i) {
+      if (temp_used[i]) {
+        c_row_indices[pos] = i;
+        c_values[pos] = temp_values[i];
+        pos++;
+      }
+    }
+  }
+}
+}  // namespace sorokin_a_multiplication_sparse_matrices_double_ccs_omp
+\end{lstlisting}
+
+\subsection*{TBB}
+\begin{lstlisting}[language=C++]
+namespace sorokin_a_multiplication_sparse_matrices_double_ccs_tbb {
+void ProcessFirstPass(int j, int m, const std::vector<int>& a_col_ptr, const std::vector<int>& a_row_indices,
+                      const std::vector<int>& b_col_ptr, const std::vector<int>& b_row_indices,
+                      std::vector<int>& col_sizes) {
+  std::vector<bool> temp_used(m, false);
+  for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+    const int row_b = b_row_indices[t];
+    for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+      const int row_a = a_row_indices[i];
+      if (!temp_used[row_a]) {
+        temp_used[row_a] = true;
+        col_sizes[j]++;
+      }
+    }
+  }
+}
+
+void ProcessSecondPass(int j, int m, const std::vector<int>& a_col_ptr, const std::vector<int>& a_row_indices,
+                       const std::vector<double>& a_values, const std::vector<int>& b_col_ptr,
+                       const std::vector<int>& b_row_indices, const std::vector<double>& b_values,
+                       const std::vector<int>& c_col_ptr, std::vector<int>& c_row_indices,
+                       std::vector<double>& c_values) {
+  std::vector<double> temp_values(m, 0.0);
+  std::vector<bool> temp_used(m, false);
+
+  for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+    const int row_b = b_row_indices[t];
+    const double val_b = b_values[t];
+    for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+      const int row_a = a_row_indices[i];
+      temp_values[row_a] += a_values[i] * val_b;
+      temp_used[row_a] = true;
+    }
+  }
+
+  int pos = c_col_ptr[j];
+  for (int i = 0; i < m; ++i) {
+    if (temp_used[i]) {
+      c_row_indices[pos] = i;
+      c_values[pos] = temp_values[i];
+      pos++;
+    }
+  }
+}
+
+void MultiplyCCS(const std::vector<double>& a_values, const std::vector<int>& a_row_indices, int m,
+                 const std::vector<int>& a_col_ptr, const std::vector<double>& b_values,
+                 const std::vector<int>& b_row_indices, int k, const std::vector<int>& b_col_ptr,
+                 std::vector<double>& c_values, std::vector<int>& c_row_indices, int n, std::vector<int>& c_col_ptr) {
+  c_col_ptr.resize(n + 1);
+  c_col_ptr[0] = 0;
+  std::vector<int> col_sizes(n, 0);
+
+  tbb::parallel_for(tbb::blocked_range<int>(0, n), [&](const tbb::blocked_range<int>& range) {
+    for (int j = range.begin(); j < range.end(); ++j) {
+      ProcessFirstPass(j, m, a_col_ptr, a_row_indices, b_col_ptr, b_row_indices, col_sizes);
+    }
+  });
+
+  for (int j = 0; j < n; ++j) {
+    c_col_ptr[j + 1] = c_col_ptr[j] + col_sizes[j];
+  }
+
+  const int total_non_zero = c_col_ptr[n];
+  c_values.resize(total_non_zero);
+  c_row_indices.resize(total_non_zero);
+
+  tbb::parallel_for(tbb::blocked_range<int>(0, n), [&](const tbb::blocked_range<int>& range) {
+    for (int j = range.begin(); j < range.end(); ++j) {
+      ProcessSecondPass(j, m, a_col_ptr, a_row_indices, a_values, b_col_ptr, b_row_indices, b_values, c_col_ptr,
+                        c_row_indices, c_values);
+    }
+  });
+}
+}  // namespace sorokin_a_multiplication_sparse_matrices_double_ccs_tbb
+
+\end{lstlisting}
+
+\subsection*{STL}
+\begin{lstlisting}[language=C++]
+namespace sorokin_a_multiplication_sparse_matrices_double_ccs_stl {
+
+void ProcessFirstPass(int j, int m, const std::vector<int>& a_col_ptr, const std::vector<int>& a_row_indices,
+                      const std::vector<int>& b_col_ptr, const std::vector<int>& b_row_indices,
+                      std::vector<int>& col_sizes) {
+  std::vector<char> temp_used(m, 0);
+  for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+    const int row_b = b_row_indices[t];
+    for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+      const int row_a = a_row_indices[i];
+      if (temp_used[row_a] == 0) {
+        temp_used[row_a] = 1;
+        col_sizes[j]++;
+      }
+    }
+  }
+}
+
+void ProcessSecondPass(int j, int m, const std::vector<int>& a_col_ptr, const std::vector<int>& a_row_indices,
+                       const std::vector<double>& a_values, const std::vector<int>& b_col_ptr,
+                       const std::vector<int>& b_row_indices, const std::vector<double>& b_values,
+                       const std::vector<int>& c_col_ptr, std::vector<int>& c_row_indices,
+                       std::vector<double>& c_values) {
+  std::vector<double> temp_values(m, 0.0);
+  std::vector<char> temp_used(m, 0);
+
+  for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+    const int row_b = b_row_indices[t];
+    const double val_b = b_values[t];
+    for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+      const int row_a = a_row_indices[i];
+      temp_values[row_a] += a_values[i] * val_b;
+      temp_used[row_a] = 1;
+    }
+  }
+
+  int pos = c_col_ptr[j];
+  for (int i = 0; i < m; ++i) {
+    if (temp_used[i] != 0) {
+      c_row_indices[pos] = i;
+      c_values[pos] = temp_values[i];
+      pos++;
+    }
+  }
+}
+
+void MultiplyCCS(const std::vector<double>& a_values, const std::vector<int>& a_row_indices, int m,
+                 const std::vector<int>& a_col_ptr, const std::vector<double>& b_values,
+                 const std::vector<int>& b_row_indices, int k, const std::vector<int>& b_col_ptr,
+                 std::vector<double>& c_values, std::vector<int>& c_row_indices, int n, std::vector<int>& c_col_ptr) {
+  c_col_ptr.resize(n + 1);
+  c_col_ptr[0] = 0;
+  std::vector<int> col_sizes(n, 0);
+
+  int num_threads = ppc::util::GetPPCNumThreads();
+  num_threads = std::min(num_threads, n);
+
+  std::vector<std::thread> threads;
+  std::atomic<int> next_j(0);
+
+  auto first_pass_worker = [&]() {
+    int j = 0;
+    while ((j = next_j.fetch_add(1, std::memory_order_relaxed)) < n) {
+      ProcessFirstPass(j, m, a_col_ptr, a_row_indices, b_col_ptr, b_row_indices, col_sizes);
+    }
+  };
+
+  threads.reserve(num_threads);
+  for (int t = 0; t < num_threads; ++t) {
+    threads.emplace_back(first_pass_worker);
+  }
+
+  for (auto& thread : threads) {
+    thread.join();
+  }
+
+  for (int j = 0; j < n; ++j) {
+    c_col_ptr[j + 1] = c_col_ptr[j] + col_sizes[j];
+  }
+
+  const int total_non_zero = c_col_ptr[n];
+  c_values.resize(total_non_zero);
+  c_row_indices.resize(total_non_zero);
+
+  threads.clear();
+  next_j.store(0);
+
+  auto second_pass_worker = [&]() {
+    int j = 0;
+    while ((j = next_j.fetch_add(1, std::memory_order_relaxed)) < n) {
+      ProcessSecondPass(j, m, a_col_ptr, a_row_indices, a_values, b_col_ptr, b_row_indices, b_values, c_col_ptr,
+                        c_row_indices, c_values);
+    }
+  };
+
+  for (int t = 0; t < num_threads; ++t) {
+    threads.emplace_back(second_pass_worker);
+  }
+
+  for (auto& thread : threads) {
+    thread.join();
+  }
+}
+
+}  // namespace sorokin_a_multiplication_sparse_matrices_double_ccs_stl
+\end{lstlisting}
+
+\subsection*{MPI + OMP}
+\begin{lstlisting}[language=C++]
+namespace {
+
+void ComputeLocalNNZ(int start_col, int local_cols, const std::vector<int>& b_col_ptr,
+                     const std::vector<int>& b_row_indices, const std::vector<int>& a_col_ptr,
+                     const std::vector<int>& a_row_indices, int m, std::vector<int>& local_nnz) {
+  for (int j_local = 0; j_local < local_cols; ++j_local) {
+    int j = start_col + j_local;
+    std::vector<bool> temp_used(m, false);
+    for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+      int row_b = b_row_indices[t];
+      for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+        int row_a = a_row_indices[i];
+        if (!temp_used[row_a]) {
+          temp_used[row_a] = true;
+          local_nnz[j_local]++;
+        }
+      }
+    }
+  }
+}
+
+void GatherNNZData(boost::mpi::communicator& world, const std::vector<int>& local_nnz, int local_cols, int start_col,
+                   std::vector<int>& nnz_per_column, std::vector<int>& recv_counts, std::vector<int>& displs) {
+  int rank = world.rank();
+  int size = world.size();
+
+  if (rank == 0) {
+    std::vector<int> all_start_cols(size);
+    std::vector<int> all_local_cols(size);
+    boost::mpi::gather(world, start_col, all_start_cols, 0);
+    boost::mpi::gather(world, local_cols, all_local_cols, 0);
+
+    for (int p = 0; p < size; ++p) {
+      recv_counts[p] = all_local_cols[p];
+      displs[p] = all_start_cols[p];
+    }
+  } else {
+    boost::mpi::gather(world, start_col, 0);
+    boost::mpi::gather(world, local_cols, 0);
+  }
+
+  if (rank == 0) {
+    boost::mpi::gatherv(world.split(0), local_nnz.data(), local_cols, nnz_per_column.data(), recv_counts, displs, 0);
+  } else {
+    boost::mpi::gatherv(world.split(0), local_nnz.data(), local_cols, 0);
+  }
+}
+
+void BuildCColPtr(boost::mpi::communicator& world, const std::vector<int>& nnz_per_column,
+                  std::vector<int>& c_col_ptr) {
+  size_t n = nnz_per_column.size();
+  if (world.rank() == 0) {
+    c_col_ptr.resize(n + 1);
+    c_col_ptr[0] = 0;
+    std::partial_sum(nnz_per_column.begin(), nnz_per_column.end(), c_col_ptr.begin() + 1);
+  }
+  boost::mpi::broadcast(world, c_col_ptr, 0);
+}
+
+void ComputeCValuesAndIndices(const std::vector<double>& a_values, const std::vector<int>& a_row_indices,
+                              const std::vector<int>& a_col_ptr, const std::vector<double>& b_values,
+                              const std::vector<int>& b_row_indices, const std::vector<int>& b_col_ptr, int m, int n,
+                              std::vector<double>& c_values, std::vector<int>& c_row_indices,
+                              const std::vector<int>& c_col_ptr) {
+  int total_nnz = c_col_ptr[n];
+  c_values.resize(total_nnz);
+  c_row_indices.resize(total_nnz);
+
+#pragma omp parallel for
+  for (int j = 0; j < n; ++j) {
+    std::vector<double> temp_values(m, 0.0);
+    std::vector<bool> temp_used(m, false);
+
+    for (int t = b_col_ptr[j]; t < b_col_ptr[j + 1]; ++t) {
+      int row_b = b_row_indices[t];
+      double val_b = b_values[t];
+      for (int i = a_col_ptr[row_b]; i < a_col_ptr[row_b + 1]; ++i) {
+        int row_a = a_row_indices[i];
+        temp_values[row_a] += a_values[i] * val_b;
+        temp_used[row_a] = true;
+      }
+    }
+
+    int pos = c_col_ptr[j];
+    int count = 0;
+    for (int i = 0; i < m; ++i) {
+      if (temp_used[i]) {
+        c_row_indices[pos + count] = i;
+        c_values[pos + count] = temp_values[i];
+        count++;
+      }
+    }
+  }
+}
+
+}  // namespace
+
+namespace sorokin_a_multiplication_sparse_matrices_double_ccs_all {
+
+void MultiplyCCS(boost::mpi::communicator& world, const std::vector<double>& a_values,
+                 const std::vector<int>& a_row_indices, int m, const std::vector<int>& a_col_ptr,
+                 const std::vector<double>& b_values, const std::vector<int>& b_row_indices, int k,
+                 const std::vector<int>& b_col_ptr, std::vector<double>& c_values, std::vector<int>& c_row_indices,
+                 int n, std::vector<int>& c_col_ptr) {
+  int rank = world.rank();
+  int size = world.size();
+
+  int cols_per_process = n / size;
+  int remainder = n % size;
+  int start_col = (rank * cols_per_process) + std::min(rank, remainder);
+  int end_col = start_col + cols_per_process + (rank < remainder ? 1 : 0);
+  int local_cols = end_col - start_col;
+
+  std::vector<int> local_nnz(local_cols, 0);
+  ComputeLocalNNZ(start_col, local_cols, b_col_ptr, b_row_indices, a_col_ptr, a_row_indices, m, local_nnz);
+
+  std::vector<int> nnz_per_column(n, 0);
+  std::vector<int> recv_counts(size);
+  std::vector<int> displs(size);
+  GatherNNZData(world, local_nnz, local_cols, start_col, nnz_per_column, recv_counts, displs);
+
+  BuildCColPtr(world, nnz_per_column, c_col_ptr);
+
+  if (rank == 0) {
+    ComputeCValuesAndIndices(a_values, a_row_indices, a_col_ptr, b_values, b_row_indices, b_col_ptr, m, n, c_values,
+                             c_row_indices, c_col_ptr);
+  } else {
+    c_col_ptr.clear();
+    c_values.clear();
+    c_row_indices.clear();
+  }
+
+  world.barrier();
+}
+
+}  // namespace sorokin_a_multiplication_sparse_matrices_double_ccs_all
+\end{lstlisting}
+\end{document}
