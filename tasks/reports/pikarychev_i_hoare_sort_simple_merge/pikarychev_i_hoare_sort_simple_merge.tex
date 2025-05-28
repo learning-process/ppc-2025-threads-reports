@@ -1,13 +1,12 @@
 \documentclass[a4paper,12pt]{article}
 
-\usepackage{algorithmicx}
-\usepackage{setspace}
-\usepackage{multirow}
-\usepackage[utf8]{inputenc}
 \usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
 \usepackage[russian]{babel}
-
-\usepackage{amsmath,amssymb,siunitx}
+\usepackage{hyperref}
+\usepackage{setspace}
+\usepackage{amsmath,amssymb}
+\usepackage{siunitx}
 \sisetup{
     output-decimal-marker={,},
     group-digits = false
@@ -21,25 +20,15 @@
 \usepackage{booktabs}
 \usepackage{tabularx}
 
-\usepackage{listings}
-\usepackage{xcolor}
-\lstset{
-    basicstyle=\ttfamily\small,
-    keywordstyle=\color{blue},
-    commentstyle=\color{green},
-    stringstyle=\color{red},
-    frame=single,
-    tabsize=4,
-    showstringspaces=false,
-    breaklines=true
-}
+\usepackage{algorithm}
+\usepackage{algorithmicx}
+\usepackage{algpseudocode}
 
 \usepackage{titlesec}
 \titleformat{\section}{\normalfont\Large\bfseries\centering}{\thesection.}{1em}{}
 \titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection.}{1em}{}
 
 \usepackage{indentfirst}
-
 \setlength{\parindent}{1.25cm}
 \setlength{\parskip}{0pt}
 
@@ -91,7 +80,6 @@
 Среди разнообразия алгоритмов сортировки особое место занимает быстрая сортировка (Хоара), сочетающая в себе высокую эффективность и простоту реализации.
 
 Однако классическая реализация этого алгоритма имеет ряд ограничений, связанных с глубиной рекурсии и обработкой уже частично упорядоченных последовательностей.
-\newpage
 
 \section{Постановка задачи}
 Требуется реализовать комбинированный алгоритм сортировки, сочетающий:
@@ -135,14 +123,14 @@
 \caption{Гибридная сортировка}
 \begin{algorithmic}[1]
 \Function{HybridSort}{$arr$}
-    \If{$|arr| \leq$ threshold}
-        \State \Return InsertionSort($arr$)
+    \If{$\text{length}(arr) \leq \text{threshold}$}
+        \State \Return $\text{InsertionSort}(arr)$
     \EndIf
-    \State $pivot \gets$ SelectPivot($arr$)
-    \State $(left, right) \gets$ Partition($arr$, $pivot$)
-    \State $left\_sorted \gets$ HybridSort($left$)
-    \State $right\_sorted \gets$ HybridSort($right$)
-    \State \Return Merge($left\_sorted$, $right\_sorted$)
+    \State $pivot \gets \text{SelectPivot}(arr)$
+    \State $(left, right) \gets \text{Partition}(arr, pivot)$
+    \State $left\_sorted \gets \text{HybridSort}(left)$
+    \State $right\_sorted \gets \text{HybridSort}(right)$
+    \State \Return $\text{Merge}(left\_sorted, right\_sorted)$
 \EndFunction
 \end{algorithmic}
 \end{algorithm}
@@ -163,19 +151,13 @@
 \hline
 Размер массива & Время (мс) & Память (МБ) & Сравнений \\
 \hline
-100 & 0.12 & 0.8 & 520 \\
-10 000 & 14.5 & 1.2 & 132 000 \\
-1 000 000 & 1 850 & 12.4 & 19 500 000 \\
+100 & 0,12 & 0,8 & 520 \\
+10 000 & 14,5 & 1,2 & 132 000 \\
+1 000 000 & 1 850 & 12,4 & 19 500 000 \\
 \hline
 \end{tabular}
 \caption{Результаты тестирования}
 \end{table}
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.8\textwidth]{perf_graph.png}
-\caption{График зависимости времени выполнения от размера массива}
-\end{figure}
 
 \section{Выводы}
 \begin{itemize}
