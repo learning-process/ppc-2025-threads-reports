@@ -7,7 +7,7 @@
 \usepackage{enumitem}
 \usepackage{float}
 \usepackage{geometry}
-\usepackage{hyperref}
+\usepackage[breaklinks=true]{hyperref}
 \usepackage{listings}
 \usepackage[expansion=false]{microtype}
 \usepackage{multirow}
@@ -72,9 +72,9 @@
     2025
 \end{titlepage}
 
-
+\clearpage
 \tableofcontents
-\newpage
+\clearpage
 
 \section*{Введение}
 Сортировка данных — одна из ключевых задач в информатике, лежащая в основе множества алгоритмов и приложений, от баз данных до анализа больших данных.\\
@@ -111,20 +111,28 @@
 \end{enumerate}
 
 \section*{Схема реализации OpenMP алгоритма и использованных функций, технологий}
-Реализация с OpenMP использует директивы для многопоточной обработки. Метод \texttt{SortParallel} делит массив на чанки размером \(arr.size() / num\_threads\), где \texttt{num\_threads} определяется через \texttt{ppc::util::GetPPCNumThreads()}. Директива \texttt{\#pragma omp parallel} создает потоки, каждый из которых сортирует свой чанк с помощью \texttt{Sort}. Метод \texttt{BatcherMergeParallel} выполняет слияние с шагом \texttt{step}, используя \texttt{\#pragma omp parallel for} для параллельного объединения блоков с помощью \texttt{std::inplace\_merge}. OpenMP обеспечивает простоту параллелизации с минимальной синхронизацией.
+Реализация с OpenMP использует директивы для многопоточной обработки. Метод \texttt{SortParallel} делит массив на чанки размером \(arr.size() / num\_threads\), где \texttt{num\_threads} определяется через \texttt{ppc::util::GetPPCNumThreads()}. 
+Директива \texttt{\#pragma omp parallel} создает потоки, каждый из которых сортирует свой чанк с помощью \texttt{Sort}. 
+Метод \texttt{BatcherMergeParallel} выполняет слияние с шагом \texttt{step}, используя \texttt{\#pragma omp parallel for} для параллельного объединения блоков с помощью \texttt{std::inplace\_merge}. 
+OpenMP обеспечивает простоту параллелизации с минимальной синхронизацией.
 
 \section*{Схема реализации TBB алгоритма и использованных функций, технологий}
-TBB-версия использует Intel Threading Building Blocks. Метод \texttt{SortParallel} применяет \texttt{oneapi::tbb::parallel\_for} с порогом \texttt{kSortThreshold = 1000}, переключаясь на последовательную сортировку для малых массивов. Чанки определяются как \(chunk\_size = (n + num\_threads - 1) / num\_threads\). Слияние в \texttt{BatcherMergeParallel} использует \texttt{blocked\_range} с порогом \texttt{kMergeThreshold = 32} для оптимального распределения задач. TBB обеспечивает автоматическую балансировку нагрузки.
+TBB-версия использует Intel Threading Building Blocks. Метод \texttt{SortParallel} применяет \texttt{oneapi::tbb::parallel\_for} с порогом \texttt{kSortThreshold = 1000}, переключаясь на последовательную сортировку для малых массивов. 
+Чанки определяются как \(chunk\_size = (n + num\_threads - 1) / num\_threads\). Слияние в \texttt{BatcherMergeParallel} использует \texttt{blocked\_range} с порогом \texttt{kMergeThreshold = 32} для оптимального распределения задач. 
+TBB обеспечивает автоматическую балансировку нагрузки.
 
 \section*{Схема реализации STL алгоритма и использованных функций, технологий}
-STL-версия использует \texttt{std::thread}. Метод \texttt{SortParallel} делит массив на чанки размером \(chunk\_size = (n + num\_threads - 1) / num\_threads\), создавая потоки для каждого сегмента. Слияние в \texttt{BatcherMergeParallel} запускает потоки с порогом \texttt{kMergeThreshold = 32}, переключаясь на последовательное выполнение для малых блоков. STL требует ручного управления потоками, что усложняет синхронизацию.
+STL-версия использует \texttt{std::thread}. Метод \texttt{SortParallel} делит массив на чанки размером \(chunk\_size = (n + num\_threads - 1) / num\_threads\), создавая потоки для каждого сегмента. 
+Слияние в \texttt{BatcherMergeParallel} запускает потоки с порогом \texttt{kMergeThreshold = 32}, переключаясь на последовательное выполнение для малых блоков. STL требует ручного управления потоками, что усложняет синхронизацию.
 
 \section*{Схема реализации MPI + OpenMP алгоритма и использованных функций, технологий}
-MPI+OMP-версия совмещает в себе использование Boost.MPI и OpenMP. Метод \texttt{SortParallel} разбивает массив на подмассивы через \texttt{PartitionArray}, распределяя их между процессами MPI. Локальная сортировка выполняется с OpenMP (\texttt{\#pragma omp parallel for}). Слияние реализовано в \texttt{BatcherMergeParallel} (внутри процесса) и \texttt{MergeAcross} (между процессами), используя \texttt{group.send()} и \texttt{group.recv()} для обмена данными. Преимущество гибридного подхода заключается в обеспечении возможностей масштабирования на кластерах.
+MPI+OMP-версия совмещает в себе использование Boost.MPI и OpenMP. Метод \texttt{SortParallel} разбивает массив на подмассивы через \texttt{PartitionArray}, распределяя их между процессами MPI. 
+Локальная сортировка выполняется с OpenMP (\texttt{\#pragma omp parallel for}). Слияние реализовано в \texttt{BatcherMergeParallel} (внутри процесса) и \texttt{MergeAcross} (между процессами), используя \texttt{group.send()} и \texttt{group.recv()} для обмена данными. 
+Преимущество гибридного подхода заключается в обеспечении возможностей масштабирования на кластерах.
 
 \section*{Результаты экспериментов}
 Для оценки производительности реализованных версий алгоритма были проведены измерения времени выполнения программы на входном массиве из 4 194 304 случайных чисел (2 в степени 22). 
-Для каждой представленной конфигурации производилось по 10 запусков, после чего было зафиксировано среднее арифметическое значение для каждой временной характеристики (\texttt{PipelineRun}, \texttt{TaskRun}), а также высчитано ускорение относительно \texttt{PipelineRun} показателя последовательной реализации.
+Для каждой представленной конфигурации производилось по 10 запусков, после чего было зафиксировано среднее арифметическое значение для каждой временной характеристики (\texttt{PipelineRun}, \texttt{TaskRun}), а также \\высчитано ускорение относительно \texttt{PipelineRun} показателя последовательной реализации.
 
 \begin{center}
 \begin{tabular}{|c|c|c|c|c|}
@@ -185,7 +193,7 @@ SEQ & — & 5.3222 & 5.2229 & 1.00 \\
     \item Intel TBB Documentation. \url{https://www.intel.com/content/www/us/en/docs/oneapi/tbb/developer-guide-a/2021-6/overview.html}.
     \item OpenMP Specification. \url{https://www.openmp.org/spec-html/5.0/openmp.html}.
     \item Boost MPI Documentation. \url{https://www.boost.org/doc/libs/release/doc/html/mpi.html}.
-    \item Львовский С.М. Набор и верстка в системе LATEX. 3-е издание, исправленное и дополненное. 2003. \url{https://kaf70.mephi.ru/content/public/uploads/files/pdf/львовский_latex2е.pdf}.
+    \item Львовский С.М. Набор и верстка в системе LATEX. 3-е издание, исправленное и дополненное. 2003.
 \end{enumerate}
 
 
