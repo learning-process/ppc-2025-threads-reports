@@ -1,0 +1,1060 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage[protrusion=true,expansion=false]{microtype}
+\sloppy
+\emergencystretch=1em
+
+\geometry{top=2cm, bottom=2cm, left=2.5cm, right=2cm}
+\usepackage{indentfirst}
+\setlength{\parindent}{1.25cm} 
+\setlength{\parskip}{0pt}      
+
+\usepackage{enumitem}
+\setlist[enumerate,1]{left=0pt,label=\arabic*.,labelsep=0.5cm,itemindent=1.25cm}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny,
+  keywordstyle=\color{blue}\bfseries,
+  stringstyle=\color{red},
+  commentstyle=\color{gray},
+}
+
+\renewcommand{\baselinestretch}{1.5}
+
+\renewcommand{\normalsize}{\fontsize{14}{16.8}\selectfont}
+\renewcommand{\large}{\fontsize{16}{19.2}\selectfont}
+
+\begin{document}
+\thispagestyle{empty}
+\begin{center}
+    Министерство науки и высшего образования Российской Федерации\\[0.5cm]
+    Федеральное государственное автономное образовательное учреждение высшего образования\\[0.1cm]
+    \textbf{Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского}\\[0.1cm]
+    Институт информационных технологий, математики и механики\\[2.5cm]
+
+    \Huge
+    \textbf{Отчет по лабораторным работам}\\[0.5cm]
+    \LARGE
+    \textbf{«Сортировка Шелла с четно-нечетным слиянием Бэтчера»}\\[2cm]
+
+    \normalsize
+    \begin{flushright}
+        \textbf{Выполнила:}\\
+        студент группы 3822Б1ПР1\\
+        Ермилова Д.С.\\[1cm]
+
+        \textbf{Преподаватель:}\\
+        Доцент кафедры ВВиСП, к.т.н.,\\
+        Сысоев А.В.\\
+    \end{flushright}
+    \vfill
+    Нижний Новгород\\
+    2025
+\end{center}
+\newpage 
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+Сортировка данных — одна из ключевых задач в области обработки информации. Для ускорения выполнения таких задач используются параллельные алгоритмы. В данной работе реализуется параллельная версия сортировки Шелла с четно-нечетным слиянием Бэтчера с использованием различных технологий: OpenMP, TBB, STL (std::thread) и гибридной MPI+OpenMP.
+
+\section{Постановка задачи}
+Целью данной лабораторной работы является разработка, реализация и сравнительный анализ различных версий параллельного алгоритма сортировки Шелла с последующим слиянием чётно-нечётным слиянием Бэтчера.
+Задачи:
+\begin{itemize}
+    \item Реализовать последовательную версию алгоритма сортировки, объединяющего сортировку Шелла и чётно-нечётное слияние. Эта реализация служит базой для дальнейшего сравнения с параллельными версиями;
+    \item Разработать параллельную реализацию алгоритма с использованием OpenMP;
+    \item Реализовать версию алгоритма с использованием библиотеки Intel Threading Building Blocks (TBB);
+    \item Реализовать многопоточную версию с использованием стандартной библиотеки потоков C++ (std::thread);
+    \item Разработать гибридную версию алгоритма на основе MPI + OpenMP;
+    \item Провести тестирование корректности работы всех реализаций на различных наборах данных. Убедиться, что все алгоритмы возвращают правильно отсортированные массивы;
+    \item Осуществить измерение времени выполнения каждой версии . Сравнить полученные результаты, определить эффективность масштабирования каждой версии и выявить преимущества и ограничения используемых подходов.
+\end{itemize}
+\newpage
+
+\section{Описание алгоритма}
+Алгоритм сортировки Шелла с четно-нечетным слиянием Бэтчера реализована с помощью следующих функций:
+
+\subsection{Функция \texttt{CreateSedgwickSequence}}
+Данная функция формирует последовательность промежутков \texttt{gaps}, используемую в алгоритме сортировки Шелла. Используется модифицированная последовательность Сэджвика, значения которой вычисляются по чередующимся формулам:
+\begin{lstlisting}[language=C++,caption={Формулы генерации последовательности Седжвика}]
+if (k % 2 == 0) {
+    gap = 9 * (1 << (2 * k)) - 9 * (1 << k) + 1;
+} else {
+    gap = 8 * (1 << k) - 6 * (1 << ((k + 1) / 2)) + 1;
+}
+\end{lstlisting}
+
+Цикл генерации завершается, когда очередной шаг превышает половину длины сортируемого массива. Полученная последовательность инвертируется, чтобы сортировка начиналась с наибольших шагов и завершалась минимальными, что соответствует стратегии грубой предварительной сортировки с последующей уточняющей фазой.
+
+\vspace{1em}
+\subsection{Функция \texttt{ShellSort}}
+Функция реализует алгоритм сортировки Шелла на заданном диапазоне массива от \texttt{start} до \texttt{end} (включительно). Алгоритм использует заранее вычисленную последовательность шагов, возвращаемую функцией \texttt{CreateSedgwickSequence}. На каждом этапе элементы массива сравниваются и перемещаются с интервалом, равным текущему значению \textit{gap}. Постепенное уменьшение \textit{gap} позволяет сгруппировать элементы и приблизить их к целевому положению ещё до финальной фазы.
+На последнем шаге (при \textit{gap = 1}) сортировка переходит в режим сортировки вставками, но благодаря предварительным проходам общее число необходимых операций существенно сокращается.
+
+\vspace{0.5em}
+\begin{lstlisting}[language=C++,caption={Основной цикл сортировки ShellSort}]
+for (int gap : gaps) {
+  for (size_t i = start + gap; i <= end; i++) {
+    int temp = data[i];
+    size_t j = i;
+    while (j >= start + gap && data[j - gap] > temp) {
+      data[j] = data[j - gap];
+      j -= gap;
+    }
+    data[j] = temp;
+  }
+}
+\end{lstlisting}
+
+\vspace{0.5em}
+\vspace{1em}
+\subsection{Функция \texttt{BatcherMerge}}
+Функция реализует алгоритм чётно-нечётного слияния по методу Бэтчера, предназначенный для объединения двух отсортированных подмассивов в один отсортированный массив. Входными данными являются границы двух подмассивов: $[start, mid)$ и $[mid, end)$. Из них формируются временные массивы \texttt{left} и \texttt{right}.
+Слияние выполняется по следующей схеме:
+
+\begin{itemize}
+    \item на чётных позициях результирующего массива выбирается минимальный элемент из текущих позиций \texttt{left} и \texttt{right};
+    \item на нечётных позициях выбирается минимальный элемент с приоритетом в пользу правого подмассива.
+\end{itemize}
+
+Такое чередование обеспечивает корректное слияние при параллельной реализации, а также позволяет эффективно распараллеливать процесс на более высоком уровне.
+\vspace{0.5em}
+\begin{lstlisting}[language=C++,caption={Основной цикл слияния в BatcherMerge}]
+for (size_t i = start; i < end; ++i) {
+  if (i % 2 == 0) {
+    if (left_index < left_size && (right_index >= right_size || left[left_index] <= right[right_index])) {
+      data[data_offset++] = left[left_index++];
+    } else {
+      data[data_offset++] = right[right_index++];
+    }
+  } else {
+    if (right_index < right_size && (left_index >= left_size || right[right_index] <= left[left_index])) {
+      data[data_offset++] = right[right_index++];
+    } else {
+      data[data_offset++] = left[left_index++];
+    }
+  }
+}
+\end{lstlisting}
+\vspace{1em}
+\newpage
+
+\section{Описание схемы распараллеливания}
+Общая идея параллелизации задачи заключается в следующем: исходный массив данных разбивается на несколько блоков, количество которых соответствует числу доступных потоков или процессов. Каждый блок сортируется независимо с использованием алгоритма Шелла. Эта сортировка выполняется параллельно, что позволяет существенно ускорить предварительную обработку данных.
+
+После завершения локальной сортировки каждого блока выполняется этап объединения — чётно-нечётное слияние по методу Бэтчера. Этот этап также реализуется в параллельном режиме, где каждая пара блоков обрабатывается независимо.
+
+Предложенный подход позволяет эффективно использовать ресурсы многопроцессорных и многопоточных вычислительных систем. За счёт разделения задачи на независимые подзадачи достигается значительное сокращение времени выполнения и повышение масштабируемости алгоритма на различных архитектурах.
+\newpage
+
+\section{Описание OMP версии алгоритма}
+Реализация алгоритма с использованием OpenMP организована в виде трёх основных этапов:
+
+\begin{enumerate}
+    \item \textbf{Деление массива на блоки.} \\
+    На первом этапе исходный массив разбивается на блоки, количество которых соответствует числу доступных потоков. Число потоков определяется вызовом функции \texttt{omp\_get\_max\_threads()}. Это позволяет равномерно распределить нагрузку между потоками, минимизировать дисбаланс и обеспечить эффективную загрузку всех процессорных ядер.
+
+    \item \textbf{Параллельная сортировка блоков.} \\
+    Сортировка каждого блока выполняется независимо в отдельном потоке. Для этого используется параллельная секция OpenMP с директивой \texttt{\#pragma omp parallel}. Каждый поток сортирует свой участок массива с помощью алгоритма Шелла. Благодаря независимости блоков, сортировка выполняется без необходимости синхронизации между потоками, что повышает эффективность исполнения.
+
+    \item \textbf{Параллельное слияние блоков.} \\
+    После завершения сортировки начинается этап поэтапного слияния отсортированных блоков. На каждом шаге размер объединяемых блоков удваивается (2, 4, 8 и т.д.), пока весь массив не будет объединён в один отсортированный сегмент. Для выполнения слияний используется директива \texttt{\#pragma omp parallel for}, которая позволяет одновременно запускать слияние всех пар блоков. Объединение выполняется с использованием алгоритма чётно-нечётного слияния по методу Бэтчера.
+\end{enumerate}
+
+\textbf{Особенность OpenMP:} простота использования и высокая эффективность параллелизации циклов без необходимости ручного управления потоками.
+\newpage
+
+\section{Описание TBB версии алгоритма}
+Реализация алгоритма с использованием библиотеки Intel Threading Building Blocks (TBB) включает три ключевых этапа:
+
+\begin{enumerate}
+    \item \textbf{Деление массива на блоки.} \\
+    Исходный массив данных разбивается на несколько блоков. Количество блоков определяется числом потоков, получаемым через вспомогательную функцию \texttt{ppc::util::GetPPCNumThreads()}. Такой подход позволяет контролировать степень параллелизма и адаптировать выполнение к архитектуре системы.
+
+    \item \textbf{Параллельная сортировка блоков.} \\
+    Для управления количеством потоков используется абстракция \texttt{task\_arena}, определяющая область выполнения с фиксированным числом рабочих потоков. Внутри этой области осуществляется параллельный обход блоков с помощью \texttt{oneapi::tbb::parallel\_for}. Каждая итерация обрабатывает отдельный блок массива, выполняя на нём сортировку методом Шелла.
+
+    \item \textbf{Параллельное слияние блоков.} \\
+    После завершения локальной сортировки начинается этап поэтапного слияния отсортированных блоков. На каждой итерации создаётся список заданий \texttt{merge\_jobs}, где каждая задача содержит параметры слияния: начальную позицию, середину и конец интервала. Эти задачи обрабатываются параллельно с использованием \texttt{tbb::parallel\_for}. Слияние блоков выполняется функцией \texttt{BatcherMerge}, реализующей чётно-нечётный метод объединения Бэтчера.
+\end{enumerate}
+
+\textbf{Особенность TBB:} библиотека автоматически управляет пулом потоков и балансирует нагрузку между задачами, что упрощает реализацию и повышает производительность при работе на многоядерных системах.
+\newpage
+
+\section{Описание STL версии алгоритма}
+Реализация параллельного алгоритма с использованием стандартной библиотеки потоков C++ (\texttt{std::thread}) включает следующие этапы:
+
+\begin{enumerate}
+    \item \textbf{Разбиение массива на блоки.} \\
+    Количество блоков определяется числом потоков, возвращаемым функцией \texttt{ppc::util::GetPPCNumThreads()}. Далее рассчитывается размер одного блока (\texttt{block\_size}) с учётом общего размера массива. Каждому потоку назначается диапазон индексов, соответствующий его блоку. Такое распределение обеспечивает равномерную загрузку потоков.
+
+    \item \textbf{Параллельная сортировка блоков.} \\
+    Для каждого блока создаётся отдельный поток с помощью \texttt{std::thread}, в котором вызывается функция \texttt{ShellSort}. Сортировка выполняется в пределах строго заданного диапазона индексов с использованием последовательности Сэджвика. После запуска всех потоков основной поток синхронизирует выполнение с помощью вызовов \texttt{join()}, ожидая завершения всех сортировок.
+
+    \item \textbf{Многопоточное слияние отсортированных блоков.} \\
+    После завершения локальной сортировки осуществляется итеративное слияние блоков. На каждом этапе объединяются попарно блоки фиксированной длины. Размер блоков при этом удваивается на каждом шаге. Каждая операция слияния запускается в отдельном потоке. Для объединения используется функция \texttt{BatcherMerge}, реализующая алгоритм чётно-нечётного слияния. После каждого уровня слияния происходит синхронизация всех потоков, затем запускается следующий этап слияния с увеличенным размером блоков. Процесс повторяется до тех пор, пока весь массив не будет объединён в один отсортированный сегмент.
+\end{enumerate}
+\textbf{Особенность STL:} ручное управление созданием, запуском и завершением потоков. Это требует дополнительного контроля и может приводить к накладным расходам при большом количестве задач, особенно при малых объёмах данных на поток.
+\newpage
+
+\section{Описание MPI + OMP версии}
+Данная реализация использует гибридный подход, объединяя два уровня параллелизма: межпроцессный (с использованием технологии MPI) и внутрипроцессный (на базе OpenMP). Такой подход обеспечивает хорошую масштабируемость как на многопроцессорных системах с общей памятью, так и в распределённых вычислительных средах, включая кластеры.
+
+Основная идея заключается в следующем: входной массив делится между несколькими процессами, управляемыми MPI. Каждый процесс получает свой фрагмент данных и выполняет его обработку с использованием многопоточной сортировки на базе OpenMP. После завершения локальной обработки данные возвращаются на главный процесс, где они объединяются в один отсортированный массив.
+
+\begin{enumerate}
+    \item \textbf{Распределение данных с использованием MPI.} \\
+    На начальном этапе весь массив данных доступен только процессу с рангом 0 (главному процессу). Этот процесс делит массив на равные части в соответствии с числом доступных процессов $N$, рассчитывает смещения и размеры подмассивов, и передаёт соответствующие участки другим процессам с помощью \texttt{MPI\_Send}. Каждый процесс получает свой уникальный подмассив для локальной обработки.
+
+    \item \textbf{Локальная сортировка (внутри каждого процесса).} \\
+    Получив данные, каждый процесс выполняет сортировку своего блока с использованием функции \texttt{ParallelShellSortWithBatcherMerge}. Эта функция реализует сортировку Шелла с поэтапным слиянием блоков, используя OpenMP для организации многопоточности.
+
+    \item \textbf{Возврат отсортированных блоков.} \\
+    После завершения локальной сортировки каждый процесс отправляет свой отсортированный подмассив обратно процессу с рангом 0 с помощью \texttt{MPI\_Send}. Главный процесс собирает фрагменты, используя заранее рассчитанные смещения, и формирует итоговый массив.
+
+    \item \textbf{Финальное слияние.} \\
+    На главном процессе запускается финальное слияние всех полученных отсортированных блоков. Этот процесс организован в виде логарифмической поэтапной процедуры, на каждом уровне которой объединяются пары соседних блоков. Для ускорения используется директива \texttt{\#pragma omp parallel for}, позволяющая выполнять слияния в потоках. В качестве метода объединения используется алгоритм чётно-нечётного слияния Бэтчера.
+\end{enumerate}
+\textbf{Особенность гибридного подхода (MPI + OpenMP):} эффективное сочетание межпроцессного и внутрипроцессного параллелизма  делает данный вариант особенно подходящим для использования в высокопроизводительных распределённых вычислениях.
+
+\newpage
+\section{Результаты экспериметов}
+Тесты проводились на устройстве с характеристиками:
+
+\begin{itemize}
+    \item AMD Ryzen 5 5600H (6 ядер, 12 потоков, 3.3 ГГц);
+    \item Оперативная память: 16 ГБ.
+\end{itemize}
+
+Для эксперимента использовался массив из 50\,000 случайно сгенерированных чисел. Все версии алгоритма были протестированы при фиксированном числе потоков — 2 (в гибридной версии 2 потока и 2 процесса). Это ограничение было выбрано по следующим причинам:
+\begin{itemize}
+    \item \textbf{Справедливое сравнение:} использование одного и того же количества потоков во всех реализациях позволяет объективно оценить эффективность каждого подхода к параллелизму, без влияния масштабируемости и поведения планировщика операционной системы.
+
+    \item \textbf{Контролируемая среда:} фиксированное малое число потоков исключает нежелательные побочные эффекты, связанные с троттлингом, переключением контекста и другими системными накладными расходами, особенно на многозадачных системах или в условиях ограниченного доступа к вычислительным ресурсам.
+
+    \item \textbf{Реалистичный сценарий:} двухпоточная параллельная обработка актуальна для низкоядерных процессоров, встраиваемых систем и пользовательских приложений, где многопоточность используется умеренно.
+
+    \item \textbf{Базовая точка масштабируемости:} запуск на двух потоках позволяет получить начальные оценки ускорения, которые затем можно масштабировать до большего числа потоков для дальнейшего анализа.
+\end{itemize}
+
+Такой подход обеспечивает чистоту эксперимента, позволяя сосредоточиться на структуре, реализации и эффективности самого алгоритма, а не на абсолютных вычислительных возможностях платформы.
+\bigskip
+\begin{table}[h!]
+\centering
+\caption{Результаты производительности различных реализаций}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Реализация} & \textbf{PipelineRun (мс)} & \textbf{TaskRun (мс)} \\
+\hline
+Последовательная & 4422 & 876  \\
+OpenMP           & 120  & 27 \\
+TBB              & 137  & 34 \\
+STL              & 142  & 37 \\
+MPI + OpenMP     & 103  & 32 \\
+\hline
+\end{tabular}
+\label{tab:results}
+\end{table}
+\newpage
+
+\section{Вывод из результатов}
+
+\subsection{Производительность алгоритмов}
+На основе проведённых экспериментальных исследований можно сделать следующие выводы:
+Последовательная реализация алгоритма сортировки Шелла с чётно-нечётным слиянием Бэтчера, как и ожидалось, продемонстрировала наибольшее время выполнения. Это значение использовалось в качестве базового для оценки ускорения параллельных реализаций.
+
+Наибольшую производительность продемонстрировала гибридная версия MPI + OpenMP, завершив выполнение за 135 мс, что дало ускорение примерно в 40 раз по сравнению с последовательной реализацией. Версия на OpenMP выполнилась за 147 мс, обеспечив ускорение в 36.6 раз
+
+Версии на основе TBB и STL соответствуют ускорению порядка 38 и 37 раз соответственно. Данные результаты связаны с:
+
+  \begin{itemize}
+    \item динамическим распределением задач у TBB (что даёт гибкость, но увеличивает накладные расходы);
+    \item затратами на создание и завершение потоков в реализации на STL.
+  \end{itemize}
+
+\subsection{Подтверждение корректности алгоритмов}
+Для верификации корректности всех реализаций проводилось сравнение выходных данных с эталонным результатом, полученным с использованием стандартного алгоритма \texttt{std::sort} из библиотеки C++. Проверка проводилась для всех версий алгоритма — как последовательной, так и параллельных.
+Эксперименты выполнялись как на явно заданных тестовых массивах (включая частные случаи: уже отсортированные массивы, инверсные последовательности), так и на случайно сгенерированных массивах различной длины. Это позволило обеспечить полноту проверки и убедиться в корректности реализации при различных входных данных.
+\newpage
+
+\section{Заключение}
+В ходе выполнения лабораторной работы была разработана, реализована и проанализирована серия версий параллельного алгоритма сортировки. В рамках исследования были реализованы следующие версии алгоритма:
+\begin{itemize}
+    \item базовая последовательная версия;
+    \item параллельная версия с использованием OpenMP;
+    \item реализация на основе библиотеки Intel Threading Building Blocks (TBB);
+    \item многопоточная реализация с использованием стандартной библиотеки C++ (STL);
+    \item гибридная версия, объединяющая технологии MPI и OpenMP.
+\end{itemize}
+Проведённые экспериментальные исследования показали, что использование параллельных технологий позволяет существенно сократить время выполнения по сравнению с последовательной реализацией. Наибольшую производительность продемонстрировала гибридная версия MPI + OpenMP, достигнув ускорения 40 раз при работе на двух потоках. Это указывает на высокую эффективность реализованного подхода к распараллеливанию задачи сортировки.
+
+Таким образом, все поставленные задачи лабораторной работы были успешно выполнены. Реализованные версии алгоритма прошли тестирование, были проанализированы с точки зрения производительности, а полученные результаты подтвердили целесообразность использования параллельных вычислений. Полученные наработки могут быть использованы в дальнейшем для масштабирования на большее количество потоков или процессов, а также для адаптации под особенности конкретных многопроцессорных архитектур.
+\newpage
+
+\section{Литература}
+\begin{enumerate}
+    \item Кормен Т., Лейзерсон Ч., Ривест Р. "Алгоритмы. Построение и анализ". М.: Вильямс, 2005.
+    \item Гольдберг А. В., Козлов С. А. Основы параллельного программирования. — М.: ДМК Пресс, 2020. — 368 с.
+    \item Boost MPI Documentation. Boost C++ Libraries.  \url{https://www.boost.org/doc/libs/release/doc/html/mpi.html}
+\item OpenMP Architecture Review Board. OpenMP Application Program Interface Version 5.0. — 2018. \url{https://www.openmp.org/specifications}
+    \item Документация STL и std::thread. C++ Reference.  \url{https://en.cppreference.com}
+    \item Intel TBB Documentation. \url{https://www.intel.com/content/www/us/en/docs/oneapi/tbb/developer-guide-a/2021-6/overview.html}.
+    \item Хабр: "Сортировка Шелла". \url{https://habr.com/ru/articles/335920/}
+\end{enumerate}
+\newpage
+
+\section{Приложение}
+\textbf{Листинг 4.} Файл \texttt{ops\_seq.cpp}
+\begin{lstlisting}[language=C++]
+#include "seq/ermilova_d_shell_sort_batcher_even-odd_merger/include/ops_seq.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <vector>
+
+namespace {
+std::vector<int> SedgwickSequence(int n) {
+  std::vector<int> gaps;
+  int k = 0;
+  while (true) {
+    int gap = 0;
+    if (k % 2 == 0) {
+      gap = 9 * (1 << (2 * k)) - 9 * (1 << k) + 1;
+    } else {
+      gap = 8 * (1 << k) - 6 * (1 << ((k + 1) / 2)) + 1;
+    }
+
+    if (gap * 3 >= n) {
+      break;
+    }
+
+    gaps.push_back(gap);
+    k++;
+  }
+  return gaps;
+}
+
+void ShellSort(std::vector<int> &vec, const std::function<bool(int, int)> &comp) {
+  int n = static_cast<int>(vec.size());
+  std::vector<int> gaps = SedgwickSequence(n);
+
+  for (int k = static_cast<int>(gaps.size()) - 1; k >= 0; k--) {
+    int gap = gaps[k];
+    for (int i = gap; i < n; i++) {
+      int temp = vec[i];
+      int j = 0;
+      for (j = i; j >= gap && comp(vec[j - gap], temp); j -= gap) {
+        vec[j] = vec[j - gap];
+      }
+      vec[j] = temp;
+    }
+  }
+}
+}  // namespace
+bool ermilova_d_shell_sort_batcher_even_odd_merger_seq::TestTaskSequential::PreProcessingImpl() {
+  // Init value for input and output
+  unsigned int input_size = task_data->inputs_count[0];
+  auto *in_ptr = reinterpret_cast<int *>(task_data->inputs[0]);
+  is_descending_ = *reinterpret_cast<bool *>(task_data->inputs[1]);
+  input_.assign(in_ptr, in_ptr + input_size);
+
+  unsigned int output_size = task_data->outputs_count[0];
+  output_ = std::vector<int>(output_size, 0);
+
+  return true;
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_seq::TestTaskSequential::ValidationImpl() {
+  // Check equality of counts elements
+  return (task_data->inputs_count[0] > 0) && (task_data->inputs_count[0] == task_data->outputs_count[0]);
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_seq::TestTaskSequential::RunImpl() {
+  if (is_descending_) {
+    ShellSort(input_, std::less());
+  } else {
+    ShellSort(input_, std::greater());
+  }
+  return true;
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_seq::TestTaskSequential::PostProcessingImpl() {
+  auto *data = reinterpret_cast<int *>(task_data->outputs[0]);
+  std::ranges::copy(input_, data);
+  return true;
+}
+\end{lstlisting}
+\textbf{Листинг 5.} Файл \texttt{ops\_omp.cpp}
+
+\begin{lstlisting}[language=C++]
+#include "omp/ermilova_d_shell_sort_batcher_even_odd_merger/include/ops_omp.hpp"
+
+#include <omp.h>
+
+#include <algorithm>
+#include <cstddef>
+#include <vector>
+
+namespace {
+
+std::vector<int> CreateSedgwickSequence(int n) {
+  std::vector<int> gaps;
+  int k = 0;
+  while (true) {
+    int gap =
+        (k % 2 == 0) ? (9 * (1 << (2 * k))) - (9 * (1 << k)) + 1 : (8 * (1 << k)) - (6 * (1 << ((k + 1) / 2))) + 1;
+
+    if (gap > n / 2) {
+      break;
+    }
+
+    gaps.push_back(gap);
+    k++;
+  }
+
+  if (gaps.empty() || gaps.back() != 1) {
+    gaps.push_back(1);
+  }
+
+  std::ranges::reverse(gaps);
+  return gaps;
+}
+
+void ShellSort(std::vector<int> &data, size_t start, size_t end) {
+  auto partition_size = static_cast<int>(end - start + 1);
+  auto gaps = CreateSedgwickSequence(partition_size);
+
+  for (int gap : gaps) {
+    for (size_t i = start + gap; i <= end; i++) {
+      int temp = data[i];
+      size_t j = i;
+      while (j >= start + gap && data[j - gap] > temp) {
+        data[j] = data[j - gap];
+        j -= gap;
+      }
+      data[j] = temp;
+    }
+  }
+}
+
+void BatcherMerge(std::vector<int> &data, size_t start, size_t mid, size_t end) {
+  std::vector<int> left(data.begin() + static_cast<std::ptrdiff_t>(start),
+                        data.begin() + static_cast<std::ptrdiff_t>(mid));
+
+  std::vector<int> right(data.begin() + static_cast<std::ptrdiff_t>(mid),
+                         data.begin() + static_cast<std::ptrdiff_t>(end));
+  size_t left_index = 0;
+  size_t right_index = 0;
+  size_t data_offset = start;
+
+  size_t left_size = mid - start;
+  size_t right_size = end - mid;
+
+  for (size_t i = start; i < end; ++i) {
+    if (i % 2 == 0) {
+      if (left_index < left_size && (right_index >= right_size || left[left_index] <= right[right_index])) {
+        data[data_offset++] = left[left_index++];
+      } else {
+        data[data_offset++] = right[right_index++];
+      }
+    } else {
+      if (right_index < right_size && (left_index >= left_size || right[right_index] <= left[left_index])) {
+        data[data_offset++] = right[right_index++];
+      } else {
+        data[data_offset++] = left[left_index++];
+      }
+    }
+  }
+}
+
+void ParallelShellSortWithBatcherMerge(std::vector<int> &data) {
+  size_t elements_count = data.size();
+  if (elements_count <= 1) {
+    return;
+  }
+
+  int threads_count = omp_get_max_threads();
+  size_t block_size = (elements_count + threads_count - 1) / threads_count;
+
+#pragma omp parallel
+  {
+    int thread_number = omp_get_thread_num();
+
+    size_t start_block_index = static_cast<size_t>(thread_number) * block_size;
+    size_t end_block_index = std::min(start_block_index + block_size, elements_count) - 1;
+    if (start_block_index < elements_count) {
+      ShellSort(data, start_block_index, end_block_index);
+    }
+  }
+
+  for (size_t merge_size = block_size; merge_size < elements_count; merge_size *= 2) {
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < static_cast<int>(elements_count); i += static_cast<int>(2 * merge_size)) {
+      size_t mid = std::min(i + merge_size, elements_count);
+      size_t end = std::min(i + (2 * merge_size), elements_count);
+      if (mid < end) {
+        BatcherMerge(data, i, mid, end);
+      }
+    }
+  }
+}
+}  // namespace
+bool ermilova_d_shell_sort_batcher_even_odd_merger_omp::OmpTask::PreProcessingImpl() {
+  auto input_task_size = task_data->inputs_count[0];
+  auto *input_task_data = reinterpret_cast<int *>(task_data->inputs[0]);
+  data_ = std::vector(input_task_data, input_task_data + input_task_size);
+
+  return true;
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_omp::OmpTask::ValidationImpl() {
+  return task_data->inputs_count[0] > 0 && task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_omp::OmpTask::RunImpl() {
+  ParallelShellSortWithBatcherMerge(data_);
+  return true;
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_omp::OmpTask::PostProcessingImpl() {
+  auto *output_task_data = reinterpret_cast<int *>(task_data->outputs[0]);
+  std::ranges::copy(data_, output_task_data);
+  return true;
+}
+\end{lstlisting}
+
+\textbf{Листинг 6} Файл \texttt{ops\_tbb.cpp}
+\begin{lstlisting}[language=C++]
+#include "tbb/ermilova_d_shell_sort_batcher_even_odd_merger/include/ops_tbb.hpp"
+
+#include <algorithm>
+#include <cstddef>
+#include <tuple>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+#include "oneapi/tbb/parallel_for.h"
+#include "oneapi/tbb/task_arena.h"
+
+namespace {
+
+std::vector<int> CreateSedgwickSequence(int n) {
+  std::vector<int> gaps;
+  int k = 0;
+  while (true) {
+    int gap =
+        (k % 2 == 0) ? (9 * (1 << (2 * k))) - (9 * (1 << k)) + 1 : (8 * (1 << k)) - (6 * (1 << ((k + 1) / 2))) + 1;
+
+    if (gap > n / 2) {
+      break;
+    }
+
+    gaps.push_back(gap);
+    k++;
+  }
+
+  if (gaps.empty() || gaps.back() != 1) {
+    gaps.push_back(1);
+  }
+
+  std::ranges::reverse(gaps);
+  return gaps;
+}
+
+void ShellSort(std::vector<int> &data, size_t start, size_t end) {
+  auto partition_size = static_cast<int>(end - start + 1);
+  auto gaps = CreateSedgwickSequence(partition_size);
+
+  for (int gap : gaps) {
+    for (size_t i = start + gap; i <= end; i++) {
+      int temp = data[i];
+      size_t j = i;
+      while (j >= start + gap && data[j - gap] > temp) {
+        data[j] = data[j - gap];
+        j -= gap;
+      }
+      data[j] = temp;
+    }
+  }
+}
+
+void BatcherMerge(std::vector<int> &data, size_t start, size_t mid, size_t end) {
+  std::vector<int> left(data.begin() + static_cast<std::ptrdiff_t>(start),
+                        data.begin() + static_cast<std::ptrdiff_t>(mid));
+
+  std::vector<int> right(data.begin() + static_cast<std::ptrdiff_t>(mid),
+                         data.begin() + static_cast<std::ptrdiff_t>(end));
+  size_t left_index = 0;
+  size_t right_index = 0;
+  size_t data_offset = start;
+
+  size_t left_size = mid - start;
+  size_t right_size = end - mid;
+
+  for (size_t i = start; i < end; ++i) {
+    if (i % 2 == 0) {
+      if (left_index < left_size && (right_index >= right_size || left[left_index] <= right[right_index])) {
+        data[data_offset++] = left[left_index++];
+      } else {
+        data[data_offset++] = right[right_index++];
+      }
+    } else {
+      if (right_index < right_size && (left_index >= left_size || right[right_index] <= left[left_index])) {
+        data[data_offset++] = right[right_index++];
+      } else {
+        data[data_offset++] = left[left_index++];
+      }
+    }
+  }
+}
+
+void ParallelShellSortWithBatcherMerge(std::vector<int> &data) {
+  size_t elements_count = data.size();
+  if (elements_count <= 1) {
+    return;
+  }
+
+  int threads_count = ppc::util::GetPPCNumThreads();
+  size_t block_size = (elements_count + threads_count - 1) / threads_count;
+
+  oneapi::tbb::task_arena arena(threads_count);
+  arena.execute([&] {
+    oneapi::tbb::parallel_for(0, threads_count, [&](int thread_number) {
+      size_t start_block_index = static_cast<size_t>(thread_number) * block_size;
+      size_t end_block_index = std::min(start_block_index + block_size, elements_count) - 1;
+      if (start_block_index < elements_count) {
+        ShellSort(data, start_block_index, end_block_index);
+      }
+    });
+
+    for (size_t merge_size = block_size; merge_size < elements_count; merge_size *= 2) {
+      std::vector<std::tuple<size_t, size_t, size_t>> merge_jobs;
+
+      for (size_t i = 0; i < elements_count; i += 2 * merge_size) {
+        size_t mid = std::min(i + merge_size, elements_count);
+        size_t end = std::min(i + (2 * merge_size), elements_count);
+        if (mid < end) {
+          merge_jobs.emplace_back(i, mid, end);
+        }
+      }
+
+      oneapi::tbb::parallel_for(size_t(0), merge_jobs.size(), [&](size_t j) {
+        auto [start, mid, end] = merge_jobs[j];
+        BatcherMerge(data, start, mid, end);
+      });
+    }
+  });
+}
+}  // namespace
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_tbb::TbbTask::PreProcessingImpl() {
+  auto input_task_size = task_data->inputs_count[0];
+  auto *input_task_data = reinterpret_cast<int *>(task_data->inputs[0]);
+  data_ = std::vector(input_task_data, input_task_data + input_task_size);
+
+  return true;
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_tbb::TbbTask::ValidationImpl() {
+  return task_data->inputs_count[0] > 0 && task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_tbb::TbbTask::RunImpl() {
+  ParallelShellSortWithBatcherMerge(data_);
+  return true;
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_tbb::TbbTask::PostProcessingImpl() {
+  auto *output_task_data = reinterpret_cast<int *>(task_data->outputs[0]);
+  std::ranges::copy(data_, output_task_data);
+  return true;
+}
+\end{lstlisting}
+\textbf{Листинг 7.} Файл \texttt{ops\_stl.cpp}
+
+\begin{lstlisting}[language=C++]
+#include "stl/ermilova_d_shell_sort_batcher_even_odd_merger/include/ops_stl.hpp"
+
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+#include <thread>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+namespace {
+
+std::vector<int> CreateSedgwickSequence(int n) {
+  std::vector<int> gaps;
+  int k = 0;
+  while (true) {
+    int gap =
+        (k % 2 == 0) ? (9 * (1 << (2 * k))) - (9 * (1 << k)) + 1 : (8 * (1 << k)) - (6 * (1 << ((k + 1) / 2))) + 1;
+
+    if (gap > n / 2) {
+      break;
+    }
+
+    gaps.push_back(gap);
+    k++;
+  }
+
+  if (gaps.empty() || gaps.back() != 1) {
+    gaps.push_back(1);
+  }
+
+  std::ranges::reverse(gaps);
+  return gaps;
+}
+
+void ShellSort(std::vector<int> &data, size_t start, size_t end) {
+  auto partition_size = static_cast<int>(end - start + 1);
+  auto gaps = CreateSedgwickSequence(partition_size);
+
+  for (int gap : gaps) {
+    for (size_t i = start + gap; i <= end; i++) {
+      int temp = data[i];
+      size_t j = i;
+      while (j >= start + gap && data[j - gap] > temp) {
+        data[j] = data[j - gap];
+        j -= gap;
+      }
+      data[j] = temp;
+    }
+  }
+}
+
+void BatcherMerge(std::vector<int> &data, size_t start, size_t mid, size_t end) {
+  std::vector<int> left(data.begin() + static_cast<std::ptrdiff_t>(start),
+                        data.begin() + static_cast<std::ptrdiff_t>(mid));
+
+  std::vector<int> right(data.begin() + static_cast<std::ptrdiff_t>(mid),
+                         data.begin() + static_cast<std::ptrdiff_t>(end));
+  size_t left_index = 0;
+  size_t right_index = 0;
+  size_t data_offset = start;
+
+  size_t left_size = mid - start;
+  size_t right_size = end - mid;
+
+  for (size_t i = start; i < end; ++i) {
+    if (i % 2 == 0) {
+      if (left_index < left_size && (right_index >= right_size || left[left_index] <= right[right_index])) {
+        data[data_offset++] = left[left_index++];
+      } else {
+        data[data_offset++] = right[right_index++];
+      }
+    } else {
+      if (right_index < right_size && (left_index >= left_size || right[right_index] <= left[left_index])) {
+        data[data_offset++] = right[right_index++];
+      } else {
+        data[data_offset++] = left[left_index++];
+      }
+    }
+  }
+}
+
+void ParallelShellSortWithBatcherMerge(std::vector<int> &data) {
+  size_t elements_count = data.size();
+  if (elements_count <= 1) {
+    return;
+  }
+
+  int threads_count = ppc::util::GetPPCNumThreads();
+  size_t block_size = (elements_count + threads_count - 1) / threads_count;
+  std::vector<std::thread> threads(threads_count);
+  for (int i = 0; i < threads_count; i++) {
+    size_t start_block_index = static_cast<size_t>(i) * block_size;
+    size_t end_block_index = std::min(start_block_index + block_size, elements_count) - 1;
+    if (start_block_index < elements_count) {
+      threads[i] = std::thread(ShellSort, std::ref(data), start_block_index, end_block_index);
+    }
+  }
+
+  for (auto &t : threads) {
+    if (t.joinable()) {
+      t.join();
+    }
+  }
+
+  for (size_t merge_size = block_size; merge_size < elements_count; merge_size *= 2) {
+    size_t num_merges = (elements_count + 2 * merge_size - 1) / (2 * merge_size);
+    std::vector<std::thread> merge_threads(num_merges);
+
+    for (size_t i = 0; i < num_merges; ++i) {
+      size_t left = i * 2 * merge_size;
+      size_t mid = std::min(left + merge_size, elements_count);
+      size_t right = std::min(left + (2 * merge_size), elements_count);
+
+      if (mid < right) {
+        merge_threads[i] = std::thread(BatcherMerge, std::ref(data), left, mid, right);
+      }
+    }
+
+    for (auto &t : merge_threads) {
+      if (t.joinable()) {
+        t.join();
+      }
+    }
+  }
+}
+}  // namespace
+bool ermilova_d_shell_sort_batcher_even_odd_merger_stl::StlTask::PreProcessingImpl() {
+  auto input_task_size = task_data->inputs_count[0];
+  auto *input_task_data = reinterpret_cast<int *>(task_data->inputs[0]);
+  data_ = std::vector(input_task_data, input_task_data + input_task_size);
+
+  return true;
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_stl::StlTask::ValidationImpl() {
+  return task_data->inputs_count[0] > 0 && task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_stl::StlTask::RunImpl() {
+  ParallelShellSortWithBatcherMerge(data_);
+  return true;
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_stl::StlTask::PostProcessingImpl() {
+  auto *output_task_data = reinterpret_cast<int *>(task_data->outputs[0]);
+  std::ranges::copy(data_, output_task_data);
+  return true;
+}
+\end{lstlisting}
+\textbf{Листинг 8.} Файл \texttt{ops\_all.cpp}
+
+\begin{lstlisting}[language=C++]
+#include "mpi/ermilova_d_shell_sort_batcher_even_odd_merger/include/ops_all.hpp"
+
+#include <omp.h>
+
+#include <algorithm>
+#include <boost/mpi/collectives.hpp>
+#include <boost/serialization/vector.hpp>
+#include <core/util/include/util.hpp>
+#include <cstddef>
+#include <ranges>
+#include <vector>
+
+namespace {
+
+std::vector<int> CreateSedgwickSequence(int n) {
+  std::vector<int> gaps;
+  int k = 0;
+  while (true) {
+    int gap =
+        (k % 2 == 0) ? (9 * (1 << (2 * k))) - (9 * (1 << k)) + 1 : (8 * (1 << k)) - (6 * (1 << ((k + 1) / 2))) + 1;
+
+    if (gap > n / 2) {
+      break;
+    }
+
+    gaps.push_back(gap);
+    k++;
+  }
+
+  if (gaps.empty() || gaps.back() != 1) {
+    gaps.push_back(1);
+  }
+
+  std::ranges::reverse(gaps);
+  return gaps;
+}
+
+void ShellSort(std::vector<int> &data, size_t start, size_t end) {
+  auto partition_size = static_cast<int>(end - start + 1);
+  auto gaps = CreateSedgwickSequence(partition_size);
+
+  for (int gap : gaps) {
+    for (size_t i = start + gap; i <= end; i++) {
+      int temp = data[i];
+      size_t j = i;
+      while (j >= start + gap && data[j - gap] > temp) {
+        data[j] = data[j - gap];
+        j -= gap;
+      }
+      data[j] = temp;
+    }
+  }
+}
+
+void BatcherMerge(std::vector<int> &data, size_t start, size_t mid, size_t end) {
+  std::vector<int> left(data.begin() + static_cast<std::ptrdiff_t>(start),
+                        data.begin() + static_cast<std::ptrdiff_t>(mid));
+
+  std::vector<int> right(data.begin() + static_cast<std::ptrdiff_t>(mid),
+                         data.begin() + static_cast<std::ptrdiff_t>(end));
+  size_t left_index = 0;
+  size_t right_index = 0;
+  size_t data_offset = start;
+
+  size_t left_size = mid - start;
+  size_t right_size = end - mid;
+
+  for (size_t i = start; i < end; ++i) {
+    if (i % 2 == 0) {
+      if (left_index < left_size && (right_index >= right_size || left[left_index] <= right[right_index])) {
+        data[data_offset++] = left[left_index++];
+      } else {
+        data[data_offset++] = right[right_index++];
+      }
+    } else {
+      if (right_index < right_size && (left_index >= left_size || right[right_index] <= left[left_index])) {
+        data[data_offset++] = right[right_index++];
+      } else {
+        data[data_offset++] = left[left_index++];
+      }
+    }
+  }
+}
+
+void ParallelShellSortWithBatcherMerge(std::vector<int> &data) {
+  size_t elements_count = data.size();
+  if (elements_count <= 1) {
+    return;
+  }
+
+  int threads_count = omp_get_max_threads();
+  size_t block_size = (elements_count + threads_count - 1) / threads_count;
+
+#pragma omp parallel
+  {
+    int thread_number = omp_get_thread_num();
+
+    size_t start_block_index = static_cast<size_t>(thread_number) * block_size;
+    size_t end_block_index = std::min(start_block_index + block_size, elements_count) - 1;
+    if (start_block_index < elements_count) {
+      ShellSort(data, start_block_index, end_block_index);
+    }
+  }
+
+  for (size_t merge_size = block_size; merge_size < elements_count; merge_size *= 2) {
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < static_cast<int>(elements_count); i += static_cast<int>(2 * merge_size)) {
+      size_t mid = std::min(i + merge_size, elements_count);
+      size_t end = std::min(i + (2 * merge_size), elements_count);
+      if (mid < end) {
+        BatcherMerge(data, i, mid, end);
+      }
+    }
+  }
+}
+}  // namespace
+bool ermilova_d_shell_sort_batcher_even_odd_merger_all::AllTask::PreProcessingImpl() {
+  boost::mpi::communicator world;
+  if (world.rank() == 0) {
+    auto input_task_size = task_data->inputs_count[0];
+    auto *input_task_data = reinterpret_cast<int *>(task_data->inputs[0]);
+    data_ = std::vector(input_task_data, input_task_data + input_task_size);
+  }
+  return true;
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_all::AllTask::ValidationImpl() {
+  boost::mpi::communicator world;
+  if (world.rank() == 0) {
+    if (task_data->inputs_count.empty() || task_data->outputs_count.empty() || task_data->inputs_count[0] <= 0 ||
+        task_data->inputs_count[0] != task_data->outputs_count[0]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_all::AllTask::RunImpl() {
+  boost::mpi::communicator world;
+
+  int rank = world.rank();
+  int size = world.size();
+
+  std::vector<int> full_data;
+  std::vector<int> send_counts(size);
+  std::vector<int> displs(size);
+
+  if (rank == 0) {
+    full_data = data_;
+    size_t total_size = full_data.size();
+    size_t offset = 0;
+
+    size_t base = total_size / size;
+    size_t rem = total_size % size;
+    for (size_t i = 0; i < size; ++i) {
+      send_counts[i] = static_cast<int>(base + (i < rem ? 1 : 0));
+      displs[i] = static_cast<int>(offset);
+      offset += send_counts[i];
+    }
+
+  for (int i = 1; i < size; ++i) {
+    std::vector<int> chunk(full_data.begin() + displs[i], full_data.begin() + displs[i] + send_counts[i]);
+    world.send(i, 0, chunk);
+  }
+}
+
+std::vector<int> local_chunk;
+
+if (rank == 0) {
+  local_chunk.assign(full_data.begin(), full_data.begin() + send_counts[0]);
+} else {
+  world.recv(0, 0, local_chunk);
+}
+
+ParallelShellSortWithBatcherMerge(local_chunk);
+
+if (rank != 0) {
+  world.send(0, 1, local_chunk);
+}
+
+if (rank == 0) {
+  std::vector<int> result(full_data.size());
+  std::ranges::copy(local_chunk, result.begin());
+
+  for (int i = 1; i < size; ++i) {
+    std::vector<int> tmp;
+    world.recv(i, 1, tmp);
+    std::ranges::copy(tmp, result.begin() + displs[i]);
+  }
+
+  data_ = result;
+
+  for (int merge_step = 1; merge_step < size; merge_step *= 2) {
+    int loop_end = size - merge_step;
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < loop_end; i += 2 * merge_step) {
+      size_t left_start = displs[i];
+      size_t mid = displs[i + merge_step];
+      size_t right_end = (i + 2 * merge_step < size) ? displs[i + 2 * merge_step] : data_.size();
+      BatcherMerge(data_, left_start, mid, right_end);
+    }
+  }
+}
+
+return true;
+}
+
+bool ermilova_d_shell_sort_batcher_even_odd_merger_all::AllTask::PostProcessingImpl() {
+  boost::mpi::communicator world;
+  if (world.rank() == 0) {
+    auto *output_task_data = reinterpret_cast<int *>(task_data->outputs[0]);
+    std::ranges::copy(data_, output_task_data);
+  }
+  return true;
+}
+\end{lstlisting}
+\end{document}
