@@ -1,0 +1,568 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{geometry}
+\usepackage{multirow}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{tocloft}
+\usepackage{xcolor} 
+\usepackage{listings}
+\usepackage{float}
+
+\geometry{a4paper, left=10mm, right=10mm, top=20mm, bottom=20mm}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=black,
+    pdftitle={Отчет по проекту},
+    pdfauthor={Соцков Андрей},
+    pdfsubject={Сортировка Шелла с простым слиянием.}
+}
+
+\lstset{
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{blue},
+  commentstyle=\itshape\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=8pt,
+  backgroundcolor=\color{gray!10},
+  showspaces=false,
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  captionpos=b
+}
+
+\renewcommand{\cftsecaftersnum}{.}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\titleformat{\section}{\large\bfseries}{\thesection.}{1em}{}
+
+\begin{document}
+\begin{titlepage}
+    \centering
+    \large
+    Министерство науки и высшего образования Российской Федерации\\[0.5cm]
+    Федеральное государственное автономное образовательное учреждение высшего образования\\[0.5cm]
+    «Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского» \\
+    (ННГУ)\\[1cm]
+    Институт информационных технологий, математики и механики\\[0.5cm]
+    Направление подготовки: «Программная инженерия»\\[1cm]
+
+    \vspace{1cm}
+    {\LARGE \textbf{ОТЧЕТ}}\\[0.5cm]
+    {\Large по задаче}\\[0.5cm]
+    {\LARGE {«Вычисление многомерных интегралов с использованием многошаговой схемы (метод Симпсона)»}}\\[0.5cm]
+    \vspace{2cm}
+    \hfill\parbox{0.4\textwidth}{
+        \textbf{Выполнила:} \\
+        студентка группы 3822Б1ПР4 \\
+        {Колоколова Дарья}
+    }\\[0.5cm]
+    \vfill
+    Нижний Новгород\\
+    2025
+\end{titlepage}
+
+
+\thispagestyle{empty}
+\clearpage
+\pagenumbering{arabic} 
+\setcounter{page}{2} 
+\tableofcontents
+\clearpage
+\setcounter{page}{3} 
+\section{Введение}
+
+\hspace*{1.35em}Вычисление многомерных интегралов – ключевая задача во многих областях, где аналитические решения недоступны. Численные методы позволяют найти приближенное значение интеграла с заданной точностью. Метод Симпсона, основанный на аппроксимации подынтегральной функции многомерными параболоидами, обеспечивает более высокую точность по сравнению с методами прямоугольников или трапеций, поскольку использует квадратичную интерполяцию. Однако, вычислительная сложность метода экспоненциально возрастает с увеличением размерности интегрирования, ограничивая его применение для задач большой размерности.
+
+Для преодоления ограничений вычислительной сложности метода Симпсона, необходимо разрабатывать эффективные параллельные алгоритмы. Современные вычислительные архитектуры предоставляют инструменты для распараллеливания, позволяя сократить время выполнения и повысить производительность. В данной работе будут рассмотрены различные подходы к распараллеливанию метода Симпсона с использованием OpenMP, Intel TBB, STL threads и гибридной модели MPI + TBB. Целью является выявление наиболее эффективных параллельных реализаций метода Симпсона для задач разной размерности и сложности, а также сравнение их производительности и масштабируемости.
+
+\section{Постановка задачи}
+
+\hspace*{1.35em}Основная цель работы – разработка и сравнительный анализ различных параллельных реализаций алгоритма вычисления многомерных интегралов методом Симпсона. Для этого необходимо реализовать последовательную версию алгоритма, а затем разработать и протестировать параллельные версии с использованием OpenMP, Intel TBB, STL threads и гибридного подхода MPI + TBB. Ключевой задачей является выявление наиболее эффективной параллельной реализации, обеспечивающей наилучшую производительность и масштабируемость при вычислении многомерных интегралов различной размерности.
+
+\section{Описание алгоритма (последовательной версии)}
+
+\hspace*{1.35em}Алгоритм вычисления многомерного интеграла методом Симпсона заключается в аппроксимации подынтегральной функции многомерными параболоидами. В основе лежит разбиение области интегрирования на элементарные ячейки и вычисление взвешенной суммы значений функции в узлах этой сетки.
+Принцип работы последовательной версии алгоритма можно описать следующим образом:
+\begin{enumerate}
+    \item \textbf{Определение параметров интегрирования:} Задаются функция $f(x_1, x_2, ..., x_n)$, границы интегрирования $[a_i, b_i]$ для каждой переменной $x_i$ (где $i = 1, 2, ..., n$, где $n$ – размерность интеграла), и количество шагов $N_i$ для каждой переменной. Валидируются входные данные: проверяется, что $a_i < b_i$ для всех $i$, и что $N_i$ — четные числа (требование метода Симпсона).
+    \item \textbf{Вычисление шага интегрирования:} Для каждой переменной $x_i$ вычисляется шаг интегрирования $h_i = (b_i - a_i) / N_i$.
+    \item \textbf{Генерация сетки:} Создается многомерная сетка узлов в области интегрирования. Координаты каждого узла вычисляются как $x_{i,j} = a_i + j \cdot h_i$, где $j = 0, 1, ..., N_i$.
+    \item \textbf{Вычисление значений функции и коэффициентов:} Для каждого узла сетки $(x_{1,j_1}, x_{2,j_2}, ..., x_{n,j_n})$ вычисляется значение функции $f(x_{1,j_1}, x_{2,j_2}, ..., x_{n,j_n})$. Кроме того, для каждого узла определяется коэффициент $c_{i,j}$, который зависит от положения узла на сетке по каждой оси:
+    \begin{itemize}
+        \item Если $j = 0$ или $j = N_i$: $c_{i,j} = 1$ (крайние точки).
+        \item Если $j$ четное: $c_{i,j} = 2$.
+        \item Если $j$ нечетное: $c_{i,j} = 4$.
+    \end{itemize}
+    \item \textbf{Вычисление взвешенной суммы:} Вычисляется взвешенная сумма значений функции, умноженных на соответствующие коэффициенты:
+    $$S = \sum [f(x_{1,j_1}, x_{2,j_2}, ..., x_{n,j_n}) \cdot c_{1,j_1} \cdot c_{2,j_2} \cdot ... \cdot c_{n,j_n}]$$
+    (суммирование ведется по всем узлам сетки).
+    \item \textbf{Финальное вычисление интеграла:} Вычисляется приближенное значение интеграла по формуле Симпсона:
+    $$Integral = S \cdot \frac{h_1 \cdot h_2 \cdot ... \cdot h_n}{3^n}$$
+\end{enumerate}
+Этот последовательный алгоритм служит основой для дальнейшей разработки параллельных версий, в которых вычисление значений функции и суммирование взвешенных значений распределяются между несколькими потоками или процессами.
+
+\section{Описание параллельных реализаций алгоритма}
+
+\subsection{Описание параллельной реализации (OpenMP)}
+
+\hspace*{1.35em}Параллельная реализация алгоритма вычисления многомерного интеграла методом Симпсона с использованием OpenMP направлена на распараллеливание наиболее вычислительно-интенсивных этапов, чтобы максимально эффективно использовать многоядерные процессоры. Основная стратегия заключается в применении директивы \texttt{\#pragma omp parallel for} к циклам, которые выполняют независимые вычисления над элементами данных.
+
+В частности, распараллелены следующие этапы: вычисление шага интегрирования для каждой переменной, создание вектора точек (сетки интегрирования) по каждой переменной, цикл начального умножения значений функций на коэффициенты, а также последующие итерации умножения, учитывающие размерность задачи.  Например, вычисление шага интегрирования распараллеливается следующим образом:
+
+\begin{verbatim}
+#pragma omp parallel for
+for (int i = 0; i < nums_variables_; i++) {
+  double a = (double((borders_[(2 * i) + 1] - borders_[2 * i])) / double(steps_[i]));
+  size_step[i] = a;
+}
+\end{verbatim}
+
+Для суммирования взвешенных значений функции при вычислении итоговой суммы используется конструкция \texttt{reduction(+: sum)}, что позволяет безопасно и эффективно суммировать результаты вычислений из разных потоков. В тех местах, где это необходимо, использует
+
+
+\subsection{Описание параллельной реализации (TBB)}
+
+\hspace*{1.35em}Параллельная реализация алгоритма вычисления многомерного интеграла методом Симпсона с использованием Intel TBB (Threading Building Blocks) направлена на эффективное распараллеливание циклов с применением пула потоков и автоматического распределения задач. TBB позволяет минимизировать накладные расходы на управление потоками и обеспечивает хорошую масштабируемость.
+
+В данной реализации, для распараллеливания циклов используется конструкция \texttt{tbb::parallel\_for}. Например, создание вектора точек (сетки интегрирования) распараллеливается следующим образом:
+
+\begin{verbatim}
+tbb::parallel_for(tbb::blocked_range<int>(0, nums_variables_),
+  [&](const tbb::blocked_range<int>& r) {
+    for (int i = r.begin(); i < r.end(); ++i) {
+      std::vector<double> vec;
+      for (int j = 0; j < steps_[i] + 1; j++) {
+        auto num = double(borders_[2 * i] + (double(j) * size_step[i]));
+        vec.push_back(num);
+      }
+      points[i] = vec;
+    }
+});
+\end{verbatim}
+
+Цикл умножения значений функций на коэффициенты также распараллеливается с использованием \texttt{tbb::parallel\_for}. Это позволяет эффективно распределить вычисления между доступными потоками и ускорить процесс вычисления многомерного интеграла.
+
+
+\subsection{Описание параллельной реализации (STL threads)}
+
+\hspace*{1.35em}Параллельная реализация алгоритма вычисления многомерного интеграла методом Симпсона с использованием стандартной библиотеки потоков C++ (STL threads) предполагает ручное управление потоками для распараллеливания вычислительно-интенсивных участков кода. В отличие от OpenMP и TBB, STL threads требует явного создания, запуска и синхронизации потоков.
+
+В данной реализации, для распараллеливания вычислений используются объекты \texttt{std::thread}. Например, вычисление шага интегрирования для каждой переменной распараллеливается следующим образом:
+
+\begin{verbatim}
+std::vector<std::thread> threads;
+threads.reserve(nums_variables_);
+for (int i = 0; i < nums_variables_; ++i) {
+  threads.emplace_back(calculate_size_step, i);
+}
+for (auto& t : threads) {
+  t.join();
+}
+\end{verbatim}
+
+Аналогично, цикл умножения значений функций на коэффициенты также распараллеливается с использованием \texttt{std::thread}. Для этого вычисляется количество потоков, которое будет использовано (определяется функцией `ppc::util::GetPPCNumThreads()` или берется максимальное число доступных потоков), а затем создается вектор потоков, каждый из которых обрабатывает свою часть данных. После завершения работы каждого потока вызывается метод \texttt{join()}, чтобы дождаться окончания их выполнения и обеспечить корректность дальнейших вычислений.  Суммирование результатов также распараллеливается с использованием потоков, где каждый поток вычисляет локальную сумму, а затем эти локальные суммы суммируются в общую сумму.
+
+
+\subsection{Описание параллельной реализации (MPI + TBB)}
+
+\hspace*{1.35em}Гибридная параллельная реализация алгоритма вычисления многомерного интеграла методом Симпсона сочетает в себе возможности MPI (Message Passing Interface) для распределенных вычислений между процессами и Intel TBB (Threading Building Blocks) для параллелизации внутри каждого процесса. Это позволяет эффективно использовать как многопроцессорные системы, так и многоядерные процессоры в каждой вычислительной единице.
+
+В данной реализации, распределение данных и вычислений между процессами осуществляется с использованием MPI. В частности, процессы обмениваются данными для выполнения операций умножения значений функций на коэффициенты и формирования конечного результата. Например, код для умножения значений функций на коэффициенты выглядит следующим образом:
+
+\begin{verbatim}
+tbb::parallel_for(0, function_vec_size,
+  [&](int i) { local_results_func_[i] *= local_coeff_[i % local_coeff_.size()]; });
+\end{verbatim}
+
+Функциональность этапов \texttt{MultiplyCoeffandFunctionValue} и \texttt{CreateOutputResult} интегрирована непосредственно в функцию \texttt{RunImpl} для упрощения параллелизации. Внутри каждого процесса, распараллеливание вычислений выполняется с использованием TBB, что позволяет эффективно использовать все доступные ядра процессора. TBB используется, в частности, для распараллеливания циклов умножения и суммирования, обеспечивая оптимальное использование вычислительных ресурсов на каждом узле кластера.  Итоговое суммирование также выполняется с использованием TBB, где каждый процесс вычисляет локальную сумму, а затем MPI используется для сведения этих сумм в общий результат.
+
+\section{Результаты экспериментов}
+
+\hspace*{1.35em}Для оценки производительности реализованных версий алгоритма вычисления многомерного интеграла методом Симпсона были проведены замеры времени выполнения в конфигурациях с различным числом потоков и процессов. В таблице ниже представлены усреднённые значения времени выполнения (в секундах) для двух режимов тестирования — \texttt{PipelineRun} и \texttt{TaskRun}.
+
+\subsection{Таблица производительности}
+
+\renewcommand{\arraystretch}{1.4}
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Версия} & \textbf{Конфигурация} & \textbf{PipelineRun (с)} & \textbf{TaskRun (с)} \\
+\hline
+\textbf{Последовательная} & 1 поток & \centering 0.851 & 0.853 \\
+\hline
+\multirow{3}{*}{OpenMP} 
+  & 2 потока & 0.837 & 0.841 \\
+  & 4 потока & 0.732 & 0.787 \\
+
+\hline
+\multirow{3}{*}{TBB} 
+  & 2 потока & 0.865 & 0.862 \\
+  & 4 потока & 0.772 & 0.734 \\
+
+\hline
+\multirow{3}{*}{STL (std::thread)} 
+  & 2 потока & 1.012 & 1.010 \\
+  & 4 потока & 0.887 & 0.875 \\
+
+\hline
+\multirow{5}{*}{MPI + STL} 
+  & 2 процесса и 2 потока & 1.366 & 1.461 \\
+  & 2 процесса и 4 потока & 1.215 & 1.766 \\
+  & 4 процесса и 2 потока & 1.015 & 0.024 \\
+  & 4 процесса и 4 потока & 0.178 & 0.070 \\
+\hline
+\end{tabular}
+\label{tab:parallel_perf}
+\end{table}
+\subsection{Анализ производительности}
+\hspace*{1.35em}Представленные результаты показывают, что параллельные реализации демонстрируют различную эффективность в зависимости от используемой технологии и конфигурации. В целом, как OpenMP, так и TBB показывают некоторое улучшение производительности по сравнению с последовательной версией, однако прирост не столь значителен. STL threads также показывают небольшое улучшение при увеличении числа потоков. Наиболее заметный прирост производительности достигается при использовании гибридной модели MPI + TBB, особенно при использовании 4 процессов и 4 потоков, что свидетельствует об эффективности комбинирования распределенных и многопоточных вычислений.
+\section{Вывод}
+
+\hspace*{1.35em}В ходе работы были исследованы различные подходы к параллельной реализации алгоритма вычисления многомерного интеграла методом Симпсона, включая OpenMP, TBB, STL threads и гибридную модель MPI + TBB. Каждая из этих технологий была применена для распараллеливания наиболее вычислительно-интенсивных этапов алгоритма, таких как вычисление шага интегрирования, создание сетки интегрирования, умножение значений функций на коэффициенты и суммирование результатов.
+
+Анализ производительности показал, что использование OpenMP, TBB и STL threads позволяет добиться умеренного ускорения по сравнению с последовательной версией. Наиболее значительное улучшение производительности было достигнуто с использованием гибридной модели MPI + TBB, особенно в конфигурации с 4 процессами и 4 потоками на процесс. Это свидетельствует об эффективности комбинирования распределенных вычислений (MPI) и многопоточного распараллеливания внутри каждого узла (TBB). Гибридный подход позволяет оптимально использовать ресурсы вычислительной системы, обеспечивая масштабируемость и высокую производительность при вычислении многомерных интегралов.
+
+\section{Список литературы}
+
+\begin{enumerate}
+    \item OpenMP Architecture Review Board. \textit{OpenMP Specifications}. \url{https://www.openmp.org/specifications/}
+    \item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks}. — Нижний Новгород, 2007.
+    \item OpenMP Architecture Review Board. \textit{OpenMP Reference Guides}. \url{https://www.openmp.org/resources/refguides/}
+    \item UXL Foundation. \textit{oneAPI Threading Building Blocks (oneTBB) Documentation}. \url{http://uxlfoundation.github.io/oneTBB/}
+    \item cppreference.com. \textit{Concurrency support library (since C++11)}. \url{https://en.cppreference.com/w/cpp/thread.html}
+\end{enumerate}
+\newpage
+\section*{Приложение}
+\addcontentsline{toc}{section}{Приложение}
+
+В этом разделе приведены ключевые фрагменты реализации алгоритма вычисления многомерного интеграла методом Симпсона для различных технологий распараллеливания.
+
+\subsection*{OpenMP}
+\begin{lstlisting}[language=C++]
+bool kolokolova_d_integral_simpson_method_omp::TestTaskOpenMP::RunImpl() {
+  std::vector<double> size_step(nums_variables_);
+#pragma omp parallel for
+  for (int i = 0; i < nums_variables_; i++) {
+    double a = (double((borders_[(2 * i) + 1] - borders_[2 * i])) / double(steps_[i]));
+    size_step[i] = a;
+  }
+
+  std::vector<std::vector<double>> points(nums_variables_);
+
+#pragma omp parallel for
+  for (int i = 0; i < nums_variables_; i++) {
+    std::vector<double> vec;
+    for (int j = 0; j < steps_[i] + 1; j++) {
+      auto num = double(borders_[2 * i] + (double(j) * size_step[i]));
+      vec.push_back(num);
+    }
+    points[i] = vec;
+  }
+
+  std::vector<double> results_func = FindFunctionValue(points, func_);
+  std::vector<double> coeff = FindCoeff(steps_[0]);
+  MultiplyCoeffandFunctionValue(results_func, coeff, nums_variables_);
+  result_output_ = CreateOutputResult(results_func, size_step);
+  return true;
+}
+\end{lstlisting}
+\newpage
+\begin{lstlisting}[language=C++]
+void kolokolova_d_integral_simpson_method_omp::TestTaskOpenMP::MultiplyCoeffandFunctionValue(
+    std::vector<double>& function_val, const std::vector<double>& coeff_vec, int a) {
+  int coeff_vec_size = int(coeff_vec.size());
+  int function_vec_size = int(function_val.size());
+
+#pragma omp parallel for
+  for (int i = 0; i < function_vec_size; ++i) {
+    function_val[i] *= coeff_vec[i % coeff_vec_size];
+  }
+
+#pragma omp parallel for
+  for (int iteration = 1; iteration < a; ++iteration) {
+    int block_size = iteration * coeff_vec_size;
+    for (int i = 0; i < function_vec_size; ++i) {
+      int current_n_index = (i / block_size) % coeff_vec_size;
+#pragma omp atomic
+      function_val[i] *= coeff_vec[current_n_index];
+    }
+  }
+}
+\end{lstlisting}
+
+\subsection*{TBB}
+\begin{lstlisting}[language=C++]
+bool kolokolova_d_integral_simpson_method_tbb::TestTaskTBB::RunImpl() {
+  std::vector<double> size_step(nums_variables_);
+  for (int i = 0; i < nums_variables_; i++) {
+    double a = (double(borders_[(2 * i) + 1] - borders_[2 * i]) / double(steps_[i]));
+    size_step[i] = a;
+  }
+  std::vector<std::vector<double>> points(nums_variables_);
+  tbb::parallel_for(tbb::blocked_range<int>(0, nums_variables_), [&](const tbb::blocked_range<int>& r) {
+    for (int i = r.begin(); i < r.end(); ++i) {
+      std::vector<double> vec;
+      for (int j = 0; j < steps_[i] + 1; j++) {
+        auto num = double(borders_[2 * i] + (double(j) * size_step[i]));
+        vec.push_back(num);
+      }
+      points[i] = vec;
+    }
+  });
+
+  std::vector<double> results_func = FindFunctionValue(points, func_);
+  std::vector<double> coeff = FindCoeff(steps_[0]);
+  MultiplyCoeffandFunctionValue(results_func, coeff, nums_variables_);
+  result_output_ = CreateOutputResult(results_func, size_step);
+  return true;
+}
+\end{lstlisting}
+\begin{lstlisting}[language=C++]
+void kolokolova_d_integral_simpson_method_tbb::TestTaskTBB::MultiplyCoeffandFunctionValue(
+    std::vector<double>& function_val, const std::vector<double>& coeff_vec, int a) {
+  int function_vec_size = int(function_val.size());
+
+  // Perform parallel multiplication
+  tbb::parallel_for(0, function_vec_size, [&](int i) { function_val[i] *= coeff_vec[i % coeff_vec.size()]; });
+
+  // Additional iterations on a
+  for (int iteration = 1; iteration < a; ++iteration) {
+    tbb::parallel_for(0, function_vec_size, [&](int i) {
+      int block_size = iteration * int(coeff_vec.size());
+      int current_n_index = (i / block_size) % int(coeff_vec.size());
+      function_val[i] *= coeff_vec[current_n_index];
+    });
+  }
+}
+}
+\end{lstlisting}
+\newpage
+\subsection*{STL (std::thread)}
+\begin{lstlisting}[language=C++]
+bool kolokolova_d_integral_simpson_method_stl::TestTaskSTL::RunImpl() {
+  std::vector<double> size_step(nums_variables_);
+
+  auto calculate_size_step = [&](int i) {
+    double a = double(borders_[(2 * i) + 1] - borders_[2 * i]) / double(steps_[i]);
+    size_step[i] = a;
+  };
+
+  std::vector<std::thread> threads;
+  threads.reserve(nums_variables_);
+  for (int i = 0; i < nums_variables_; ++i) {
+    threads.emplace_back(calculate_size_step, i);
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  std::vector<std::vector<double>> points(nums_variables_);
+  threads.clear();
+
+  for (int i = 0; i < nums_variables_; ++i) {
+    threads.emplace_back([&, i]() {
+      std::vector<double> vec;
+      for (int j = 0; j <= steps_[i]; ++j) {
+        double num = borders_[2 * i] + (double(j) * size_step[i]);
+        vec.push_back(num);
+      }
+      points[i] = vec;
+    });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  std::vector<double> results_func = FindFunctionValue(points, func_);
+  std::vector<double> coeff = FindCoeff(steps_[0]);
+  MultiplyCoeffandFunctionValue(results_func, coeff, nums_variables_);
+  result_output_ = CreateOutputResult(results_func, size_step);
+
+  return true;
+}
+\end{lstlisting}
+\newpage
+\begin{lstlisting}[language=C++]
+std::vector<double> kolokolova_d_integral_simpson_method_stl::TestTaskSTL::FindCoeff(int count_step) {
+  std::vector<double> result_coeff(1, 1.0);  // first coeff is always 1
+  for (int i = 1; i < count_step; i++) {
+    if (i % 2 != 0) {
+      result_coeff.push_back(4.0);  // odd coeff is 4
+    } else {
+      result_coeff.push_back(2.0);  // even coeff is 2
+    }
+  }
+  result_coeff.push_back(1.0);  // last coeff is always 1
+  return result_coeff;
+}
+
+void kolokolova_d_integral_simpson_method_stl::TestTaskSTL::MultiplyCoeffandFunctionValue(
+    std::vector<double>& function_val, const std::vector<double>& coeff_vec, int a) {
+  int coeff_vec_size = int(coeff_vec.size());
+  int function_vec_size = int(function_val.size());
+
+  // Determine the number of threads for parallel processing using GetPPCNumThreads
+  int thread_count = ppc::util::GetPPCNumThreads();
+  if (thread_count <= 0 || thread_count > int(std::thread::hardware_concurrency())) {
+    // Use maximum available threads if GetPPCNumThreads gives a non-viable count
+    thread_count = int(std::thread::hardware_concurrency());
+  }
+
+  // vector for storing threads
+  std::vector<std::thread> threads;
+  threads.reserve(thread_count);
+
+  // calculate the section size for each thread
+  int section_size = function_vec_size / thread_count;
+
+  // loop of multiplying function values ??by coefficients
+  for (int t = 0; t < thread_count; ++t) {
+    threads.emplace_back([&, t, section_size, function_vec_size, coeff_vec_size]() {
+      int start = t * section_size;
+
+      // determine the start and end indices for the current thread
+      int end = (t == thread_count - 1) ? function_vec_size : start + section_size;
+      for (int i = start; i < end; ++i) {
+        function_val[i] *= coeff_vec[i % coeff_vec_size];
+      }
+    });
+  }
+\end{lstlisting}
+\begin{lstlisting}[language=C++]
+  // wait for all threads to complete
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  // additional iterations of multiplication by coefficients
+  for (int iteration = 1; iteration < a; ++iteration) {
+    threads.clear();
+    for (int t = 0; t < thread_count; ++t) {
+      threads.emplace_back([&, t, section_size, function_vec_size, coeff_vec_size, iteration]() {
+        int start = t * section_size;
+
+        // determine the start and end indices for the current thread
+        int end = (t == thread_count - 1) ? function_vec_size : start + section_size;
+        for (int i = start; i < end; ++i) {
+          int block_size = iteration * coeff_vec_size;
+          int current_n_index = (i / block_size) % coeff_vec_size;
+          function_val[i] *= coeff_vec[current_n_index];
+        }
+      });
+    }
+
+    for (auto& t : threads) {
+      t.join();
+    }
+  }
+}
+\end{lstlisting}
+\newpage
+\subsection*{MPI + TBB}
+\begin{lstlisting}[language=C++]
+bool kolokolova_d_integral_simpson_method_all::TestTaskALL::RunImpl() {
+  int rank = world_.rank();
+  int size = world_.size();
+
+  boost::mpi::broadcast(world_, size_local_results_func_, 0);
+  boost::mpi::broadcast(world_, nums_variables_, 0);
+  boost::mpi::broadcast(world_, size_local_coeff_, 0);
+  boost::mpi::broadcast(world_, size_local_size_step_, 0);
+
+  local_results_func_ = std::vector<double>(size_local_results_func_);
+  local_coeff_ = std::vector<double>(size_local_coeff_);
+
+  if (rank == 0) {
+    for (int proc = 1; proc < size; proc++) {
+      world_.communicator::send(proc, 0, results_func_.data() + (proc * size_local_results_func_),
+                                size_local_results_func_);
+    }
+    local_results_func_ = std::vector<double>(results_func_.begin(), results_func_.begin() + size_local_results_func_);
+  } else {
+    world_.communicator::recv(0, 0, local_results_func_.data(), size_local_results_func_);
+  }
+
+  if (rank == 0) {
+    for (int proc = 1; proc < size; proc++) {
+      world_.communicator::send(proc, 0, vec_coeff_.data() + (proc * size_local_coeff_), size_local_coeff_);
+    }
+    local_coeff_ = std::vector<double>(vec_coeff_.begin(), vec_coeff_.begin() + size_local_coeff_);
+  } else {
+    world_.communicator::recv(0, 0, local_coeff_.data(), size_local_coeff_);
+  }
+
+  int function_vec_size = int(local_results_func_.size());
+
+  tbb::parallel_for(0, function_vec_size,
+                    [&](int i) { local_results_func_[i] *= local_coeff_[i % local_coeff_.size()]; });
+
+  boost::mpi::gather(world_, local_results_func_.data(), size_local_results_func_, results_func_, 0);
+
+  if (rank == 0) {
+    ApplyCoefficientIteration();
+  }
+\end{lstlisting}
+\newpage
+\begin{lstlisting}[language=C++]
+  local_results_func_ = std::vector<double>(size_local_results_func_);
+  local_size_step_ = std::vector<double>(size_local_size_step_);
+
+  if (rank == 0) {
+    for (int proc = 1; proc < size; proc++) {
+      world_.communicator::send(proc, 0, results_func_.data() + (proc * size_local_results_func_),
+                                size_local_results_func_);
+    }
+    local_results_func_ = std::vector<double>(results_func_.begin(), results_func_.begin() + size_local_results_func_);
+  } else {
+    world_.communicator::recv(0, 0, local_results_func_.data(), size_local_results_func_);
+  }
+
+  if (rank == 0) {
+    for (int proc = 1; proc < size; proc++) {
+      world_.communicator::send(proc, 0, size_step_.data(), size_local_size_step_);
+    }
+    local_size_step_ = std::vector<double>(size_step_.begin(), size_step_.begin() + size_local_size_step_);
+  } else {
+    world_.communicator::recv(0, 0, local_size_step_.data(), size_local_size_step_);
+  }
+
+  double sum = tbb::parallel_reduce(
+      tbb::blocked_range<size_t>(0, local_results_func_.size()), 0.0,
+      [&](const tbb::blocked_range<size_t>& r, double init) {
+        for (size_t i = r.begin(); i < r.end(); ++i) {
+          init += local_results_func_[i];
+        }
+        return init;
+      },
+      std::plus<>());
+  local_results_output_ += sum;
+
+  for (size_t i = 0; i < local_size_step_.size(); i++) {
+    local_results_output_ *= local_size_step_[i];
+  }
+
+  boost::mpi::reduce(world_, local_results_output_, result_output_, std::plus(), 0);
+
+  if (rank == 0) {
+    result_output_ /= pow(3, nums_variables_);
+  }
+  return true;
+}
+}
+\end{lstlisting}
+\end{document}
