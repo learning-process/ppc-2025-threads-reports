@@ -177,7 +177,6 @@ for (int iter = 0; iter < max_iters; ++iter) {
 \noindent\textbf{Описание кода:}
 \lstset{language=C++}
 \begin{lstlisting}
-// Пример фрагмента QuickSort для OpenMP
 void QuickSort(It low, It high, int depth) {
   if (std::distance(low, high) <= 1) return;
   int pivot = *std::next(low, GetRandomIndex(0, n-1));
@@ -198,7 +197,7 @@ void QuickSort(It low, It high, int depth) {
   }
 }
 
-// Итеративное слияние
+// Iterative merging
 for (int iter = 0; iter < 2*p; ++iter) {
   bool changed = false;
   #pragma omp parallel for schedule(static) reduction(||:changed)
@@ -219,7 +218,7 @@ for (int iter = 0; iter < 2*p; ++iter) {
 \noindent\textbf{Фрагменты кода:}
 \lstset{language=C++}
 \begin{lstlisting}
-// QuickSort с TBB
+// QuickSort with TBB
 void QuickSort(It low, It high, int depth) {
   if (distance(low, high) <= 1) return;
   int pivot = *(low + GetRandomIndex(0, n-1));
@@ -237,7 +236,7 @@ void QuickSort(It low, It high, int depth) {
   }
 }
 
-// Odd-Even Merge с TBB
+// Odd-Even Merge with TBB
 tbb::enumerable_thread_specific<vector<int>> buffers(
     [=]{ return vector<int>(buffer_size); });
 for (int iter=0; iter<2*p; ++iter) {
@@ -270,7 +269,7 @@ for (int iter=0; iter<2*p; ++iter) {
 \noindent\textbf{Ключевые фрагменты:}
 \lstset{language=C++}
 \begin{lstlisting}
-// Запуск сортировки блоков
+// Starting block sorting
 int tasks = min(numThreads, max(1, n/256));
 vector<thread> threads;
 auto blocks = PartitionBlocks(input, tasks);
@@ -281,7 +280,7 @@ for (int i = 0; i < tasks; ++i) {
 }
 for (auto &t : threads) t.join();
 
-// Odd-Even Merge через потоки
+// Odd-Even Merge via streams
 for (int iter=0; iter<2*tasks; ++iter) {
   atomic<bool> changed(false);
   vector<thread> mergeThreads;
@@ -322,7 +321,7 @@ for (int iter=0; iter<2*tasks; ++iter) {
 \noindent\textbf{Код MPI+OpenMP:}
 \lstset{language=C++}
 \begin{lstlisting}
-// Распределение посредством Boost.MPI
+// Distribution via Boost.MPI
 vector<int> counts(size), displs(size);
 for (int i=0; i<size; ++i) {
   counts[i] = chunk + (i<rem?1:0);
@@ -331,22 +330,22 @@ for (int i=0; i<size; ++i) {
 vector<int> local(counts[rank]);
 scatterv(world, root_ptr, counts, displs, local.data(), counts[rank], 0);
 
-// Локальная параллельная сортировка
+// Local parallel sorting
 int p = max(omp_get_max_threads(),1);
 auto blocks = PartitionBlocks(local, p);
 #pragma omp parallel for schedule(static)
 for (int i=0; i<p; ++i)
   QuickSort(blocks[i].low, blocks[i].high, 0);
 
-// Слияние пар блоков
+// Merging pairs of blocks
 #pragma omp parallel for schedule(static) reduction(||:changed)
 for (int b=iter%2; b<p; b+=2)
   InPlaceMerge(blocks[b], blocks[b+1], buffer);
 
-// Сбор результатов
+// Collecting results
 gatherv(world, local.data(), counts[rank], input.data(), counts, displs, 0);
 if (rank==0) {
-  // Финальная параллельная фаза на root
+  // The final parallel phase on root
   auto blocks2 = PartitionBlocks(input, omp_get_max_threads());
   #pragma omp parallel for schedule(static)
   for (int i=0; i<blocks2.size(); ++i)
@@ -459,7 +458,6 @@ tbb::parallel_invoke(
   [&]{ QuickSort(part, high, depth+1); }
 );
 tbb::parallel_for(tbb::blocked_range<int>(0,p/2), [&](auto &r){
-  // порядок слияния
 });
 \end{lstlisting}
 
