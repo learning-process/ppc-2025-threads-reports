@@ -1,0 +1,751 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
+\usepackage[russian]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{titlesec}
+\usepackage{tabularx}
+\usepackage{url}
+\usepackage{listings}
+\usepackage{multirow}
+\usepackage{xcolor}
+\hypersetup{hidelinks}
+\usepackage{siunitx}
+
+\geometry{top=2cm, bottom=2cm, left=2cm, right=2cm}
+
+\sisetup{
+output-decimal-marker={,},
+group-digits = false
+}
+
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0pt}
+
+\titleformat{\section}{\normalfont\Large\bfseries\centering}{\thesection.}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection.}{1em}{}
+
+\lstset{
+	basicstyle=\ttfamily\small,
+	keywordstyle=\color{blue},
+	commentstyle=\color{green},
+	stringstyle=\color{red},
+	frame=single,
+	tabsize=4,
+	showstringspaces=false,
+	breaklines=true
+}
+
+\hypersetup{hidelinks}
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\[0.5cm]
+\textbf{Федеральное государственное автономное образовательное учреждение высшего образования} \\[0.5cm]
+\textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»} \\[0.5cm]
+Институт информационных технологий, математики и механики \\
+\vfill
+{\Large
+\textbf{Отчёт по лабораторной работе на тему:} \\[0.5cm]
+\textbf{Построение выпуклой оболочки — проход Джарвиса} \\
+}
+\vfill
+\begin{flushright}
+Выполнил: студент группы 3822Б1ПР1 \\
+Капустин Иван \\
+\vspace{1cm}
+Преподаватель: \\
+Сысоев А.В., доцент, кандидат технических наук \\
+\end{flushright}
+\vfill
+Нижний Новгород \\
+2025
+\end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section*{Введение}
+
+Задача построения выпуклой оболочки множества точек на плоскости является фундаментальной в вычислительной геометрии. Она находит применение в компьютерной графике, геоинформационных системах, робототехнике, распознавании образов и других областях. Среди множества алгоритмов, предназначенных для решения этой задачи, особое место занимает алгоритм Джарвиса (или алгоритм обхода подарочной упаковки), известный своей простотой и наглядностью.
+
+Актуальность темы обусловлена необходимостью адаптации классических алгоритмов к современным вычислительным архитектурам. Алгоритм Джарвиса представляет собой итеративную процедуру выбора следующей вершины оболочки по принципу наименьшего угла поворота, и при последовательной реализации он может быть ресурсоёмким при большом объёме данных. Поэтому в данной работе рассматриваются подходы к его параллельной реализации с использованием различных технологий: OpenMP, STL, TBB, гибридного подхода MPI+OpenMP, а также базовой последовательной версии (SEQ) для сравнительного анализа.
+
+Целью данной лабораторной работы является реализация и сравнение эффективности указанных подходов на практике. Результаты экспериментов позволяют оценить, насколько параллелизация ускоряет процесс построения выпуклой оболочки и какие технологии лучше подходят для решения задач, где производительность имеет критическое значение.
+
+\newpage
+
+\section{Постановка задачи}
+
+В данной работе требуется реализовать алгоритм построения \textbf{выпуклой оболочки множества точек на плоскости} с использованием \textbf{метода Джарвиса} (Jarvis March) и провести исследование производительности при его распараллеливании.
+
+\subsection*{Математическая формулировка}
+
+Пусть задано множество точек $S = \{P_1, P_2, \dots, P_n\}$ на плоскости. Требуется построить минимальный по площади выпуклый многоугольник, содержащий все точки множества $S$ (выпуклую оболочку $CH(S)$). Алгоритм Джарвиса строит оболочку поэтапным выбором крайних точек, начиная с самой левой.
+
+\subsection*{Описание алгоритма Джарвиса}
+
+\begin{enumerate}
+    \item Найти точку $P_0$ с минимальной абсциссой (при равенстве — с минимальной ординатой).
+    \item Инициализировать текущую точку $P_c = P_0$.
+    \item На каждом шаге:
+    \begin{itemize}
+        \item Среди всех других точек выбрать такую $P_{\text{next}}$, что вектор $\overrightarrow{P_c P_{\text{next}}}$ образует минимальный положительный угол с предыдущим направлением.
+        \item Записать $P_{\text{next}}$ как следующую вершину оболочки.
+        \item Если $P_{\text{next}} = P_0$, завершить алгоритм.
+        \item Иначе: $P_c := P_{\text{next}}$, повторить шаг.
+    \end{itemize}
+    \item Вернуть полученную последовательность точек как выпуклую оболочку.
+\end{enumerate}
+
+\subsection*{Требования к реализации}
+
+Необходимо реализовать и сравнить пять версий алгоритма Джарвиса:
+\begin{itemize}
+    \item \textbf{SEQ} — базовая последовательная реализация.
+    \item \textbf{OpenMP} — реализация с использованием многопоточности на основе OpenMP.
+    \item \textbf{STL} — реализация с использованием стандартных средств многопоточности C++ (std::thread, std::mutex).
+    \item \textbf{TBB} — реализация на основе библиотеки Intel oneAPI Threading Building Blocks.
+    \item \textbf{MPI+OpenMP} — гибридная реализация с распределёнными и локальными потоками.
+\end{itemize}
+
+Также требуется:
+\begin{itemize}
+    \item Выполнить сравнение производительности реализаций на наборах точек.
+    \item Проанализировать масштабируемость каждого подхода.
+\newpage
+\section{Общий подход к распараллеливанию алгоритма Джарвиса}
+
+Алгоритм Джарвиса изначально является последовательным методом, который на каждом шаге последовательно выбирает следующую вершину выпуклой оболочки, опираясь на поиск точки с минимальным углом относительно текущей. Это делает параллелизацию напрямую сложной, поскольку каждый следующий шаг зависит от результата предыдущего.
+
+Тем не менее, существует несколько ключевых возможностей для распараллеливания, характерных для большинства версий алгоритма.
+
+\begin{enumerate}
+    \item \textbf{Параллельный поиск следующей точки:}  
+    На каждом шаге алгоритма необходимо просмотреть все точки множества, чтобы найти ту, которая образует минимальный положительный угол с текущей вершиной. Эта операция сводится к вычислению углов для каждой точки и выбору минимума — классическая задача, отлично распараллеливаемая.  
+    Каждый поток или задача обрабатывает часть точек, вычисляет локальный минимум, затем из локальных минимумов выбирается глобальный.
+
+    \item \textbf{Распараллеливание вычислений вектора и углов:}  
+    Вычисление вектора $\overrightarrow{P_c P_i}$ и угла с предыдущим вектором — это независимые операции для каждой точки. Их можно выполнять параллельно без зависимости.
+
+    \item \textbf{Использование редукции:}  
+    Для определения точки с минимальным углом после параллельных вычислений применяется операция редукции, которая аккумулирует локальные результаты в глобальный.
+
+    \item \textbf{Минимизация синхронизации:}  
+    На каждом шаге необходимо дождаться результатов всех потоков, поэтому синхронизация неизбежна. Однако она ограничивается лишь этапом выбора следующей вершины, а сама работа по вычислению углов эффективно параллелится.
+
+    \item \textbf{Гибридные подходы:}  
+    В сочетании с MPI возможна дополнительная параллельная обработка распределённых по узлам частей данных, а OpenMP или TBB — внутри каждого узла.
+
+\end{enumerate}
+
+Таким образом, несмотря на последовательную природу алгоритма Джарвиса по построению вершины за вершиной, его вычислительно затратный этап выбора следующей точки реализуется с эффективным параллелизмом, что позволяет существенно сократить время работы на больших наборах данных.
+\newpage
+\section{Параллельная реализация алгоритма Джарвиса с использованием OpenMP}
+
+В данной работе была реализована параллельная версия алгоритма Джарвиса для построения выпуклой оболочки множества точек с использованием технологии OpenMP. Основная идея параллелизации заключается в ускорении этапа поиска следующей точки оболочки. В последовательном алгоритме этот этап требует перебора всех точек и вычисления ориентации для выбора оптимального кандидата, что при большом числе точек становится узким местом по времени.
+
+В OpenMP-версии перебор кандидатов распределён между потоками, которые одновременно оценивают ориентацию и расстояния до текущей точки. Каждый поток поддерживает локального претендента на роль следующей вершины оболочки, а по окончании параллельного цикла происходит объединение результатов в критической секции, чтобы выбрать единственного победителя. Такой подход позволяет эффективно использовать многопроцессорные системы, существенно сокращая время выполнения алгоритма.
+
+Ниже приведён ключевой фрагмент реализации, иллюстрирующий параллельный поиск следующей точки:
+
+\begin{lstlisting}[language=C++, caption={Параллельный выбор следующей точки оболочки с использованием OpenMP}]
+#pragma omp parallel
+{
+  int local_next = static_cast<int>(next_index);
+
+  #pragma omp for nowait
+  for (int i = 0; i < static_cast<int>(input_.size()); ++i) {
+    if (static_cast<size_t>(i) == current_index) continue;
+
+    int orientation = Orientation(input_[current_index], input_[local_next], input_[i]);
+
+    if (orientation == 0) {
+      int dist_next = CalculateDistance(input_[local_next], input_[current_index]);
+      int dist_i = CalculateDistance(input_[i], input_[current_index]);
+      if (dist_i > dist_next) local_next = i;
+    } else if (orientation > 0) {
+      local_next = i;
+    }
+  }
+
+  #pragma omp critical
+  {
+    int orientation = Orientation(input_[current_index], input_[next_index], input_[local_next]);
+    if (orientation > 0) {
+      next_index = static_cast<size_t>(local_next);
+    } else if (orientation == 0) {
+      int dist_next = CalculateDistance(input_[next_index], input_[current_index]);
+      int dist_local = CalculateDistance(input_[local_next], input_[current_index]);
+      if (dist_local > dist_next) {
+        next_index = static_cast<size_t>(local_next);
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+Таким образом, OpenMP позволяет распараллелить вычисления внутри цикла выбора следующей точки, сохраняя при этом корректность и детерминированность алгоритма за счёт использования локальных переменных и критической секции для объединения результатов. Это решение демонстрирует классическую схему параллельного поиска экстремума с минимальными накладными расходами на синхронизацию.
+\newpage
+\section{Параллельная реализация алгоритма Джарвиса с использованием Intel oneAPI TBB}
+
+Вторая версия алгоритма Джарвиса была реализована с применением библиотеки Intel oneAPI Threading Building Blocks (TBB). В отличие от OpenMP, TBB предоставляет более высокоуровневые конструкции для параллельных вычислений, что позволяет лаконично выразить параллелизм и эффективно управлять балансировкой нагрузки.
+
+В основе параллелизации лежит операция \texttt{parallel\_reduce} по диапазону индексов точек, где вычисляется индекс "лучшей" (следующей) точки оболочки. Лямбда-функция тела редукции по поддиапазону осуществляет локальный поиск кандидата, а функция объединения результатов определяет между ними точку с более выгодной ориентацией относительно текущей.
+
+Такой подход позволяет без явных критических секций и блокировок объединить параллельный поиск оптимального следующего элемента, используя атомарные и функциональные возможности TBB. Это улучшает масштабируемость и минимизирует накладные расходы на синхронизацию потоков.
+
+Ниже представлен ключевой участок кода, реализующий параллельный поиск следующей точки оболочки с использованием \texttt{oneapi::tbb::parallel\_reduce}:
+
+\begin{lstlisting}[language=C++, caption={Параллельный выбор следующей точки оболочки с использованием Intel TBB}]
+size_t best_index = oneapi::tbb::parallel_reduce(
+    oneapi::tbb::blocked_range<size_t>(0, input_.size()), next_index,
+    [&](const oneapi::tbb::blocked_range<size_t>& r, size_t local_best) -> size_t {
+      for (size_t i = r.begin(); i != r.end(); ++i) {
+        if (i == current_index) continue;
+
+        int orientation = Orientation(input_[current_index], input_[local_best], input_[i]);
+        if (orientation > 0 || 
+           (orientation == 0 && CalculateDistance(input_[i], input_[current_index]) > 
+                               CalculateDistance(input_[local_best], input_[current_index]))) {
+          local_best = i;
+        }
+      }
+      return local_best;
+    },
+    [&](size_t a, size_t b) -> size_t {
+      int orientation = Orientation(input_[current_index], input_[a], input_[b]);
+      if (orientation > 0 || (orientation == 0 && CalculateDistance(input_[b], input_[current_index]) >
+                                            CalculateDistance(input_[a], input_[current_index]))) {
+        return b;
+      }
+      return a;
+    });
+\end{lstlisting}
+
+Таким образом, благодаря встроенной поддержке редукции в TBB достигается эффективный параллелизм при поиске следующей вершины выпуклой оболочки, что существенно ускоряет выполнение алгоритма на многопроцессорных системах без необходимости ручного управления синхронизацией.
+
+\newpage
+\section{Параллельная реализация алгоритма Джарвиса с использованием стандартных потоков C++ (STL threads)}
+
+В третьей версии алгоритма Джарвиса параллелизм был реализован с помощью стандартной библиотеки C++ \texttt{<thread>}. В отличие от Intel TBB, STL threads предоставляют более низкоуровневый механизм управления потоками, требующий ручного разбиения задачи и синхронизации.
+
+Параллелизация достигается путем разбиения множества точек на блоки, каждый из которых обрабатывается отдельным потоком. Каждый поток локально ищет "лучшую" точку для своей части диапазона, учитывая ориентацию и расстояние относительно текущей точки оболочки. После завершения работы всех потоков главный поток выбирает глобально оптимального кандидата среди локальных результатов.
+
+Данный подход требует явного создания и запуска потоков с помощью \texttt{std::thread}, а также их последующего ожидания через метод \texttt{join()}. Для хранения локальных результатов используется вектор, индексируемый по номеру потока.
+
+Ниже приведён ключевой фрагмент кода, реализующий параллельный поиск следующей точки оболочки с использованием STL threads:
+
+\begin{lstlisting}[language=C++, caption={Параллельный выбор следующей точки оболочки с использованием STL threads}]
+size_t chunk_size = (input_.size() + num_threads - 1) / num_threads;
+std::vector<size_t> local_best(num_threads, (current_index + 1) % input_.size());
+std::vector<std::thread> threads;
+
+for (size_t thread_id = 0; thread_id < num_threads; ++thread_id) {
+  size_t start = thread_id * chunk_size;
+  size_t end = std::min(start + chunk_size, input_.size());
+
+  threads.emplace_back([&, thread_id, start, end]() {
+    size_t best = local_best[thread_id];
+    for (size_t i = start; i < end; ++i) {
+      if (i == current_index) continue;
+
+      int orientation = Orientation(input_[current_index], input_[best], input_[i]);
+      if (orientation > 0 || 
+         (orientation == 0 && CalculateDistance(input_[i], input_[current_index]) > 
+                             CalculateDistance(input_[best], input_[current_index]))) {
+        best = i;
+      }
+    }
+    local_best[thread_id] = best;
+  });
+}
+
+for (auto& t : threads) {
+  t.join();
+}
+
+size_t best_index = local_best[0];
+for (size_t i = 1; i < num_threads; ++i) {
+  int orientation = Orientation(input_[current_index], input_[best_index], input_[local_best[i]]);
+  if (orientation > 0 || 
+     (orientation == 0 && CalculateDistance(input_[local_best[i]], input_[current_index]) > 
+                         CalculateDistance(input_[best_index], input_[current_index]))) {
+    best_index = local_best[i];
+  }
+}
+\end{lstlisting}
+
+Таким образом, несмотря на необходимость явного управления потоками и синхронизацией, использование стандартных потоков C++ позволяет эффективно распараллелить критическую часть алгоритма — поиск следующей точки выпуклой оболочки. Это существенно снижает время выполнения на многоядерных системах, особенно при больших объемах входных данных.
+
+\newpage
+\section{Гибридная параллельная реализация алгоритма Джарвиса с использованием MPI и OpenMP}
+
+В данной версии алгоритма Джарвиса реализован гибридный параллелизм с использованием MPI и OpenMP, что позволяет эффективно распределять вычислительную нагрузку между несколькими процессами и несколькими потоками внутри каждого процесса. Такой подход сочетает преимущества распределённых вычислений и многопоточности, обеспечивая масштабируемость и ускорение.
+
+MPI используется для разделения входного множества точек между процессами. Каждый процесс отвечает за поиск локального кандидата на следующую точку выпуклой оболочки на своей части данных. Внутри процесса поиск реализован параллельно с помощью OpenMP, что ускоряет перебор точек.
+
+Основные этапы алгоритма:
+\begin{itemize}
+  \item Распределение точек между MPI-процессами с учётом остатка при делении.
+  \item Параллельный перебор точек в локальном диапазоне с использованием директив OpenMP.
+  \item Использование критической секции OpenMP для выбора локального лучшего кандидата среди потоков.
+  \item Сбор локальных лучших кандидатов всех MPI-процессов с помощью \texttt{MPI\_Allgather}.
+  \item Выбор глобально лучшего кандидата на основе ориентации и расстояния.
+  \item Повторение до замыкания оболочки.
+\end{itemize}
+\newpage
+Код ключевой функции поиска локального кандидата с использованием OpenMP:
+
+\begin{lstlisting}[language=C++, caption={Параллельный локальный поиск лучшей точки с OpenMP}]
+std::pair<int, int> kapustin_i_jarv_alg_all::TestTaskAll::FindLocalBestOMP(size_t start, size_t end, size_t current_index, const std::pair<int, int>& init_best) {                             
+  std::pair<int, int> global_best = init_best;
+
+#pragma omp parallel
+  {
+    std::pair<int, int> thread_best = global_best;
+
+#pragma omp for
+    for (int i = static_cast<int>(start); i < static_cast<int>(end); ++i) {
+      if (static_cast<size_t>(i) == current_index) continue;
+
+      int orient = Orientation(input_[current_index], thread_best, input_[i]);
+      if (orient > 0 || (orient == 0 && CalculateDistance(input_[current_index], input_[i]) > CalculateDistance(input_[current_index], thread_best))) {
+        thread_best = input_[i];
+      }
+    }
+
+#pragma omp critical
+    {
+      int orient = Orientation(input_[current_index], global_best, thread_best);
+      if (orient > 0 || (orient == 0 && CalculateDistance(input_[current_index], thread_best) > CalculateDistance(input_[current_index], global_best))) {
+        global_best = thread_best;
+      }
+    }
+  }
+
+  return global_best;
+}
+\end{lstlisting}
+\newpage
+Основной цикл построения оболочки с использованием MPI и OpenMP:
+
+\begin{lstlisting}[language=C++, caption={Основной цикл алгоритма с MPI и OpenMP}]
+bool kapustin_i_jarv_alg_all::TestTaskAll::RunImpl() {
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+  std::pair<int, int> start_point = current_point_;
+  size_t current_index = leftmost_index_;
+  output_.clear();
+  output_.push_back(start_point);
+
+  do {
+    size_t next_index = (current_index + 1) % input_.size();
+    std::pair<int, int> local_best = input_[next_index];
+
+    size_t chunk_size = input_.size() / size;
+    size_t remainder = input_.size() % size;
+    size_t start = rank * chunk_size + std::min(static_cast<size_t>(rank), remainder);
+    size_t end = start + chunk_size + (rank < static_cast<int>(remainder) ? 1 : 0);
+
+    local_best = FindLocalBestOMP(start, end, current_index, local_best);
+
+    int local_data[3] = {local_best.first, local_best.second, CalculateDistance(current_point_, local_best)};
+    int* all_data = new int[3 * size];
+
+    MPI_Allgather(local_data, 3, MPI_INT, all_data, 3, MPI_INT, MPI_COMM_WORLD);
+
+    std::pair<int, int> global_best = local_best;
+    int best_dist = local_data[2];
+
+    for (int i = 0; i < size; ++i) {
+      int x = all_data[i * 3];
+      int y = all_data[(i * 3) + 1];
+      int dist = all_data[(i * 3) + 2];
+      std::pair<int, int> candidate = {x, y};
+
+      int orient = Orientation(current_point_, global_best, candidate);
+      if (orient > 0 || (orient == 0 && dist > best_dist)) {
+        global_best = candidate;
+        best_dist = dist;
+      }
+    }
+
+    delete[] all_data;
+
+    if (!output_.empty() && global_best == output_.front()) {
+      break;
+    }
+
+    current_point_ = global_best;
+    output_.push_back(current_point_);
+
+    for (size_t i = 0; i < input_.size(); ++i) {
+      if (input_[i] == current_point_) {
+        current_index = i;
+        break;
+      }
+    }
+
+  } while (current_point_ != start_point);
+
+  return true;
+}
+\end{lstlisting}
+
+Таким образом, комбинация MPI и OpenMP позволяет эффективно использовать ресурсы как распределённых вычислительных систем, так и многоядерных процессоров, что значительно ускоряет алгоритм Джарвиса на больших объёмах данных.
+\newpage
+\section{Результаты экспериментов}
+
+Экспериментальные данные представлены в таблице \ref{tab:results}. Она содержит результаты двух тестов --- \textbf{Pipeline test} и \textbf{TaskRun test} --- для различных реализаций алгоритма: \texttt{seq} (последовательная), \texttt{all} (MPI + OpenMP), \texttt{omp} (OpenMP), \texttt{tbb} и \texttt{stl}. Для гибридной версии указано количество потоков + процессов, для остальных --- количество потоков. \textbf{Все тесты проводились на входных данных объёмом 10 миллионов точек.}
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Тип} & \textbf{Конфигурация} & \textbf{Потоки / Процессы} & \textbf{Pipeline (с)} & \textbf{TaskRun (с)} \\
+\hline
+\multirow{1}{*}{\texttt{seq}} & seq & 1 поток & 1,7 & 0,3 \\
+\hline
+\multirow{4}{*}{\texttt{all}} 
+& all 2 + 2 & 2 потока + 2 процесса & 2,3 & 0,25 \\
+& all 2 + 4 & 2 потока + 4 процесса & 1,8 & 0,16 \\
+& all 4 + 2 & 4 потока + 2 процесса & 1,6 & 0,17 \\
+& all 4 + 4 & 4 потока + 4 процесса & 1,5 & 0,14 \\
+\hline
+\multirow{8}{*}{\texttt{omp}} 
+& omp 2  & 2 потока  & 4,0  & 0,3 \\
+& omp 4  & 4 потока  & 2,8  & 0,28 \\
+& omp 8  & 8 потоков & 1,7  & 0,18 \\
+& omp 12 & 12 потоков & 1,4  & 0,13 \\
+& omp 15 & 15 потоков & 1,2  & 0,12 \\
+& omp 20 & 20 потоков & 1,01 & 0,09 \\
+& omp 25 & 25 потоков & 0,8  & 0,08 \\
+& omp 35 & 35 потоков & 0,74 & 0,07 \\
+& omp 40 & 40 потоков & 0,7  & 0,06 \\
+\hline
+\multirow{3}{*}{\texttt{tbb}} 
+& tbb 2 & 2 потока & 2,0 & 0,31 \\
+& tbb 4 & 4 потока & 1,7 & 0,21 \\
+& tbb 8 & 8 потоков & 1,2 & 0,144 \\
+\hline
+\multirow{2}{*}{\texttt{stl}} 
+& stl 2 & 2 потока & 0,4 & 0,09 \\
+& stl 4 & 4 потока & 0,27 & 0,04 \\
+\hline
+\end{tabular}
+\caption{Сравнение времени выполнения различных реализаций алгоритма}
+\label{tab:results}
+\end{table}
+\newpage
+\section{Выводы по результатам экспериментов}
+
+На основе экспериментальных данных, представленных в таблице \ref{tab:results}, можно сделать следующие выводы:
+
+\begin{enumerate}
+    \item \textbf{Последовательная реализация (\texttt{seq})} ожидаемо демонстрирует наибольшее время выполнения: 1{,}7 секунды в \texttt{Pipeline test} и 0{,}3 секунды в \texttt{TaskRun test}, что делает её самой медленной и служит базовым уровнем для сравнительного анализа.
+
+    \item \textbf{OpenMP реализация (\texttt{omp})} показывает наилучшие результаты при большом числе потоков. Производительность монотонно возрастает с ростом количества потоков, достигая минимального времени при 40 потоках: 0{,}7 секунды (\texttt{Pipeline}) и 0{,}06 секунды (\texttt{TaskRun}). Это делает \texttt{omp} наиболее эффективной при наличии большого числа ядер.
+
+    \item \textbf{STL-параллелизация (\texttt{stl})}, напротив, демонстрирует наилучшее время на малом количестве потоков. Например, при 4 потоках она достигает 0{,}27 секунды и 0{,}04 секунды соответственно, что делает её наиболее подходящей для машин с ограниченным количеством доступных потоков. Однако при увеличении числа потоков её масштабируемость ограничена.
+
+    \item \textbf{Гибридная реализация (\texttt{all}, MPI + OpenMP)} показывает промежуточные результаты, зависящие от конкретной конфигурации потоков и процессов. Наилучший результат достигнут в конфигурации 4+4: 1{,}5 секунды (\texttt{Pipeline}) и 0{,}14 секунды (\texttt{TaskRun}), что сопоставимо с \texttt{tbb} при 8 потоках. Это говорит о разумном потенциале гибридного подхода при умеренном числе вычислительных ресурсов.
+
+    \item \textbf{TBB реализация (\texttt{tbb})} также показывает среднюю производительность, постепенно ускоряясь при увеличении количества потоков. При 8 потоках достигается 1{,}2 секунды и 0{,}144 секунды, что делает TBB универсальным вариантом между OpenMP и STL по производительности и удобству использования.
+
+    \item \textbf{Обобщённо}:
+    \begin{itemize}
+        \item \texttt{omp} наиболее эффективна при большом числе потоков (от 20 и выше);
+        \item \texttt{stl} — самая быстрая при небольшом числе потоков (2--4), но плохо масштабируется;
+        \item \texttt{tbb} и \texttt{all} показывают стабильные средние результаты при умеренном числе потоков и процессов;
+        \item \texttt{seq} значительно уступает всем параллельным реализациям.
+    \end{itemize}
+\end{enumerate}
+
+Таким образом, выбор подхода должен определяться числом доступных потоков: при малом числе предпочтительна STL, при большом — OpenMP, при средних значениях — гибридный или TBB-подход.
+\newpage
+\section{Список литературы}
+
+\begin{enumerate}
+    \item Barber, C. B., Dobkin, D. P., \& Huhdanpaa, H. (1996). \textit{The Quickhull Algorithm for Convex Hulls}. ACM Transactions on Mathematical Software, 22(4), 469–483.
+
+    \item Blelloch, G. E., Gu, Y., Shun, J., \& Sun, Y. (2020). \textit{Randomized Incremental Convex Hull is Highly Parallel}. Proceedings of the 32nd ACM Symposium on Parallelism in Algorithms and Architectures (SPAA). 
+
+    \item Wang, Y., Yesantharao, R., Yu, S., Dhulipala, L., Gu, Y., \& Shun, J. (2022). \textit{ParGeo: A Library for Parallel Computational Geometry}. arXiv preprint arXiv:2207.01834.
+\end{enumerate}
+
+\newpage
+\section{Приложение}
+
+\subsection*{MPI + OpenMP}
+\begin{lstlisting}[language=C++]
+std::pair<int, int> kapustin_i_jarv_alg_all::TestTaskAll::FindLocalBestOMP(size_t start, size_t end, size_t current_index,const std::pair<int, int>& init_best) {
+  std::pair<int, int> global_best = init_best;
+
+#pragma omp parallel
+  {
+    std::pair<int, int> thread_best = global_best;
+
+#pragma omp for
+    for (int i = static_cast<int>(start); i < static_cast<int>(end); ++i) {
+      if (static_cast<size_t>(i) == current_index) {
+        continue;
+      }
+
+      const int orient = Orientation(input_[current_index], thread_best, input_[i]);
+
+      if (orient > 0) {
+        thread_best = input_[i];
+      } else if (orient == 0) {
+        const int current_dist = CalculateDistance(input_[current_index], thread_best);
+        const int candidate_dist = CalculateDistance(input_[current_index], input_[i]);
+
+        if (candidate_dist > current_dist) {
+          thread_best = input_[i];
+        }
+      }
+    }
+
+#pragma omp critical
+    {
+      const int orient = Orientation(input_[current_index], global_best, thread_best);
+
+      if (orient > 0) {
+        global_best = thread_best;
+      } else if (orient == 0) {
+        const int global_dist = CalculateDistance(input_[current_index], global_best);
+        const int thread_dist = CalculateDistance(input_[current_index], thread_best);
+
+        if (thread_dist > global_dist) {
+          global_best = thread_best;
+        }
+      }
+    }
+  }
+
+  return global_best;
+}
+\end{lstlisting}
+
+\subsection*{OpenMP}
+\begin{lstlisting}[language=C++]
+bool kapustin_i_jarv_alg_omp::TestTaskOMP::RunImpl() {
+  std::pair<int, int> start_point = current_point_;
+  size_t current_index = leftmost_index_;
+  output_.clear();
+  output_.push_back(start_point);
+
+  do {
+    size_t next_index = (current_index + 1) % input_.size();
+
+#pragma omp parallel
+    {
+      int local_next = static_cast<int>(next_index);
+
+#pragma omp for nowait
+      for (int i = 0; i < static_cast<int>(input_.size()); ++i) {
+        if (static_cast<size_t>(i) == current_index) {
+          continue;
+        }
+
+        int orientation = Orientation(input_[current_index], input_[local_next], input_[i]);
+
+        if (orientation == 0) {
+          int dist_next = CalculateDistance(input_[local_next], input_[current_index]);
+          int dist_i = CalculateDistance(input_[i], input_[current_index]);
+          if (dist_i > dist_next) {
+            local_next = i;
+          }
+        } else if (orientation > 0) {
+          local_next = i;
+        }
+      }
+
+#pragma omp critical
+      {
+        int orientation = Orientation(input_[current_index], input_[next_index], input_[local_next]);
+        if (orientation > 0) {
+          next_index = static_cast<size_t>(local_next);
+        } else if (orientation == 0) {
+          int dist_next = CalculateDistance(input_[next_index], input_[current_index]);
+          int dist_local = CalculateDistance(input_[local_next], input_[current_index]);
+          if (dist_local > dist_next) {
+            next_index = static_cast<size_t>(local_next);
+          }
+        }
+      }
+    }
+
+    if (!output_.empty() && input_[next_index] == output_.front()) {
+      break;
+    }
+
+    current_point_ = input_[next_index];
+    output_.push_back(current_point_);
+    current_index = next_index;
+
+  } while (current_point_ != start_point);
+
+  return true;
+}
+\end{lstlisting}
+\section*{SEQ}
+
+\begin{lstlisting}[language=C++]
+bool kapustin_i_jarv_alg_seq::TestTaskSequential::RunImpl() {
+  std::pair<int, int> start_point = current_point_;
+  size_t current_index = leftmost_index_;
+  output_.clear();
+  output_.push_back(start_point);
+
+  do {
+    size_t next_index = (current_index + 1) % input_.size();
+
+    for (size_t i = 0; i < input_.size(); ++i) {
+      if (i == current_index) {
+        continue;
+      }
+
+      int orientation = Orientation(input_[current_index], input_[next_index], input_[i]);
+
+      if (orientation > 0) {
+        next_index = i;
+
+      } else if (orientation == 0) {
+        int dist_next = static_cast<int>(std::pow(input_[next_index].first - input_[current_index].first, 2) + std::pow(input_[next_index].second - input_[current_index].second, 2));
+        int dist_i = static_cast<int>(std::pow(input_[i].first - input_[current_index].first, 2) + std::pow(input_[i].second - input_[current_index].second, 2));
+        if (dist_i > dist_next) {
+          next_index = i;
+        }
+      }
+    }
+
+    if (!output_.empty() && input_[next_index] == output_.front()) {
+      break;
+    }
+
+    current_point_ = input_[next_index];
+    output_.push_back(current_point_);
+    current_index = next_index;
+
+  } while (current_point_ != start_point);
+
+  return true;
+}
+\end{lstlisting}
+
+\section*{TBB}
+
+\begin{lstlisting}[language=C++]
+bool kapustin_i_jarv_alg_tbb::TestTaskTBB::RunImpl() {
+  std::pair<int, int> start_point = current_point_;
+  size_t current_index = leftmost_index_;
+  output_.clear();
+  output_.push_back(start_point);
+
+  do {
+    size_t next_index = (current_index + 1) % input_.size();
+
+    size_t best_index = oneapi::tbb::parallel_reduce(
+        oneapi::tbb::blocked_range<size_t>(0, input_.size()), next_index,
+        [&](const oneapi::tbb::blocked_range<size_t>& r, size_t local_best) -> size_t {
+          for (size_t i = r.begin(); i != r.end(); ++i) {
+            if (i == current_index) {
+              continue;
+            }
+
+            int orientation = Orientation(input_[current_index], input_[local_best], input_[i]);
+            if (orientation > 0 ||
+                (orientation == 0 && CalculateDistance(input_[i], input_[current_index]) >CalculateDistance(input_[local_best], input_[current_index]))) {
+              local_best = i;
+            }
+          }
+          return local_best;
+        },
+        [&](size_t a, size_t b) -> size_t {
+          int orientation = Orientation(input_[current_index], input_[a], input_[b]);
+          if (orientation > 0 || (orientation == 0 && CalculateDistance(input_[b], input_[current_index]) >CalculateDistance(input_[a], input_[current_index]))) {
+            return b;
+          }
+          return a;
+        });
+
+    if (!output_.empty() && input_[best_index] == output_.front()) {
+      break;
+    }
+
+    current_point_ = input_[best_index];
+    output_.push_back(current_point_);
+    current_index = best_index;
+
+  } while (current_point_ != start_point);
+
+  return true;
+}
+\end{lstlisting}
+
+\newpage
+\section*{STL (std::thread)}
+
+\begin{lstlisting}[language=C++]
+void kapustin_i_jarv_alg_stl::TestTaskSTL::FindBestPointMultithreaded(size_t current_index, std::vector<size_t>& local_best) {
+  const size_t total_points = input_.size();
+  const size_t num_threads = local_best.size();
+  const size_t chunk_size = (total_points + num_threads - 1) / num_threads;
+
+  std::vector<std::thread> threads;
+  threads.reserve(num_threads);
+
+  for (size_t thread_id = 0; thread_id < num_threads; ++thread_id) {
+    const size_t start = thread_id * chunk_size;
+    const size_t end = std::min(start + chunk_size, total_points);
+
+    threads.emplace_back([this, current_index, &local_best, thread_id, start, end]() {
+      const auto& current_point = input_[current_index];
+      size_t best = (current_index + 1) % input_.size();
+      for (size_t j = start; j < end; ++j) {
+        if (j == current_index) {
+          continue;
+        }
+        const auto& candidate = input_[j];
+        const auto& best_point = input_[best];
+
+        const int orient = ((best_point.second - current_point.second) * (candidate.first - best_point.first)) -
+                           ((best_point.first - current_point.first) * (candidate.second - best_point.second));
+
+        if (orient > 0) {
+          best = j;
+        } else if (orient == 0) {
+          const int dx1 = candidate.first - current_point.first;
+          const int dy1 = candidate.second - current_point.second;
+          const int dx2 = best_point.first - current_point.first;
+          const int dy2 = best_point.second - current_point.second;
+          const int dist1 = (dx1 * dx1) + (dy1 * dy1);
+          const int dist2 = (dx2 * dx2) + (dy2 * dy2);
+          if (dist1 > dist2) {
+            best = j;
+          }
+        }
+      }
+      local_best[thread_id] = best;
+    });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+}
+\end{lstlisting}
+\end{itemize}
+
+\end{document}
