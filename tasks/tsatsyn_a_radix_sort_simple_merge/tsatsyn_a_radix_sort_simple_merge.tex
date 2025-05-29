@@ -1,0 +1,908 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
+\usepackage[russian]{babel}
+\usepackage{titlesec}
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection.}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection.}{1em}{}
+\usepackage{tocloft}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\usepackage{hyperref}
+\usepackage{geometry}
+\geometry{top=2cm, bottom=2cm, left=2cm, right=2cm}
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0pt}
+\usepackage{amsmath,amssymb}
+\usepackage{listings}
+\hypersetup{hidelinks}
+
+\begin{document}
+\begin{titlepage}
+\begin{center}
+\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\
+\textbf{Федеральное государственное автономное образовательное учреждение высшего образования} \\
+\textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»} \\[1cm]
+\textbf{Институт информационных технологий, математики и механики }\\[0.5cm]
+\textbf{Кафедра: Математического обеспечения и суперкомпьютерных технологий}\\[0.5cm]
+Направление подготовки: «Программная инженерия»\\
+Профиль подготовки: «Общий»\\
+
+\vfill
+
+Отчёт по лабораторной работе на тему:\\
+{\Large
+\textbf{«Поразрядная сортировка для вещественных чисел (тип double) с простым слиянием»} \\
+}
+\vfill
+\begin{flushright}
+\textbf{Выполнил}:\\
+студент группы 3822Б1ПР2 \\
+Цацын Александр \\
+\vspace{1cm}
+\textbf{Преподаватель}: \\
+Сысоев Александр Владимирович \\
+\textbf{Руководитель}: \\
+Нестеров Александр Юрьевич\\
+Оболенский Арсений Андреевич\\
+\end{flushright}
+\vfill
+Нижний Новгород \\
+2025
+\end{center}
+\end{titlepage}
+
+
+
+\tableofcontents
+\newpage
+
+
+\section{Введение}
+В данном отчёте рассматривается задача реализации поразрядной сортировки с простым слиянием, элементы имеют тип double. Основная цель работы - реализовать эффективные схемы распараллеливания данных и исследовать производительность этих способов по сравнению с последовательным вариантом.
+\newpage
+
+\section{Постановка задачи}
+\hspace*{1.25em}Необходимо разработать пять версий алгоритма сортировки Хоара с четно-нечетным слиянием Бэтчера для массивов целых чисел:
+\begin{enumerate}
+    \item Последовательная реализация для базовой проверки корректности и замера опорного времени.
+    \item OpenMP-реализация, использующая директивы \texttt{\#pragma} для параллельной сортировки фрагментов и слияния блоков.
+    \item Intel TBB-реализация, использующая \texttt{tbb::parallel\_invoke} и \texttt{tbb::parallel\_for}.
+    \item STL-реализация на \texttt{std::async/wait} для создания задач параллельной сортировки и слияния.
+    \item Комбинированная MPI+OpenMP-версия, в которой Boost.MPI распределяет исходный массив по процессам, а внутри каждого процесса используется OpenMP.
+\end{enumerate}
+
+\hspace*{1.25em}Каждую версию необходимо протестировать на одном и том же наборе данных, замерить время выполнения двух тестов:
+\begin{itemize}
+    \item \texttt{test\_pipeline\_run}
+    \item \texttt{test\_task\_run}
+\end{itemize}
+\newpage
+
+
+\section{Описание алгоритма}
+Мы получаем массив в виде одномерного \textit{std::vector<double>} и каждый его элемент меняем на тип \textit{\normalsize uint\_64t}. Далее распределяем отрицательные и положительные числа в два разных контейнера и каждый отдельно сортируем поразрядно.
+\newpage
+
+
+\section{Схемы параллельного алгоритма}
+\subsection{Seq-версия}
+\hspace*{1.25em}В последовательной реализации отсутствует распараллеливание. Алгоритм выполняет:
+\begin{enumerate}
+    \item Чтение входных данных в вектор \texttt{input\_}.
+    \item Вызов \texttt{RadixSort(input\_, 0, n-1)} при $n>1$.
+    \item Копирование отсортированного результата в выходной буфер.
+\end{enumerate}
+\noindent\textbf{Ключевые детали реализации:}
+\begin{itemize}
+    \item \texttt{ParseOrigin(std::vector<double>\&input\_data)} — генерация случайного индекса опорного элемента.
+     \begin{lstlisting}[language=C++,
+    breaklines=true,       % Автоматический перенос строк
+    columns=fullflexible ]
+std::pair<std::vector<uint64_t>, std::vector<uint64_t>> tsatsyn_a_radix_sort_simple_merge_seq::ParseOrigin(
+    std::vector<double> &input_data) {
+  std::vector<uint64_t> pozitive_copy;
+  std::vector<uint64_t> negative_copy;
+  for (int i = 0; i < static_cast<int>(input_data.size()); i++) {
+    if (input_data[i] > 0.0) {
+      pozitive_copy.emplace_back(*reinterpret_cast<uint64_t *>(&input_data[i]));
+    } else {
+      negative_copy.emplace_back(*reinterpret_cast<uint64_t *>(&input_data[i]));
+    }
+  }
+  return {pozitive_copy, negative_copy};
+}
+    \end{lstlisting}
+    \item \texttt{RadixSort(std::vector<double>\& arr)}:
+    \begin{lstlisting}[language=C++,
+    breaklines=true,       % Автоматический перенос строк
+    columns=fullflexible ]
+for (int bit = 0; bit < positive_bits; bit++) {
+    std::vector<uint64_t> group0;
+    std::vector<uint64_t> group1;
+    for (uint64_t b : pozitive_copy) {
+      if (((b >> bit) & 1) != 0U) {
+        group1.push_back(b);
+      } else {
+        group0.push_back(b);
+      }
+    }
+
+    pozitive_copy.clear();
+    pozitive_copy.insert(pozitive_copy.end(), group0.begin(), group0.end());
+    pozitive_copy.insert(pozitive_copy.end(), group1.begin(), group1.end());
+  }
+    \end{lstlisting}
+
+\end{itemize}
+
+\subsection{OpenMP-версия}
+\hspace*{1.25em}В OMP реализации распараллеливание заключается в добавлении парадигм \texttt{\#pragma omp} в доступные для распараллеливания участки кода. Алгоритм так же выполняет:
+\begin{enumerate}
+    \item Чтение входных данных в вектор \texttt{input\_}.
+    \item Вызов \texttt{RadixSort(input\_, 0, n-1)} при $n>1$.
+    \item Копирование отсортированного результата в выходной буфер.
+\end{enumerate}
+
+
+\subsection{TBB-версия}
+\hspace*{1.25em}В TBB реализации распараллеливание заключается в добавлении \texttt{tbb::parallel\_invoke} и \texttt{tbb::parallel\_for.} в доступные для распараллеливания участки кода. Алгоритм так же как и Seq-версия выполняет:
+\begin{enumerate}
+    \item Чтение входных данных в вектор \texttt{input\_}.
+    \item Вызов \texttt{RadixSort(input\_, 0, n-1)} при $n>1$.
+    \item Копирование отсортированного результата в выходной буфер.
+\end{enumerate}
+\subsection{STL-версия}
+\hspace*{1.25em}В STL реализации распараллеливание заключается в добавлении парадигм \texttt{std::async} и \texttt{std::wait} в доступные для распараллеливания участки кода. Алгоритм так же как и Seq-версия выполняет:
+\begin{enumerate}
+    \item Чтение входных данных в вектор \texttt{input\_}.
+    \item Вызов \texttt{RadixSort(input\_, 0, n-1)} при $n>1$.
+    \item Копирование отсортированного результата в выходной буфер.
+\end{enumerate}
+\subsection{MPI-версия}
+\hspace*{1.25em}В MPI+OMP реализации распараллеливание заключается в добавлении парадигм \texttt{\#pragma omp}, \texttt{boost::mpi::broadcast}, \texttt{world.send} и \texttt{world.recv} в доступные для распараллеливания участки кода. Алгоритм выполняет:
+\begin{enumerate}
+    \item Чтение входных данных в вектор \texttt{input\_}.
+    \item Отправка нулевым процессом локальных данных каждому процессу \texttt{input\_}.
+    \item На каждом процессе вызов \texttt{RadixSort(input\_, 0, n-1)} при $n>1$, которая в себе имеет распараллеливание с помощью OMP.
+    \item Отправка отсортированных данных от каждого процесса нулевому
+    \item Итоговая сортировка
+    \item Копирование отсортированного результата в выходной буфер.
+\end{enumerate}
+\newpage
+
+
+
+\section{Результаты экспериментов}
+Для оценки производительности последовательной и параллельной версий алгоритма использовалась следующая тестовая система:
+\begin{itemize}
+    \item Операционная система: Windows 11
+    \item Процессор: AMD Ryzen 5 5600H with Radeon Graphics
+    \item Оперативная память: 16 ГБ.
+\end{itemize}
+На основе выполнения тестов для последовательной и параллельной (на 5 потоках для OMP,TBB,STL и на 2,3,4 процессах для MPI) версиях была создана следующая таблица:\\[0,5cm]
+\begin{tabular}{|c|c|c|c|}
+    \hline
+    Число процессов & Вид теста      & Время выполнения (с) & Ускорение \\ \hline
+    1               & pipeline\_run\_seq & 2.295                & 1.00      \\ \hline
+    1               & task\_run\_seq     & 1.800                & 1.00      \\ \hline
+    1               & pipeline\_run\_omp & 2.369                & 0.97      \\ \hline
+    1               & task\_run\_omp     & 2.062                & 0.87      \\ \hline
+    1               & pipeline\_run\_tbb & 2.214                & 1.03      \\ \hline
+    1               & task\_run\_tbb     & 1.841                & 0.98      \\ \hline
+    1               & pipeline\_run\_stl & 2.424                & 0.95      \\ \hline
+    1               & task\_run\_stl     & 1.806                & 0.99      \\ \hline
+    2               & pipeline\_run & 3.575                & 0.64      \\ \hline
+    2               & task\_run     & 2.868                & 0.63      \\ \hline
+    3               & pipeline\_run & 3.289                & 0.70      \\ \hline
+    3               & task\_run     & 2.796                & 0.64      \\ \hline
+    4               & pipeline\_run & 3.078                & 0.75      \\ \hline
+    4               & task\_run     & 2.814                & 0.64      \\ \hline
+\end{tabular}
+\newpage
+
+\section{Выводы из результатов}
+На основе результатов экспериментов можно сделать вывод, что данная задача не подходит для распараллеливания, так как очень сильно повышаются накладные расходы и очень слабо эффективность. В разы выгоднее эту задачу решать через seq-версию программы.
+\newpage
+\section{Заключение}
+В ходе выполнения лабораторной работы была реализована поразрядная сортировка для вещественных чисел типа \texttt{double} с простым слиянием в пяти различных вариантах:
+\begin{itemize}
+    \item Последовательная версия (Seq)
+    \item OpenMP-версия
+    \item TBB-версия
+    \item STL-версия
+    \item MPI+OpenMP-версия
+\end{itemize}
+
+Проведенные эксперименты показали, что для данной задачи параллельные реализации не демонстрируют ожидаемого ускорения по сравнению с последовательной версией. Напротив, во всех случаях наблюдалось снижение производительности:
+\begin{itemize}
+    \item OpenMP-версия показала замедление на 3-13\%
+    \item TBB-версия - замедление на 2-3\%
+    \item STL-версия - замедление на 1-5\%
+    \item MPI-версия показала наибольшее падение производительности - до 36\%
+\end{itemize}
+
+Основные причины неэффективности параллельных реализаций:
+\begin{enumerate}
+    \item Высокие накладные расходы на создание и синхронизацию потоков/процессов
+    \item Неоптимальное распределение данных между потоками
+    \item Ограниченный потенциал параллелизма в алгоритме поразрядной сортировки
+    \item Дополнительные затраты на слияние частично отсортированных данных
+\end{enumerate}
+
+Несмотря на отрицательные результаты, работа позволила получить ценный опыт:
+\begin{itemize}
+    \item Практическое освоение различных технологий параллельного программирования
+    \item Понимание важности анализа алгоритмов перед их параллелизацией
+    \item Навыки сравнения эффективности разных подходов к распараллеливанию
+\end{itemize}
+
+Перспективы дальнейшей работы могут включать:
+\begin{itemize}
+    \item Исследование других алгоритмов сортировки, более подходящих для параллельной реализации
+    \item Оптимизацию текущих реализаций для уменьшения накладных расходов
+    \item Использование гибридных подходов для разных этапов сортировки
+\end{itemize}
+
+\newpage
+
+\section{Список литературы}
+\begin{thebibliography}{9}
+\bibitem{Knuth1998}
+  Д. Кнут, \emph{Искусство программирования. Том 3. Сортировка и поиск}, 2-е изд., Вильямс, 1998.
+
+\bibitem{Sanders2010}
+  P. Sanders, \emph{Algorithm Engineering: Bridging the Gap Between Algorithm Theory and Practice}, Springer, 2010.
+
+\bibitem{Reinders2007}
+  J. Reinders, \emph{Intel Threading Building Blocks}, O'Reilly Media, 2007.
+
+\bibitem{OpenMP}
+  OpenMP Architecture Review Board, \emph{OpenMP Application Program Interface Specification}, Version 5.2, 2021.
+
+\bibitem{MPI}
+  MPI Forum, \emph{MPI: A Message-Passing Interface Standard}, Version 4.0, 2021.
+
+\bibitem{Cormen2022}
+  T. H. Cormen et al., \emph{Introduction to Algorithms}, 4th ed., MIT Press, 2022.
+
+\bibitem{IntelTBB}
+  Intel Corporation, \emph{Intel® oneAPI Threading Building Blocks Developer Guide}, 2023.
+
+\bibitem{STLAsync}
+  N. Josuttis, \emph{The C++ Standard Library: A Tutorial and Reference}, 2nd ed., Addison-Wesley, 2012.
+
+\bibitem{RadixSort}
+  G. E. Blelloch, \emph{Vector Models for Data-Parallel Computing}, MIT Press, 1990.
+
+\bibitem{FloatSort}
+  J. Kärkkäinen, T. Rantala, \emph{Engineering Radix Sort for Strings}, String Processing and Information Retrieval, 2008.
+\end{thebibliography}
+\newpage
+\section{Приложение}
+\subsection{ops\_seq.cpp}
+\begin{lstlisting}[language=C++,
+    breaklines=true,       % Автоматический перенос строк
+    columns=fullflexible ]
+#include "seq/tsatsyn_a_radix_sort_simple_merge_seq/include/ops_seq.hpp"
+
+#include <algorithm>
+#include <bit>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <utility>
+#include <vector>
+
+std::pair<std::vector<uint64_t>, std::vector<uint64_t>> tsatsyn_a_radix_sort_simple_merge_seq::ParseOrigin(
+    std::vector<double> &input_data) {
+  std::vector<uint64_t> pozitive_copy;
+  std::vector<uint64_t> negative_copy;
+  for (int i = 0; i < static_cast<int>(input_data.size()); i++) {
+    if (input_data[i] > 0.0) {
+      pozitive_copy.emplace_back(*reinterpret_cast<uint64_t *>(&input_data[i]));
+    } else {
+      negative_copy.emplace_back(*reinterpret_cast<uint64_t *>(&input_data[i]));
+    }
+  }
+  return {pozitive_copy, negative_copy};
+}
+int tsatsyn_a_radix_sort_simple_merge_seq::CalculateBits(const std::vector<uint64_t> &data, bool is_pozitive) {
+  if (data.empty()) {
+    return 0;
+  }
+  uint64_t extreme_val = 0;
+  int num_bits = 0;
+  if (is_pozitive) {
+    extreme_val = *std::ranges::max_element(data);
+    num_bits = std::bit_width(extreme_val);
+  } else {
+    extreme_val = *std::ranges::min_element(data);
+    num_bits = (extreme_val == 0) ? 0 : std::bit_width(extreme_val);
+  }
+
+  return num_bits;
+}
+bool tsatsyn_a_radix_sort_simple_merge_seq::TestTaskSequential::PreProcessingImpl() {
+  auto *temp_ptr = reinterpret_cast<double *>(task_data->inputs[0]);
+  input_data_ = std::vector<double>(temp_ptr, temp_ptr + task_data->inputs_count[0]);
+  output_.resize(task_data->inputs_count[0]);
+  return true;
+}
+
+bool tsatsyn_a_radix_sort_simple_merge_seq::TestTaskSequential::ValidationImpl() {
+  return task_data->inputs_count[0] != 0;
+}
+
+bool tsatsyn_a_radix_sort_simple_merge_seq::TestTaskSequential::RunImpl() {
+  std::vector<uint64_t> pozitive_copy;
+  std::vector<uint64_t> negative_copy;
+  std::pair<std::vector<uint64_t>, std::vector<uint64_t>> temp = ParseOrigin(input_data_);
+  pozitive_copy = temp.first;
+  negative_copy = temp.second;
+  int positive_bits = CalculateBits(pozitive_copy, true);
+  int negative_bits = CalculateBits(negative_copy, false);
+
+  for (int bit = 0; bit < positive_bits; bit++) {
+    std::vector<uint64_t> group0;
+    std::vector<uint64_t> group1;
+    for (uint64_t b : pozitive_copy) {
+      if (((b >> bit) & 1) != 0U) {
+        group1.push_back(b);
+      } else {
+        group0.push_back(b);
+      }
+    }
+
+    pozitive_copy.clear();
+    pozitive_copy.insert(pozitive_copy.end(), group0.begin(), group0.end());
+    pozitive_copy.insert(pozitive_copy.end(), group1.begin(), group1.end());
+  }
+  if (!negative_copy.empty()) {
+    for (int bit = 0; bit < negative_bits; bit++) {
+      std::vector<uint64_t> group0;
+      std::vector<uint64_t> group1;
+      for (uint64_t b : negative_copy) {
+        if (((b >> bit) & 1) != 0U) {
+          group1.push_back(b);
+        } else {
+          group0.push_back(b);
+        }
+      }
+      negative_copy.clear();
+      negative_copy.insert(negative_copy.end(), group1.begin(), group1.end());
+      negative_copy.insert(negative_copy.end(), group0.begin(), group0.end());
+    }
+    for (int i = 0; i < static_cast<int>(negative_copy.size()); i++) {
+      output_[i] = *reinterpret_cast<double *>(&negative_copy[i]);
+    }
+  }
+  for (int i = 0; i < static_cast<int>(pozitive_copy.size()); i++) {
+    output_[negative_copy.size() + i] = *reinterpret_cast<double *>(&pozitive_copy[i]);
+  }
+  return true;
+}
+
+bool tsatsyn_a_radix_sort_simple_merge_seq::TestTaskSequential::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<double *>(task_data->outputs[0])[i] = output_[i];
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection{ops\_omp.cpp}
+\begin{lstlisting}[language=C++,
+    breaklines=true,       % Автоматический перенос строк
+    basicstyle=\small\ttfamily, % Уменьшенный шрифт
+    columns=fullflexible ]
+    #include "omp/tsatsyn_a_radix_sort_simple_merge_omp/include/ops_omp.hpp"
+
+#include <algorithm>
+#include <bit>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <utility>
+#include <vector>
+
+namespace constants {
+constexpr int kChunk = 100;
+}  // namespace constants
+inline std::vector<uint64_t> tsatsyn_a_radix_sort_simple_merge_omp::MainSort(std::vector<uint64_t> &data, int bit) {
+  std::vector<uint64_t> group0;
+  std::vector<uint64_t> group1;
+
+  group0.reserve(data.size());
+  group1.reserve(data.size());
+#pragma omp for schedule(guided, constants::kChunk) nowait
+  for (int i = 0; i < static_cast<int>(data.size()); i++) {
+    (((data[i] >> bit) & 1) != 0U) ? group1.push_back(data[i]) : group0.push_back(data[i]);
+  }
+  data = std::move(group0);
+  data.insert(data.end(), group1.begin(), group1.end());
+
+  return data;
+}
+
+inline int tsatsyn_a_radix_sort_simple_merge_omp::CalculateBits(const std::vector<uint64_t> &data, bool is_pozitive) {
+  if (data.empty()) {
+    return 0;
+  }
+  uint64_t extreme_val = 0;
+  int num_bits = 0;
+  if (is_pozitive) {
+    extreme_val = *std::ranges::max_element(data);
+    num_bits = std::bit_width(extreme_val);
+  } else {
+    extreme_val = *std::ranges::min_element(data);
+    num_bits = (extreme_val == 0) ? 0 : std::bit_width(extreme_val);
+  }
+
+  return num_bits;
+}
+bool tsatsyn_a_radix_sort_simple_merge_omp::TestTaskOpenMP::PreProcessingImpl() {
+  auto *temp_ptr = reinterpret_cast<double *>(task_data->inputs[0]);
+  input_data_ = std::vector<double>(temp_ptr, temp_ptr + task_data->inputs_count[0]);
+  output_.resize(task_data->inputs_count[0]);
+  return true;
+}
+
+bool tsatsyn_a_radix_sort_simple_merge_omp::TestTaskOpenMP::ValidationImpl() { return task_data->inputs_count[0] != 0; }
+
+bool tsatsyn_a_radix_sort_simple_merge_omp::TestTaskOpenMP::RunImpl() {
+  std::vector<uint64_t> pozitive_copy;
+  std::vector<uint64_t> negative_copy;
+  int i = 0;
+#pragma omp parallel private(i)
+  {
+    std::vector<uint64_t> local_positive;
+    std::vector<uint64_t> local_negative;
+
+#pragma omp for nowait
+    for (i = 0; i < static_cast<int>(input_data_.size()); ++i) {
+      if (input_data_[i] > 0.0) {
+        local_positive.push_back(*reinterpret_cast<const uint64_t *>(&input_data_[i]));
+      } else {
+        local_negative.push_back(*reinterpret_cast<const uint64_t *>(&input_data_[i]));
+      }
+    }
+#pragma omp critical
+    {
+      pozitive_copy.insert(pozitive_copy.end(), local_positive.begin(), local_positive.end());
+      negative_copy.insert(negative_copy.end(), local_negative.begin(), local_negative.end());
+    }
+  }
+  int pozitive_bits = CalculateBits(pozitive_copy, true);
+  int negative_bits = CalculateBits(negative_copy, false);
+
+  for (int bit = 0; bit < pozitive_bits; bit++) {
+    pozitive_copy = MainSort(pozitive_copy, bit);
+  }
+
+  if (!negative_copy.empty()) {
+    for (int bit = 0; bit < negative_bits; bit++) {
+      negative_copy = MainSort(negative_copy, bit);
+    }
+
+#pragma omp parallel for schedule(guided, constants::kChunk)
+    for (i = 0; i < static_cast<int>(negative_copy.size()); i++) {
+      output_[static_cast<int>(negative_copy.size()) - 1 - i] = *reinterpret_cast<const double *>(&negative_copy[i]);
+    }
+  }
+#pragma omp parallel for schedule(guided, constants::kChunk)
+  for (i = 0; i < static_cast<int>(pozitive_copy.size()); ++i) {
+    output_[negative_copy.size() + i] = *reinterpret_cast<const double *>(&pozitive_copy[i]);
+  }
+
+  return true;
+}
+bool tsatsyn_a_radix_sort_simple_merge_omp::TestTaskOpenMP::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<double *>(task_data->outputs[0])[i] = output_[i];
+  }
+  return true;
+}
+    \end{lstlisting}
+\subsection{ops\_tbb.cpp}
+\begin{lstlisting}[language=C++,
+    breaklines=true,       % Автоматический перенос строк
+    basicstyle=\small\ttfamily, % Уменьшенный шрифт
+    columns=fullflexible ]
+    #include "tbb/tsatsyn_a_radix_sort_simple_merge/include/ops_tbb.hpp"
+
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/combinable.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/parallel_invoke.h>
+#include <tbb/tbb.h>
+
+#include <algorithm>
+#include <bit>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <vector>
+
+namespace {
+inline int CalculateBits(const std::vector<uint64_t>& data, bool is_pozitive) {
+  if (data.empty()) {
+    return 0;
+  }
+  uint64_t extreme_val = 0;
+  int num_bits = 0;
+  if (is_pozitive) {
+    extreme_val = *std::ranges::max_element(data);
+    num_bits = std::bit_width(extreme_val);
+  } else {
+    extreme_val = *std::ranges::min_element(data);
+    num_bits = (extreme_val == 0) ? 0 : std::bit_width(extreme_val);
+  }
+
+  return num_bits;
+}
+}  // namespace
+bool tsatsyn_a_radix_sort_simple_merge_tbb::TestTaskTBB::PreProcessingImpl() {
+  // Init value for input and output
+  auto* temp_ptr = reinterpret_cast<double*>(task_data->inputs[0]);
+  input_data_ = std::vector<double>(temp_ptr, temp_ptr + task_data->inputs_count[0]);
+  output_.resize(task_data->inputs_count[0]);
+  return true;
+}
+
+bool tsatsyn_a_radix_sort_simple_merge_tbb::TestTaskTBB::ValidationImpl() {
+  // Check equality of counts elements
+  return (task_data->inputs_count[0] != 0) && (task_data->inputs_count[0] == task_data->outputs_count[0]);
+}
+
+bool tsatsyn_a_radix_sort_simple_merge_tbb::TestTaskTBB::RunImpl() {
+  std::vector<uint64_t> pozitive_copy;
+  std::vector<uint64_t> negative_copy;
+  tbb::combinable<std::vector<uint64_t>> pos_comb;
+  tbb::combinable<std::vector<uint64_t>> neg_comb;
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, input_data_.size()), [&](const auto& r) {
+    auto& pos = pos_comb.local();
+    auto& neg = neg_comb.local();
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      double val = input_data_[i];
+      auto* bits = reinterpret_cast<uint64_t*>(&val);
+      (val > 0.0 ? pos : neg).push_back(*bits);
+    }
+  });
+  auto merge_vectors = [](auto& comb) {
+    std::vector<uint64_t> res;
+    comb.combine_each([&](const auto& v) { res.insert(res.end(), v.begin(), v.end()); });
+    return res;
+  };
+
+  pozitive_copy = merge_vectors(pos_comb);
+  negative_copy = merge_vectors(neg_comb);
+  int pozitive_bits = CalculateBits(pozitive_copy, true);
+  int negative_bits = CalculateBits(negative_copy, false);
+  for (int bit = 0; bit < pozitive_bits; bit++) {
+    std::vector<uint64_t> group0;
+    std::vector<uint64_t> group1;
+    for (uint64_t b : pozitive_copy) {
+      if (((b >> bit) & 1) != 0U) {
+        group1.push_back(b);
+      } else {
+        group0.push_back(b);
+      }
+    }
+    pozitive_copy.clear();
+    pozitive_copy.insert(pozitive_copy.end(), group0.begin(), group0.end());
+    pozitive_copy.insert(pozitive_copy.end(), group1.begin(), group1.end());
+  }
+
+  for (int bit = 0; bit < negative_bits; bit++) {
+    std::vector<uint64_t> group0;
+    std::vector<uint64_t> group1;
+    for (uint64_t b : negative_copy) {
+      if (((b >> bit) & 1) != 0U) {
+        group1.push_back(b);
+      } else {
+        group0.push_back(b);
+      }
+    }
+    negative_copy.clear();
+    negative_copy.insert(negative_copy.end(), group1.begin(), group1.end());
+    negative_copy.insert(negative_copy.end(), group0.begin(), group0.end());
+  }
+  tbb::parallel_invoke(
+      [&] {
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, negative_copy.size()), [&](const auto& r) {
+          for (size_t i = r.begin(); i < r.end(); ++i) {
+            double tmp = NAN;
+            memcpy(&tmp, &negative_copy[i], sizeof(tmp));
+            output_[i] = tmp;
+          }
+        });
+      },
+      [&] {
+        const size_t offset = negative_copy.size();
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, pozitive_copy.size()), [&](const auto& r) {
+          for (size_t i = r.begin(); i < r.end(); ++i) {
+            double tmp = NAN;
+            memcpy(&tmp, &pozitive_copy[i], sizeof(tmp));
+            output_[offset + i] = tmp;
+          }
+        });
+      });
+  return true;
+}
+
+bool tsatsyn_a_radix_sort_simple_merge_tbb::TestTaskTBB::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<double*>(task_data->outputs[0])[i] = output_[i];
+  }
+  return true;
+}
+    \end{lstlisting}
+\subsection{ops\_stl.cpp}
+\begin{lstlisting}[language=C++,
+    breaklines=true,       % Автоматический перенос строк
+    basicstyle=\small\ttfamily, % Уменьшенный шрифт
+    columns=fullflexible ]
+    #include "stl/tsatsyn_a_radix_sort_simple_merge/include/ops_stl.hpp"
+
+#include <algorithm>
+#include <bit>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <future>
+#include <mutex>
+#include <utility>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+namespace {
+inline void ToSplitData(std::vector<uint64_t> &poz, std::vector<uint64_t> &neg, std::vector<double> input) {
+  std::mutex pos_mtx;
+  std::mutex neg_mtx;
+
+  size_t num_threads = ppc::util::GetPPCNumThreads();
+  size_t chunk_size = (input.size() + num_threads - 1) / num_threads;
+
+  auto split_worker = [&](size_t start, size_t end) {
+    for (size_t i = start; i < end; ++i) {
+      double num = input[i];
+      uint64_t bits = 0;
+      bits = std::bit_cast<uint64_t>(num);
+      if (num >= 0) {
+        std::lock_guard<std::mutex> lock(pos_mtx);
+        poz.push_back(bits);
+      } else {
+        std::lock_guard<std::mutex> lock(neg_mtx);
+        neg.push_back(bits);
+      }
+    }
+  };
+  std::vector<std::future<void>> split_futures;
+  for (size_t t = 0; t < num_threads; ++t) {
+    size_t start = t * chunk_size;
+    size_t end = std::min(start + chunk_size, input.size());
+    split_futures.emplace_back(std::async(std::launch::async, split_worker, start, end));
+  }
+  for (auto &f : split_futures) {
+    f.wait();
+  }
+}
+inline int CalculateBits(const std::vector<uint64_t> &data, bool is_pozitive) {
+  if (data.empty()) {
+    return 0;
+  }
+  uint64_t extreme_val = 0;
+  int num_bits = 0;
+  if (is_pozitive) {
+    extreme_val = *std::ranges::max_element(data);
+    num_bits = std::bit_width(extreme_val);
+  } else {
+    extreme_val = *std::ranges::min_element(data);
+    num_bits = (extreme_val == 0) ? 0 : std::bit_width(extreme_val);
+  }
+
+  return num_bits;
+}
+inline void SortRadix(std::vector<uint64_t> &data, bool is_negative, int num_bits) {
+  for (int bit = 0; bit < num_bits; bit++) {
+    std::vector<uint64_t> group0;
+    std::vector<uint64_t> group1;
+    for (uint64_t b : data) {
+      if (((b >> bit) & 1) != 0U) {
+        group1.push_back(b);
+      } else {
+        group0.push_back(b);
+      }
+    }
+    if (is_negative) {
+      data = std::move(group1);
+      data.insert(data.end(), group0.begin(), group0.end());
+
+    } else {
+      data = std::move(group0);
+      data.insert(data.end(), group1.begin(), group1.end());
+    }
+  }
+}
+}  // namespace
+bool tsatsyn_a_radix_sort_simple_merge_stl::TestTaskSTL::PreProcessingImpl() {
+  // Init value for input and output
+  auto *temp_ptr = reinterpret_cast<double *>(task_data->inputs[0]);
+  input_data_ = std::vector<double>(temp_ptr, temp_ptr + task_data->inputs_count[0]);
+  output_.resize(task_data->inputs_count[0]);
+  return true;
+}
+
+bool tsatsyn_a_radix_sort_simple_merge_stl::TestTaskSTL::ValidationImpl() {
+  // Check equality of counts elements
+  return task_data->inputs_count[0] != 0;
+}
+
+bool tsatsyn_a_radix_sort_simple_merge_stl::TestTaskSTL::RunImpl() {
+  std::vector<uint64_t> pozitive_copy;
+  std::vector<uint64_t> negative_copy;
+  ToSplitData(pozitive_copy, negative_copy, input_data_);
+
+  size_t num_threads = ppc::util::GetPPCNumThreads();
+  int pozitive_bits = CalculateBits(pozitive_copy, true);
+  int negative_bits = CalculateBits(negative_copy, false);
+
+  if (num_threads >= 2) {
+    if (!negative_copy.empty()) {
+      auto future_neg = std::async(
+          std::launch::async, [&negative_copy, &negative_bits]() { SortRadix(negative_copy, true, negative_bits); });
+      future_neg.wait();
+    }
+    auto future_pos = std::async(
+        std::launch::async, [&pozitive_copy, &pozitive_bits]() { SortRadix(pozitive_copy, false, pozitive_bits); });
+    future_pos.wait();
+
+  } else {
+    if (!negative_copy.empty()) {
+      SortRadix(negative_copy, true, negative_bits);
+    }
+    SortRadix(pozitive_copy, false, pozitive_bits);
+  }
+  if (!negative_copy.empty()) {
+    auto future_neg = std::async(std::launch::async, [&]() {
+      for (size_t i = 0; i < negative_copy.size(); ++i) {
+        output_[i] = std::bit_cast<double>(negative_copy[i]);
+      }
+    });
+    future_neg.wait();
+  }
+  auto future_pos = std::async(std::launch::async, [&]() {
+    size_t offset = negative_copy.size();
+    for (size_t i = 0; i < pozitive_copy.size(); ++i) {
+      output_[offset + i] = std::bit_cast<double>(pozitive_copy[i]);
+    }
+  });
+  future_pos.wait();
+  return true;
+}
+
+bool tsatsyn_a_radix_sort_simple_merge_stl::TestTaskSTL::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<double *>(task_data->outputs[0])[i] = output_[i];
+  }
+  return true;
+}
+    \end{lstlisting}
+
+\subsection{ops\_all.cpp}
+\begin{lstlisting}[language=C++,
+    breaklines=true,       % Автоматический перенос строк
+    basicstyle=\small\ttfamily, % Уменьшенный шрифт
+    columns=fullflexible ]
+bool tsatsyn_a_increasing_contrast_by_histogram_mpi::TestMPITaskSequential::validation() {
+  internal_order_test();
+  return (taskData->outputs_count[0] > 0 && taskData->inputs_count[0] > 0);
+}
+bool tsatsyn_a_increasing_contrast_by_histogram_mpi::TestMPITaskSequential::pre_processing() {
+  internal_order_test();
+  input_data.resize(taskData->inputs_count[0]);
+  auto* tempPtr = reinterpret_cast<int*>(taskData->inputs[0]);
+  std::copy(tempPtr, tempPtr + taskData->inputs_count[0], input_data.begin());
+
+  return true;
+}
+bool tsatsyn_a_increasing_contrast_by_histogram_mpi::TestMPITaskSequential::run() {
+  internal_order_test();
+  int min_val = *std::min_element(input_data.begin(), input_data.end());
+  int max_val = *std::max_element(input_data.begin(), input_data.end());
+  if (max_val - min_val == 0) {
+    max_val++;
+  }
+  res.resize(input_data.size());
+  int input_sz = static_cast<int>(input_data.size());
+  for (int i = 0; i < input_sz; i++) {
+    res[i] = (input_data[i] - min_val) * (255 - 0) / (max_val - min_val) + 0;
+  }
+  return true;
+}
+bool tsatsyn_a_increasing_contrast_by_histogram_mpi::TestMPITaskSequential::post_processing() {
+  internal_order_test();
+  auto* outputPtr = reinterpret_cast<int*>(taskData->outputs[0]);
+  std::copy(res.begin(), res.end(), outputPtr);
+  return true;
+}
+bool tsatsyn_a_increasing_contrast_by_histogram_mpi::TestMPITaskParallel::validation() {
+  internal_order_test();
+  if (world.rank() == 0) {
+    return (taskData->outputs_count[0] > 0 && taskData->inputs_count[0] > 0);
+  }
+  return true;
+}
+bool tsatsyn_a_increasing_contrast_by_histogram_mpi::TestMPITaskParallel::pre_processing() {
+  internal_order_test();
+  if (world.rank() == 0) {
+    input_data.resize(taskData->inputs_count[0]);
+    auto* tempPtr = reinterpret_cast<int*>(taskData->inputs[0]);
+    std::copy(tempPtr, tempPtr + taskData->inputs_count[0], input_data.begin());
+  }
+  return true;
+}
+bool tsatsyn_a_increasing_contrast_by_histogram_mpi::TestMPITaskParallel::run() {
+  internal_order_test();
+  std::vector<int> local_data;
+  int min_val;
+  int max_val;
+  int input_sz;
+  input_sz = static_cast<int>(input_data.size());
+  if (world.rank() == 0) {
+    min_val = *std::min_element(input_data.begin(), input_data.end());
+    max_val = *std::max_element(input_data.begin(), input_data.end());
+    if (max_val - min_val == 0) {
+      max_val++;
+    }
+    for (int proc = 1; proc < world.size(); proc++) {
+      for (int i = proc; i < input_sz; i += world.size()) {
+        local_data.emplace_back(input_data[i]);
+      }
+      world.send(proc, 0, local_data);
+      local_data.clear();
+    }
+    for (int i = 0; i < input_sz; i += world.size()) {
+      local_data.emplace_back(input_data[i]);
+    }
+  } else {
+    world.recv(0, 0, local_data);
+  }
+  boost::mpi::broadcast(world, max_val, 0);
+  boost::mpi::broadcast(world, min_val, 0);
+
+  for (int i = 0; i < static_cast<int>(local_data.size()); i++) {
+    local_data[i] = ((local_data[i] - min_val) * (255 - 0) / (max_val - min_val)) + 0;
+  }
+  if (world.rank() == 0) {
+    std::vector<int> expected(1, 0);
+    expected.resize(taskData->inputs_count[0]);
+    for (int i = 0; i < static_cast<int>(local_data.size()); i++) {
+      expected[i * world.size()] = local_data[i];
+    }
+    for (int proc = 1; proc < world.size(); proc++) {
+      world.recv(proc, 0, local_data);
+      for (int i = 0; i < static_cast<int>(local_data.size()); i++) {
+        expected[i * world.size() + proc] = local_data[i];
+      }
+    }
+    res = expected;
+  } else {
+    world.send(0, 0, local_data);
+  }
+
+  return true;
+}
+bool tsatsyn_a_increasing_contrast_by_histogram_mpi::TestMPITaskParallel::post_processing() {
+  internal_order_test();
+  if (world.rank() == 0) {
+    auto* outputPtr = reinterpret_cast<int*>(taskData->outputs[0]);
+    std::copy(res.begin(), res.end(), outputPtr);
+  }
+  return true;
+}
+\end{lstlisting}
+
+\end{document}
