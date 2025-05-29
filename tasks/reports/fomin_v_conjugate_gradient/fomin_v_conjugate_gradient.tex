@@ -1,7 +1,7 @@
 \documentclass[12pt]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[russian]{babel}
-\usepackage[T1]{fontenc}
+\usepackage[T2A]{fontenc}
 \usepackage{amsmath}
 \usepackage{geometry}
 \usepackage{multirow}
@@ -152,7 +152,7 @@ p_{k+1} = r_{k+1} + \beta_k p_k.
 double fomin_v_conjugate_gradient::FominVConjugateGradientOmp::DotProduct(const std::vector<double>& a,
 const std::vector<double>& b) {
 double result = 0.0;
-#pragma omp parallel for reduction(+ : result) // Параллелим с редукцией
+#pragma omp parallel for reduction(+ : result)
 for (int i = 0; i < static_cast<int>(a.size()); ++i) {
 result += a[i] * b[i];
 }
@@ -162,7 +162,7 @@ return result;
 std::vector<double> fomin_v_conjugate_gradient::FominVConjugateGradientOmp::MatrixVectorMultiply(
 const std::vector<double>& a, const std::vector<double>& x) const {
 std::vector<double> result(n, 0.0);
-#pragma omp parallel for // Параллелим по строкам матрицы
+#pragma omp parallel for
 for (int i = 0; i < n; ++i) {
 double sum = 0.0;
 for (int j = 0; j < n; ++j) {
@@ -176,7 +176,7 @@ return result;
 std::vector<double> fomin_v_conjugate_gradient::FominVConjugateGradientOmp::VectorAdd(const std::vector<double>& a,
 const std::vector<double>& b) {
 std::vector<double> result(a.size());
-#pragma omp parallel for // Параллелим поэлементное сложение
+#pragma omp parallel for 
 for (int i = 0; i < static_cast<int>(a.size()); ++i) {
 result[i] = a[i] + b[i];
 }
@@ -186,7 +186,7 @@ return result;
 std::vector<double> fomin_v_conjugate_gradient::FominVConjugateGradientOmp::VectorSub(const std::vector<double>& a,
 const std::vector<double>& b) {
 std::vector<double> result(a.size());
-#pragma omp parallel for // Параллелим поэлементное вычитание
+#pragma omp parallel for
 for (int i = 0; i < static_cast<int>(a.size()); ++i) {
 result[i] = a[i] - b[i];
 }
@@ -196,7 +196,7 @@ return result;
 std::vector<double> fomin_v_conjugate_gradient::FominVConjugateGradientOmp::VectorScalarMultiply(
 const std::vector<double>& v, double scalar) {
 std::vector<double> result(v.size());
-#pragma omp parallel for // Параллелим умножение на скаляр
+#pragma omp parallel for 
 for (int i = 0; i < static_cast<int>(v.size()); ++i) {
 result[i] = v[i] * scalar;
 }
@@ -574,7 +574,7 @@ all_reduce(world, local_sum, global_sum, std::plus<>());
 double fomin_v_conjugate_gradient::FominVConjugateGradientOmp::DotProduct(const std::vector<double>& a,
 const std::vector<double>& b) {
 double result = 0.0;
-#pragma omp parallel for reduction(+ : result) // Параллелим с редукцией
+#pragma omp parallel for reduction(+ : result)
 for (int i = 0; i < static_cast<int>(a.size()); ++i) {
 result += a[i] * b[i];
 }
@@ -584,7 +584,7 @@ return result;
 std::vector<double> fomin_v_conjugate_gradient::FominVConjugateGradientOmp::MatrixVectorMultiply(
 const std::vector<double>& a, const std::vector<double>& x) const {
 std::vector<double> result(n, 0.0);
-#pragma omp parallel for // Параллелим по строкам матрицы
+#pragma omp parallel for 
 for (int i = 0; i < n; ++i) {
 double sum = 0.0;
 for (int j = 0; j < n; ++j) {
@@ -598,7 +598,7 @@ return result;
 std::vector<double> fomin_v_conjugate_gradient::FominVConjugateGradientOmp::VectorAdd(const std::vector<double>& a,
 const std::vector<double>& b) {
 std::vector<double> result(a.size());
-#pragma omp parallel for // Параллелим поэлементное сложение
+#pragma omp parallel for 
 for (int i = 0; i < static_cast<int>(a.size()); ++i) {
 result[i] = a[i] + b[i];
 }
@@ -608,7 +608,7 @@ return result;
 std::vector<double> fomin_v_conjugate_gradient::FominVConjugateGradientOmp::VectorSub(const std::vector<double>& a,
 const std::vector<double>& b) {
 std::vector<double> result(a.size());
-#pragma omp parallel for // Параллелим поэлементное вычитание
+#pragma omp parallel for 
 for (int i = 0; i < static_cast<int>(a.size()); ++i) {
 result[i] = a[i] - b[i];
 }
@@ -618,7 +618,7 @@ return result;
 std::vector<double> fomin_v_conjugate_gradient::FominVConjugateGradientOmp::VectorScalarMultiply(
 const std::vector<double>& v, double scalar) {
 std::vector<double> result(v.size());
-#pragma omp parallel for // Параллелим умножение на скаляр
+#pragma omp parallel for 
 for (int i = 0; i < static_cast<int>(v.size()); ++i) {
 result[i] = v[i] * scalar;
 }
@@ -682,7 +682,7 @@ return true;
 
 bool fomin_v_conjugate_gradient::FominVConjugateGradientOmp::PostProcessingImpl() {
 auto* out_ptr = reinterpret_cast<double*>(task_data->outputs[0]);
-#pragma omp parallel for // Параллельное копирование результатов
+#pragma omp parallel for
 for (int i = 0; i < static_cast<int>(output_.size()); ++i) {
 out_ptr[i] = output_[i];
 }
