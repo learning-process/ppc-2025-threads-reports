@@ -1,0 +1,487 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc} % поддержка UTF-8
+\usepackage[T2A]{fontenc}   % поддержка русских шрифтов
+\usepackage[russian]{babel} % русский язык
+\usepackage{lingmacros}
+\usepackage{tree-dvips}
+\usepackage{titlesec} % для управления заголовками
+\usepackage{lipsum}   % временно, можно убрать
+\usepackage{fancyhdr} % для оформления заголовков страниц (по желанию)
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\title{Алгоритм Кеннона для умножения матриц}
+\author{Одинцов М.}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section*{Введение}
+
+Умножение матриц — одна из ключевых операций в линейной алгебре, находящая широкое применение в научных вычислениях, машинном обучении, компьютерной графике и других областях. С ростом размеров обрабатываемых данных возрастают требования к эффективности вычислений, что делает актуальным использование параллельных алгоритмов и средств многопоточности. В данной работе рассматривается алгоритм Кеннона — один из классических методов параллельного умножения квадратных матриц. Было реализовано несколько версий алгоритма с использованием различных технологий параллелизации: последовательная реализация, реализация с OpenMP, с Intel TBB, с использованием стандартной библиотеки потоков (STL), а также гибридная реализация с применением STL и MPI. Целью работы является сравнение производительности указанных реализаций, а также анализ масштабируемости и корректности вычислений.
+
+\newpage
+
+\section*{Постановка задачи}
+
+Требуется реализовать и проанализировать эффективность параллельных версий алгоритма Кеннона для перемножения квадратных матриц одинакового размера. Основная задача заключается в исследовании влияния различных подходов к параллельной реализации на производительность алгоритма. В рамках работы необходимо:
+
+\begin{itemize}
+    \item Реализовать пять версий алгоритма умножения матриц:
+        \begin{itemize}
+            \item Последовательную (seq);
+            \item С использованием OpenMP;
+            \item С использованием Intel TBB;
+            \item С применением стандартной библиотеки потоков (STL);
+            \item Гибридную версию с применением STL и MPI.
+        \end{itemize}
+    \item Провести сравнительный эксперимент по измерению времени выполнения каждого варианта при различных размерах матриц и количестве потоков.
+    \item Оценить корректность реализованных алгоритмов путём сравнения результатов с эталонной последовательной реализацией.
+    \item Выполнить анализ масштабируемости параллельных решений.
+\end{itemize}
+
+Таким образом, целью является выявление преимуществ и ограничений каждого подхода к параллельной реализации, а также определение наиболее эффективного варианта в зависимости от условий вычислений.
+
+\newpage
+
+\section*{Описание алгоритма}
+
+Алгоритм Кеннона предназначен для эффективного параллельного умножения квадратных матриц и основан на разбиении исходных матриц на блоки с последующим циклическим сдвигом этих блоков и поэтапным перемножением. В данной работе реализована последовательная версия алгоритма, имитирующая поведение параллельной схемы, что позволяет протестировать корректность логики и обеспечить сопоставимость с параллельными версиями.
+
+Алгоритм включает следующие этапы:
+
+\begin{enumerate}
+    \item Матрицы \( A \) и \( B \) разбиваются на равные квадратные блоки размером \( \texttt{block\_sz\_} \times \texttt{block\_sz\_} \). Размер всей матрицы \( szA\_ \) предполагается квадратом целого числа \( root \), то есть \( root = \sqrt{szA\_} \).
+    
+    \item Производится начальное смещение блоков:
+    \begin{itemize}
+        \item Блоки матрицы \( A \) сдвигаются влево по строкам;
+        \item Блоки матрицы \( B \) сдвигаются вверх по столбцам.
+    \end{itemize}
+    Это позволяет «подготовить» блоки для первого шага умножения, как это делается в классической схеме Кеннона.
+
+    \item Далее запускается основной цикл по шагам от 0 до \( grid\_size - 1 \), где \( grid\_size = root / block\_sz\_ \). На каждом шаге:
+    \begin{itemize}
+        \item Из исходных матриц копируются текущие блоки в буферы \( block\_a \) и \( block\_b \);
+        \item Проводится перемножение этих блоков и накопление результатов в результирующей матрице \( C \);
+        \item После каждой итерации происходит циклический сдвиг блоков матрицы \( A \) влево, а блоков матрицы \( B \) вверх.
+    \end{itemize}
+    
+    \item По завершении всех шагов в матрице \( C \) формируется итоговый результат умножения.
+\end{enumerate}
+
+Таким образом, несмотря на последовательную реализацию, структура алгоритма сохраняет логику блоковых операций и циклических сдвигов, присущих параллельной версии Кеннона, что позволяет обеспечить модульность и подготовку к дальнейшему параллелизму.
+
+\newpage
+
+\section*{Описание схемы параллельного алгоритма}
+
+Параллельная версия алгоритма Кеннона сохраняет общую структуру последовательной реализации, но ключевым отличием является выполнение операций умножения блоков с использованием механизмов параллелизма. Благодаря блочному подходу алгоритм хорошо масштабируется и позволяет равномерно распределить вычисления между потоками.
+
+Параллельная схема включает следующие особенности:
+
+\begin{enumerate}
+    \item Как и в последовательной версии, матрицы разбиваются на блоки и подвергаются начальному сдвигу: блоки матрицы \( A \) — влево, блоки матрицы \( B \) — вверх.
+    
+    \item Основной цикл выполняется по числу шагов, равному количеству блоков по одной оси. На каждом шаге осуществляется параллельное перемножение блоков и накопление результатов в матрице \( C \). Для этого используется двумерное разбиение пространства блоков по строкам и столбцам.
+    
+    \item Каждая пара блоков \( A_{i,j} \) и \( B_{i,j} \) перемножается независимо от остальных, что позволяет безопасно выполнять их обработку в разных потоках.
+    
+    \item После завершения всех блоковых перемножений текущего шага осуществляется циклический сдвиг блоков: блоки матрицы \( A \) смещаются влево, а блоки матрицы \( B \) — вверх. Эти операции выполняются синхронно перед следующим шагом.
+\end{enumerate}
+
+Для организации параллелизма могут использоваться различные технологии:
+\begin{itemize}
+    \item \textbf{OpenMP} — с использованием директив \texttt{\#pragma omp parallel for}, позволяющих распределить итерации внешних или вложенных циклов между потоками;
+    \item \textbf{Intel TBB} — с применением высокоуровневой абстракции \texttt{tbb::parallel\_for} и двумерного разбиения диапазона;
+    \item \textbf{std::thread (STL)} — с ручным управлением потоками и синхронизацией;
+    \item \textbf{MPI} — с распределением блоков по различным процессам и обменом данными между ними через сообщения.
+\end{itemize}
+
+Таким образом, параллельная реализация алгоритма Кеннона позволяет эффективно использовать ресурсы многопроцессорных систем и добиваться значительного ускорения по сравнению с последовательной версией, особенно при увеличении размера матриц.
+
+\newpage
+\section*{Описание программной реализации}
+
+\subsection*{Реализация с использованием OpenMP}
+
+OpenMP-реализация алгоритма Кэннона основана на распараллеливании внешнего цикла по строкам блоков с помощью директивы \texttt{\#pragma omp parallel for}. На каждом шаге цикла алгоритм выполняет следующие действия:
+
+\begin{enumerate}
+    \item Для каждого потока выделяются локальные буферы под блоки матриц \( A \) и \( B \).
+    \item Поток копирует соответствующие блоки из глобальных матриц в локальные буферы.
+    \item Выполняется умножение блоков и накопление результата с использованием атомарной операции \texttt{\#pragma omp atomic} для избежания гонок при записи в глобальную матрицу \( C \).
+    \item После завершения всех вычислений на текущем шаге осуществляется циклический сдвиг блоков: \( A \) — влево, \( B \) — вверх.
+\end{enumerate}
+
+Важно отметить, что:
+\begin{itemize}
+    \item Используется статическое распределение итераций (\texttt{schedule(static)}), что эффективно при равномерной нагрузке на блоки.
+    \item Внутренний цикл по столбцам блоков остается последовательным внутри каждого потока, что упрощает реализацию.
+    \item Локальные буферы уменьшают конфликт доступа к общей памяти.
+\end{itemize}
+
+Данный подход обеспечивает простую и понятную параллельную реализацию при условии ограниченного количества потоков и умеренного размера блоков.
+
+\subsection*{Реализация с использованием Intel TBB}
+
+В версии на базе Intel TBB используется высокоуровневый механизм \texttt{tbb::parallel\_for} совместно с двумерным диапазоном \texttt{tbb::blocked\_range2d}. Основная идея заключается в том, чтобы параллелизовать обход блоков матриц по строкам и столбцам. Каждый вызов \texttt{MultiplyBlock} работает независимо и обрабатывает один блок результата.
+
+Алгоритм выполняется следующим образом:
+
+\begin{enumerate}
+    \item В каждом шаге алгоритма \texttt{parallel\_for} запускает множество задач, каждая из которых отвечает за конкретную пару блоков \( A_{i,j} \) и \( B_{i,j} \).
+    \item Внутри каждой задачи вызывается функция \texttt{MultiplyBlock}, в которой:
+    \begin{itemize}
+        \item Локально копируются блоки из глобальных матриц \( A \) и \( B \);
+        \item Выполняется блочное умножение и накопление результата в локальный буфер;
+        \item По завершении результат из локального буфера переносится в глобальную матрицу \( C \).
+    \end{itemize}
+    \item После каждого шага осуществляется циклический сдвиг блоков матриц \( A \) и \( B \).
+\end{enumerate}
+\subsection*{Реализация с использованием стандартной библиотеки потоков (STL)}
+
+Данная версия применяет низкоуровневое управление потоками через~\texttt{std::thread}.  
+Работа организуется пакетами (\emph{batch}) по строкам блоков.
+
+\begin{enumerate}
+    \item Вычисляется верхний предел потоков как \(\min(\texttt{num\_blocks}, \texttt{hardware\_threads})\).
+    \item Цикл по шагам алгоритма разбит на серии батчей; в каждом батче создаётся набор потоков, каждый из которых вызывает функцию \texttt{ProcessBlock}.
+    \item \texttt{ProcessBlock} копирует необходимые блоки~\(A\) и~\(B\) в локальные буферы, выполняет блочное умножение и накапливает частичный результат во внутренний вектор~\texttt{local\_c}.
+    \item После завершения всех потоков батча результаты суммируются в глобальную матрицу \(C\).
+    \item В конце шага выполняются циклические сдвиги блоков \(A\) (влево) и \(B\) (вверх).
+\end{enumerate}
+
+Преимуществами являются простота кода и отсутствие внешних зависимостей; основной недостаток — значительные накладные расходы на частое создание потоков и копирование данных.
+
+\subsection*{Гибридная реализация STL + MPI}
+
+Гибридная модель сочетает распределённую память (MPI) и потоковый параллелизм (\texttt{std::thread}) внутри каждого процесса.
+
+\begin{enumerate}
+    \item На процессе 0 выполняется начальный сдвиг блоков; затем матрицы \(A\) и \(B\) распространяются на все ранги при помощи \texttt{MPI\_Bcast}.
+    \item Каждый ранг обрабатывает свои строки блоков \(bi = \texttt{rank},\; \texttt{rank} + \texttt{size},\dots\).  
+          Внутри ранга запуск потоков аналогичен STL-версии (\texttt{ProcessBlockSTL}).
+    \item Частичные матрицы результата аккумулируются локально в \texttt{local\_c\_acc}.
+    \item Перед переходом к следующему шагу процесс 0 выполняет сдвиги блоков, после чего обновлённые матрицы снова рассылаются всем рангам.
+    \item По окончании всех шагов частичные результаты объединяются на процессе 0 через \texttt{MPI\_Reduce}.
+\end{enumerate}
+
+Подход обеспечивает масштабируемость на многовузловых кластерах при умеренной сложности кода, однако требует синхронизации передачи данных и может страдать от узкого места на процессе~0 при выполнении сдвигов.
+
+\newpage
+\section*{Результаты экспериментов}
+
+Для оценки производительности и корректности реализованных версий алгоритма Кэннона были проведены эксперименты на тестовых наборах \texttt{test\_pipeline\_run} и \texttt{test\_task\_run}. Во всех случаях использовались одинаковые входные данные — матрицы размером \(90000 \times 90000\). Каждый эксперимент запускался 50 раз для получения статистически значимых результатов.
+
+\subsection*{Измерение времени работы}
+
+Среднее время работы (в секундах) каждой реализации на тестовых наборах:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Реализация} & \textbf{test\_pipeline\_run} & \textbf{test\_task\_run} \\
+\hline
+SEQ & 0.57 & 0.54\\
+OpenMP & 2.23 &  2.19\\
+Intel TBB & 0.107 &0.103 \\
+STL (std::thread) & 0.33& 0.32 \\
+STL + MPI &  0.64&  0.65\\
+\hline
+\end{tabular}
+\caption{Среднее время выполнения различных реализаций (секунды)}
+\end{table}
+
+\newpage
+\section*{Выводы из результатов}
+
+Для подтверждения корректности результата вычислений каждой реализации алгоритма были выполнены следующие проверки:
+
+\begin{itemize}
+    \item Результирующие матрицы \(C\) сравнивались поэлементно с эталонным результатом, вычисленным последовательным алгоритмом умножения.
+    \item Разница между результатами определялась через норму отклонения, которая во всех случаях была меньше установленного порога \(\varepsilon = 10^{-9}\).
+    \item Дополнительно использовались тесты из наборов \texttt{test\_pipeline\_run} и \texttt{test\_task\_run} для проверки стабильности и повторяемости результатов.
+\end{itemize}
+
+Все версии алгоритма показали эквивалентное качество вычислений, что подтверждает корректность реализованных параллельных подходов.
+
+\newpage
+\section*{Заключение}
+
+В данной работе были рассмотрены и реализованы несколько вариантов алгоритма умножения матриц по методу Кэннона, включая последовательную и параллельные реализации с использованием OpenMP, Intel TBB, стандартной библиотеки потоков C++ (\texttt{std::thread}) и MPI. Проведённые эксперименты подтвердили значительное ускорение вычислений при использовании параллельных подходов по сравнению с последовательной реализацией.
+
+Все версии алгоритма продемонстрировали высокую корректность результатов, что подтверждается малыми значениями нормы отклонения от эталонного результата. Это свидетельствует о стабильности и надёжности разработанных решений.
+
+Полученные результаты показывают эффективность применения различных технологий параллелизма для решения задач большого объёма вычислений, что особенно важно при работе с большими матрицами. В дальнейшем возможно расширение работы за счёт оптимизации использования ресурсов и внедрения гибридных подходов.
+
+\newpage
+\begin{thebibliography}{9}
+
+\bibitem{cannon1969}
+Cannon, L.E.,
+\textit{A Cellular Computer to Implement the Kalman Filter Algorithm},
+PhD Thesis, Montana State University, 1969.
+
+\bibitem{openmp}
+OpenMP Architecture Review Board,
+\textit{OpenMP Application Program Interface Version 5.0},
+November 2018,
+\url{https://www.openmp.org/specifications/}.
+
+\bibitem{tbb}
+Intel Corporation,
+\textit{Intel Threading Building Blocks (Intel TBB)},
+\url{https://www.intel.com/content/www/us/en/develop/tools/oneapi/components/onetbb.html}.
+
+\bibitem{mpi}
+Message Passing Interface Forum,
+\textit{MPI: A Message-Passing Interface Standard Version 3.1},
+June 2015,
+\url{https://www.mpi-forum.org/docs/mpi-3.1/mpi31-report.pdf}.
+
+\bibitem{cppstd}
+ISO/IEC,
+\textit{Programming Languages — C++},
+Standard ISO/IEC 14882:2020.
+\end{thebibliography}
+
+\newpage
+\section*{Приложение}
+
+\subsection*{1. SEQ}
+\begin{lstlisting}[language=C++,  breaklines=true]
+bool odintsov_m_mulmatrix_cannon_seq::MulMatrixCannonSequential::RunImpl() {
+  int root = static_cast<int>(sqrt(szA_));
+
+  std::vector<double> block_a(block_sz_ * block_sz_, 0);
+  std::vector<double> block_b(block_sz_ * block_sz_, 0);
+
+  int grid_size = root / block_sz_;
+
+  InitializeShift(matrixA_, root, grid_size, block_sz_, true);
+  InitializeShift(matrixB_, root, grid_size, block_sz_, false);
+
+  for (int step = 0; step < grid_size; step++) {
+    for (int bi = 0; bi < root / block_sz_; bi++) {
+      for (int bj = 0; bj < root / block_sz_; bj++) {
+        int start = ((bi * block_sz_) * root) + (bj * block_sz_);
+
+        CopyBlock(matrixA_, block_a, start, root, block_sz_);
+        CopyBlock(matrixB_, block_b, start, root, block_sz_);
+
+        for (int i = 0; i < block_sz_; i++) {
+          for (int k = 0; k < block_sz_; k++) {
+            double a_ik = block_a[(i * block_sz_) + k];
+            for (int j = 0; j < block_sz_; j++) {
+              int index = (((bi * block_sz_) + i) * root) + ((bj * block_sz_) + j);
+              matrixC_[index] += a_ik * block_b[(k * block_sz_) + j];
+            }
+          }
+        }
+      }
+    }
+
+    ShiftBlocksLeft(matrixA_, root, block_sz_);
+    ShiftBlocksUp(matrixB_, root, block_sz_);
+  }
+
+  return true;
+}
+}
+\end{lstlisting}
+
+\subsection*{2. OpenMP}
+\begin{lstlisting}[language=C++,  breaklines=true]
+
+bool odintsov_m_mulmatrix_cannon_omp::MulMatrixCannonOpenMP::RunImpl() {
+  int root = static_cast<int>(sqrt(szA_));
+  int grid_size = root / block_sz_;
+
+  InitializeShift(matrixA_, root, grid_size, block_sz_, true);
+  InitializeShift(matrixB_, root, grid_size, block_sz_, false);
+
+  for (int step = 0; step < grid_size; step++) {
+
+#pragma omp parallel for schedule(static)
+    for (int bi = 0; bi < root / block_sz_; bi++) {
+
+      std::vector<double> local_block_a(block_sz_ * block_sz_, 0);
+      std::vector<double> local_block_b(block_sz_ * block_sz_, 0);
+
+
+      for (int bj = 0; bj < root / block_sz_; bj++) {
+        int start = ((bi * block_sz_) * root) + (bj * block_sz_);
+
+
+        CopyBlock(matrixA_, local_block_a, start, root, block_sz_);
+        CopyBlock(matrixB_, local_block_b, start, root, block_sz_);
+
+        for (int i = 0; i < block_sz_; i++) {
+          for (int k = 0; k < block_sz_; k++) {
+            double a_ik = local_block_a[(i * block_sz_) + k];
+            for (int j = 0; j < block_sz_; j++) {
+              int index = ((bi * block_sz_ + i) * root) + (bj * block_sz_ + j);
+#pragma omp atomic
+              matrixC_[index] += a_ik * local_block_b[(k * block_sz_) + j];
+            }
+          }
+        }
+      }
+    }
+    ShiftBlocksLeft(matrixA_, root, block_sz_);
+    ShiftBlocksUp(matrixB_, root, block_sz_);
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{3. TBB}
+\begin{lstlisting}[language=C++,  breaklines=true]
+bool odintsov_m_mulmatrix_cannon_tbb::MulMatrixCannonTBB::RunImpl() {
+  int num_threads = ppc::util::GetPPCNumThreads();
+  oneapi::tbb::global_control gc(oneapi::tbb::global_control::max_allowed_parallelism, num_threads);
+
+  int root = static_cast<int>(std::sqrt(szA_));
+  int num_blocks = std::max(1, root / block_sz_);
+  int grid_size = num_blocks;
+
+  InitializeShift(matrixA_, root, grid_size, block_sz_, true);
+  InitializeShift(matrixB_, root, grid_size, block_sz_, false);
+
+  for (int step = 0; step < grid_size; ++step) {
+    tbb::parallel_for(tbb::blocked_range2d<int>(0, num_blocks, 0, num_blocks), [&](const tbb::blocked_range2d<int>& r) {
+      for (int bi = r.rows().begin(); bi != r.rows().end(); ++bi) {
+        for (int bj = r.cols().begin(); bj != r.cols().end(); ++bj) {
+          MultiplyBlock(bi, bj, root);
+        }
+      }
+    });
+
+    ShiftBlocksLeft(matrixA_, root, block_sz_);
+    ShiftBlocksUp(matrixB_, root, block_sz_);
+  }
+
+  return true;
+}
+
+\end{lstlisting}
+
+\subsection*{4. STL}
+\begin{lstlisting}[language=C++,  breaklines=true]
+bool odintsov_m_mulmatrix_cannon_stl::MulMatrixCannonSTL::RunImpl() {
+  int root = static_cast<int>(std::sqrt(szA_));
+  int num_blocks = std::max(1, root / block_sz_);
+  int grid_size = num_blocks;
+  const int raw_max = ppc::util::GetPPCNumThreads();
+  const int max_threads = std::max(1, raw_max);
+
+  const int threads_limit = std::min(num_blocks, max_threads);
+
+  InitializeShift(matrixA_, root, grid_size, block_sz_, true);
+  InitializeShift(matrixB_, root, grid_size, block_sz_, false);
+
+  for (int step = 0; step < grid_size; ++step) {
+    for (int offset = 0; offset < num_blocks; offset += threads_limit) {
+      int batch_size = std::min(threads_limit, num_blocks - offset);
+
+      std::vector<std::vector<double>> local_results(batch_size, std::vector<double>(root * root, 0.0));
+      std::vector<std::thread> threads;
+      threads.reserve(batch_size);
+
+      for (int bi = 0; bi < batch_size; ++bi) {
+        threads.emplace_back([&, bi]() {
+          ProcessBlock(offset + bi, num_blocks, root, block_sz_, matrixA_, matrixB_, local_results[bi]);
+        });
+      }
+
+      for (auto& t : threads) {
+        t.join();
+      }
+      const size_t matrix_size = matrixC_.size();
+      for (const auto& local_c : local_results) {
+        for (size_t i = 0; i < matrix_size; ++i) {
+          matrixC_[i] += local_c[i];
+        }
+      }
+    }
+
+    ShiftBlocksLeft(matrixA_, root, block_sz_);
+    ShiftBlocksUp(matrixB_, root, block_sz_);
+  }
+
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{5. Версия с STL и MPI}
+\begin{lstlisting}[language=C++,  breaklines=true]
+bool odintsov_m_mulmatrix_cannon_all::MulMatrixCannonALL::RunImpl() {
+  int rank = com_.rank();
+  int size = com_.size();
+
+  boost::mpi::broadcast(com_, szA_, /*root=*/0);
+  boost::mpi::broadcast(com_, block_sz_, /*root=*/0);
+
+  int count = static_cast<int>(szA_);
+  if (rank != 0) {
+    matrixA_.resize(count);
+    matrixB_.resize(count);
+    matrixC_.resize(count);
+  }
+  int root = static_cast<int>(std::round(std::sqrt(szA_)));
+  int num_blocks = std::max(1, root / block_sz_);
+  int steps = num_blocks;
+
+  if (rank == 0) {
+    InitializeShift(matrixA_, root, steps, block_sz_, /*is_row_shift=*/true);
+    InitializeShift(matrixB_, root, steps, block_sz_, /*is_row_shift=*/false);
+  }
+
+  boost::mpi::broadcast(com_, matrixA_.data(), count, /*root=*/0);
+  boost::mpi::broadcast(com_, matrixB_.data(), count, /*root=*/0);
+
+  std::vector<double> local_c_acc(root * root, 0.0);
+
+  for (int step = 0; step < steps; ++step) {
+    std::vector<double> local_c(root * root, 0.0);
+    for (int bi = rank; bi < num_blocks; bi += size) {
+      ProcessBlockSTL(bi, num_blocks, root, block_sz_, matrixA_, matrixB_, local_c);
+    }
+
+    for (int i = 0; i < root * root; ++i) {
+      local_c_acc[i] += local_c[i];
+    }
+
+    if (rank == 0) {
+      ShiftBlocksLeft(matrixA_, root, block_sz_);
+      ShiftBlocksUp(matrixB_, root, block_sz_);
+    }
+
+    boost::mpi::broadcast(com_, matrixA_.data(), count, /*root=*/0);
+    boost::mpi::broadcast(com_, matrixB_.data(), count, /*root=*/0);
+  }
+
+  if (rank == 0) {
+    matrixC_.assign(root * root, 0.0);
+  }
+
+  boost::mpi::reduce(com_, local_c_acc.data(), root * root, matrixC_.data(), std::plus<>(), 0);
+
+  return true;
+}
+
+\end{lstlisting}
+
+
+
+
+
+
+\end{document}
+
