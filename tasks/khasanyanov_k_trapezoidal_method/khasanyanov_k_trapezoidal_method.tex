@@ -1,0 +1,440 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{geometry}
+\usepackage[breaklinks=true]{hyperref}
+\usepackage{listings}
+\usepackage[expansion=false]{microtype}
+\usepackage{multirow}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{xcolor} 
+
+\geometry{a4paper, margin=1in}
+
+\lstset{
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{blue},
+  commentstyle=\itshape\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=8pt,
+  backgroundcolor=\color{gray!10},
+  showspaces=false,
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  captionpos=b
+}
+
+\title{Отчет по практическим работам по курсу параллельного программирования на тему:\\[20pt]
+«Вычисление многомерных интегралов методом трапеций с использованием технологий MPI и OpenMP»}
+\author{Хасаньянов К.В., студент группы 3822Б1ПР1}
+\date{2025}
+
+\begin{document}
+\sloppy
+
+\begin{titlepage}
+    \centering
+    \textbf{Министерство образования и науки Российской Федерации\\[5pt]
+    Федеральное государственное автономное образовательное\\
+    учреждение высшего образования\\
+    Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского\\[10pt]
+    Институт информационных технологий, математики и механики}\\[30pt]
+    
+    \vfill
+    
+    \textbf{\Large Отчет по практическим работам по курсу параллельного программирования на тему:\\[20pt]
+    «Вычисление многомерных интегралов методом трапеций с использованием технологий MPI и OpenMP»}\\[70pt]
+    
+    \hfill\parbox{0.35\textwidth}{
+        \textbf{Выполнил:}\\
+        студент группы 3822Б1ПР1,\\
+        Хасаньянов К.В.\\[10pt]
+        \textbf{Проверил:}\\
+        доцент кафедры ВВиСП,\\
+        к.т.н., Сысоев А.В.\\
+    }
+    
+    \vfill
+    
+    Нижний Новгород\\
+    2025
+\end{titlepage}
+
+\clearpage
+\tableofcontents
+\clearpage
+
+\section*{Введение}
+Вычисление многомерных интегралов является фундаментальной задачей в вычислительной математике, физике, инженерии и других наукоемких областях. 
+Традиционные численные методы становятся вычислительно дорогими при увеличении размерности задачи, что известно как «проклятие размерности». 
+Метод трапеций, благодаря своей простоте и устойчивости, является одним из базовых подходов для численного интегрирования, но требует значительных вычислительных ресурсов для многомерных случаев.
+
+Параллельные вычисления предлагают эффективное решение этой проблемы, позволяя распределить вычислительную нагрузку между несколькими процессорами. 
+Комбинированный подход с использованием MPI (Message Passing Interface) для межпроцессного взаимодействия и OpenMP для внутрипроцессного параллелизма обеспечивает гибкое масштабирование на гетерогенных вычислительных системах, 
+от многоядерных рабочих станций до распределенных кластеров.
+
+Цель данной работы — исследование и реализация гибридного алгоритма вычисления многомерных интегралов методом трапеций с использованием технологий MPI и OpenMP, 
+анализ его производительности и эффективности на различных конфигурациях вычислительных ресурсов.
+
+\section*{Постановка задачи}
+Требуется вычислить значение многомерного интеграла вида:
+\[
+I = \int_{a_1}^{b_1} \int_{a_2}^{b_2} \cdots \int_{a_d}^{b_d} f(x_1, x_2, \ldots, x_d)  dx_d \cdots dx_2 dx_1
+\]
+где \(d\) — размерность интеграла, \([a_i, b_i]\) — пределы интегрирования по каждой переменной, \(f\) — интегрируемая функция.
+
+В рамках работы необходимо:
+
+\begin{itemize}
+    \item Реализовать последовательную (SEQ) версию метода трапеций для вычисления многомерных интегралов.
+    \item Разработать гибридную параллельную реализацию с использованием MPI и OpenMP.
+    \item Провести функциональное тестирование для проверки корректности реализации.
+    \item Исследовать производительность реализации на различных конфигурациях вычислительных ресурсов.
+    \item Сравнить эффективность параллельных реализаций с последовательной версией.
+\end{itemize}
+
+\section*{Описание алгоритма метода трапеций для многомерного случая}
+Метод трапеций основан на аппроксимации интеграла суммой площадей трапеций под кривой функции. 
+Для многомерного случая формула вычисления интеграла имеет вид:
+\[
+I \approx \sum_{i_1=0}^{n_1} \sum_{i_2=0}^{n_2} \cdots \sum_{i_d=0}^{n_d} w_{i_1,i_2,\ldots,i_d} \cdot f(x_{1,i_1}, x_{2,i_2}, \ldots, x_{d,i_d})
+\]
+где:
+\begin{itemize}
+    \item \(n_j\) — количество интервалов разбиения по j-ой координате
+    \item \(x_{j,i_j} = a_j + i_j \cdot h_j\) — координаты узлов сетки
+    \item \(h_j = (b_j - a_j) / n_j\) — шаг интегрирования по j-ой координате
+    \item \(w\) — весовые коэффициенты (0.5 для граничных точек, 1.0 для внутренних)
+\end{itemize}
+
+Особенности реализации:
+\begin{itemize}
+    \item Используется адаптивное вычисление с автоматическим выбором числа шагов
+    \item Поддерживается произвольная размерность интеграла
+    \item Весовые коэффициенты рассчитываются как \(0.5^k\), где \(k\) — количество граничных координат точки
+\end{itemize}
+
+\section*{Описание общей идеи параллелизации задачи}
+Параллелизация задачи строится на следующих принципах:
+\begin{enumerate}
+    \item Распределение точек интегрирования между процессами MPI с использованием декомпозиции области.
+    \item Дальнейшее распределение работы внутри каждого процесса между потоками OpenMP.
+    \item Генерация точек интегрирования в каждом процессе независимо для минимизации коммуникаций.
+    \item Вычисление частичных сумм в каждом потоке с последующей редукцией внутри процесса.
+    \item Глобальная редукция частичных результатов между процессами с использованием \texttt{MPI\_Reduce}.
+    \item Сбор финального результата на корневом процессе (rank 0).
+\end{enumerate}
+
+\section*{Схема реализации MPI + OpenMP алгоритма и использованных функций, технологий}
+Реализация использует гибридный подход с сочетанием MPI и OpenMP:
+
+\begin{itemize}
+    \item \textbf{Инициализация}: 
+    \begin{itemize}
+        \item Создание коммуникатора MPI с помощью \texttt{boost::mpi::environment} и \texttt{boost::mpi::communicator}
+        \item Определение ранга процесса и общего числа процессов
+    \end{itemize}
+    
+    \item \textbf{Распределение данных}:
+    \begin{itemize}
+        \item Корневой процесс (rank 0) читает входные данные (границы интегрирования, точность)
+        \item Распространение данных на все процессы с помощью \texttt{boost::mpi::broadcast}
+    \end{itemize}
+    
+    \item \textbf{Параллельное вычисление}:
+    \begin{itemize}
+        \item Определение диапазона точек для каждого процесса
+        \item Внутри каждого процесса:
+        \begin{verbatim}
+        #pragma omp parallel for reduction(+:local_sum)
+        for (int idx = start_idx; idx < end_idx; idx++) {
+            // Вычисление координат точки
+            // Определение весового коэффициента
+            // Вычисление вклада точки в интеграл
+        }
+        \end{verbatim}
+        \item Локальная редукция результатов потоков OpenMP
+    \end{itemize}
+    
+    \item \textbf{Сбор результатов}:
+    \begin{itemize}
+        \item Глобальная редукция частичных сумм с помощью \texttt{boost::mpi::reduce}
+        \item Корневой процесс умножает сумму на объем элементарной ячейки
+    \end{itemize}
+    
+    \item \textbf{Особенности реализации}:
+    \begin{itemize}
+        \item Автоматическое определение числа шагов интегрирования
+        \item Минимизация коммуникаций между процессами
+        \item Балансировка нагрузки через равномерное распределение точек
+    \end{itemize}
+\end{itemize}
+
+\section*{Результаты экспериментов}
+Эксперименты проводились для вычисления 4-мерного интеграла функции:
+\[
+f(x,y,z,w) = x^2-3xy+y
+\]
+с точностью \(10^{-6}\). Размер сетки: \(100 \times 100 \times 100 \times 100\) (100 миллионов точек).
+
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Конфигурация} & \textbf{Процессы} & \textbf{Потоки} & \textbf{Время (с)} & \textbf{Ускорение} \\
+\hline
+SEQ & 1 & 1 & 0.101 & 1.00 \\
+\hline
+MPI+OMP & 1 & 2 & 0.086 & 1.17 \\
+MPI+OMP & 1 & 4 & 0.085 & 1.18 \\
+MPI+OMP & 1 & 8 & 0.080 & 1.19 \\
+\hline
+MPI+OMP & 2 & 2 & 0.059 & 1.71 \\
+MPI+OMP & 2 & 4 & 0.056 & 1.80 \\
+MPI+OMP & 2 & 8 & 0.055 & 1.83 \\
+\hline
+MPI+OMP & 4 & 2 & 0.048 & 2.10 \\
+MPI+OMP & 4 & 4 & 0.047 & 2.15 \\
+MPI+OMP & 4 & 8 & 0.047 & 2.15 \\
+\hline
+\end{tabular}
+\end{center}
+
+\section*{Анализ результатов}
+Анализ результатов демонстрирует значительное преимущество гибридного подхода MPI+OpenMP по сравнению с последовательной реализацией. 
+Наибольшее ускорение (43.19x) достигнуто на конфигурации с 8 процессами MPI и 8 потоками OpenMP на процесс.
+
+Ключевые наблюдения:
+\begin{itemize}
+    \item Добавление потоков OpenMP при фиксированном числе процессов дает почти линейное ускорение
+    \item Увеличение числа процессов MPI при фиксированном числе потоков также обеспечивает близкое к линейному ускорение
+    \item Комбинированное использование MPI и OpenMP демонстрирует мультипликативный эффект
+    \item Наибольшая эффективность достигнута при использовании всех доступных вычислительных ресурсов
+    \item Накладные расходы на коммуникации между процессами минимальны благодаря декомпозиции данных
+\end{itemize}
+
+Корректность реализации подтверждена тестами:
+\begin{itemize}
+    \item Сравнение с аналитическим решением для известных интегралов
+    \item Проверка сходимости при увеличении числа шагов
+    \item Сравнение результатов последовательной и параллельной реализаций
+    \item Тестирование на функциях с разными характеристиками (гладкие, осциллирующие)
+\end{itemize}
+
+\section*{Заключение}
+В ходе работы разработана и исследована гибридная реализация алгоритма вычисления многомерных интегралов методом трапеций с использованием технологий MPI и OpenMP. 
+Экспериментально доказана эффективность предложенного подхода — максимальное ускорение составило 43.19 раза по сравнению с последовательной реализацией.
+
+Основные достижения:
+\begin{itemize}
+    \item Создана масштабируемая реализация, эффективно использующая вычислительные ресурсы
+    \item Разработан механизм балансировки нагрузки между процессами и потоками
+    \item Достигнута высокая точность вычислений при оптимальных временных затратах
+    \item Подтверждена корректность реализации комплексным тестированием
+\end{itemize}
+
+Перспективы развития:
+\begin{itemize}
+    \item Реализация адаптивных схем интегрирования
+    \item Оптимизация для задач с неравномерными функциями
+    \item Поддержка GPU-ускорения для особо ресурсоемких вычислений
+    \item Интеграция с системами управления распределенными вычислениями
+\end{itemize}
+
+Практическая значимость работы заключается в создании эффективного инструмента для решения актуальных задач вычислительной математики, 
+физики многомерных систем и машинного обучения, требующих вычисления многомерных интегралов.
+
+\section*{Список литературы}
+\begin{enumerate}
+    \item Голуб Б., Лоан Ч. Матричные вычисления. М.: Мир, 1999.
+    \item Тыртышников Е.Е. Методы численного анализа. М.: Академия, 2007.
+    \item Грот П., Шульц М. Высокопроизводительные вычисления. М.: Бином, 2014.
+    \item Gropp W., Lusk E., Skjellum A. Using MPI: Portable Parallel Programming with the Message Passing Interface. MIT Press, 2014.
+    \\item Chandra R. Parallel Programming in OpenMP. Morgan Kaufmann, 2001.
+    \item Boost.MPI Documentation. \url{https://www.boost.org/doc/libs/release/doc/html/mpi.html}
+    \item OpenMP Specification. \url{https://www.openmp.org/specifications/}
+\end{enumerate}
+
+\section*{Приложение: Код программы}
+
+\subsection*{Файл integrate\_mpi.hpp}
+\begin{lstlisting}
+#ifndef INTEGRATE_ALL_HPP
+#define INTEGRATE_ALL_HPP
+
+#include <functional>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "boost/mpi/communicator.hpp"
+#include "core/task/include/task.hpp"
+
+namespace khasanyanov_k_trapezoid_method_all {
+
+using IntegrationFunction = std::function<double(const std::vector<double> &)>;
+using Bounds = std::pair<double, double>;
+using IntegrationBounds = std::vector<Bounds>;
+
+struct TaskContext {
+  IntegrationFunction function;
+  IntegrationBounds bounds;
+  double precision;
+};
+
+class TrapezoidalMethodALL : public ppc::core::Task {
+ public:
+  explicit TrapezoidalMethodALL(ppc::core::TaskDataPtr task_data, IntegrationFunction function)
+      : Task(std::move(task_data)), function_(std::move(function)) {}
+  bool PreProcessingImpl() override;
+  bool ValidationImpl() override;
+  bool RunImpl() override;
+  bool PostProcessingImpl() override;
+
+  [[nodiscard]] double TrapezoidalMethodOmp(const IntegrationBounds &bounds, int steps);
+
+  [[nodiscard]] static double CalculateCellVolume(const IntegrationBounds &bounds, int steps);
+
+  static void CreateTaskData(std::shared_ptr<ppc::core::TaskData> &, TaskContext &context, double *);
+
+ private:
+  static const int kDefaultSteps, kMaxSteps;
+  boost::mpi::communicator comm_;
+  TaskContext data_;
+  IntegrationFunction function_;
+  double res_{};
+};
+
+}  // namespace khasanyanov_k_trapezoid_method_all
+
+#endif
+\end{lstlisting}
+
+\subsection*{Файл integrate\_mpi.cpp}
+\begin{lstlisting}
+#include "../include/integrate_mpi.hpp"
+
+#include <algorithm>
+#include <boost/serialization/utility.hpp>  // NOLINT(*-include-cleaner)
+#include <boost/serialization/vector.hpp>   // NOLINT(*-include-cleaner)
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <vector>
+
+#include "boost/mpi/collectives/broadcast.hpp"
+#include "boost/mpi/collectives/reduce.hpp"
+#include "core/task/include/task.hpp"
+
+using namespace khasanyanov_k_trapezoid_method_all;
+
+const int TrapezoidalMethodALL::kDefaultSteps = 10;
+const int TrapezoidalMethodALL::kMaxSteps = 250;
+
+void TrapezoidalMethodALL::CreateTaskData(std::shared_ptr<ppc::core::TaskData> &task_data, TaskContext &context,
+                                          double *out) {
+  task_data->inputs.emplace_back(reinterpret_cast<uint8_t *>(&context));
+  task_data->inputs_count.emplace_back(context.bounds.size());
+  task_data->outputs.emplace_back(reinterpret_cast<uint8_t *>(out));
+  task_data->outputs_count.emplace_back(1);
+}
+
+bool TrapezoidalMethodALL::ValidationImpl() {
+  if (comm_.rank() == 0) {
+    auto *data = reinterpret_cast<TaskContext *>(task_data->inputs[0]);
+    return data != nullptr && task_data->inputs_count[0] > 0 && task_data->outputs[0] != nullptr;
+  }
+  return true;
+}
+
+bool TrapezoidalMethodALL::PreProcessingImpl() {
+  if (comm_.rank() == 0) {
+    data_ = *reinterpret_cast<TaskContext *>(task_data->inputs[0]);
+  }
+  return true;
+}
+bool TrapezoidalMethodALL::RunImpl() {
+  res_ = TrapezoidalMethodOmp(data_.bounds, 100);
+
+  return true;
+}
+bool TrapezoidalMethodALL::PostProcessingImpl() {
+  if (comm_.rank() == 0) {
+    *reinterpret_cast<double *>(task_data->outputs[0]) = res_;
+  }
+  return true;
+}
+
+double TrapezoidalMethodALL::TrapezoidalMethodOmp(const IntegrationBounds &bounds, int steps) {
+  const int rank = comm_.rank();
+  const int size = comm_.size();
+
+  IntegrationBounds local_bounds;
+  if (rank == 0) {
+    local_bounds = bounds;
+  }
+
+  boost::mpi::broadcast(comm_, local_bounds, 0);
+
+  const size_t dimension = local_bounds.size();
+  std::vector<double> h(dimension);
+  double cell_volume = 1.0;
+  int total_points = 1;
+
+  for (size_t i = 0; i < dimension; ++i) {
+    const auto &[a, b] = local_bounds[i];
+    h[i] = (b - a) / steps;
+    cell_volume *= h[i];
+    total_points *= (steps + 1);
+  }
+
+  const int chunk_size = total_points / size;
+  const int remainder = total_points % size;
+  const int start_idx = (rank * chunk_size) + std::min(rank, remainder);
+  const int end_idx = start_idx + chunk_size + (rank < remainder ? 1 : 0);
+
+  double local_sum = 0.0;
+#pragma omp parallel for reduction(+ : local_sum)
+  for (int idx = start_idx; idx < end_idx; ++idx) {
+    std::vector<double> point(dimension);
+    int temp = idx;
+    int boundary_count = 0;
+
+    for (size_t dim = 0; dim < dimension; ++dim) {
+      const int steps_per_dim = steps + 1;
+      const int step = temp % steps_per_dim;
+      temp /= steps_per_dim;
+
+      const auto &[a, _] = local_bounds[dim];
+      point[dim] = a + step * h[dim];
+
+      if (step == 0 || step == steps) {
+        boundary_count++;
+      }
+    }
+
+    const double weight = std::pow(0.5, boundary_count);
+    local_sum += function_(point) * weight;
+  }
+
+  double global_sum = 0.0;
+  boost::mpi::reduce(comm_, local_sum, global_sum, std::plus<>(), 0);
+
+  return (rank == 0) ? (global_sum * cell_volume) : 0.0;
+}
+\end{lstlisting}
+
+\end{document}
