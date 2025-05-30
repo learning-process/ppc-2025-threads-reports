@@ -1,0 +1,642 @@
+\documentclass[14pt,a4paper]{extarticle}
+\renewcommand{\normalsize}{\fontsize{14pt}{16.8pt}\selectfont}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{framed}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
+
+\geometry{
+  a4paper,
+  left=30mm,
+  right=15mm,
+  top=20mm,
+  bottom=20mm
+}
+
+\titleformat{\section}[block]
+  {\normalfont\fontsize{14}{16}\bfseries\centering}
+  {\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]
+  {\normalfont\fontsize{14}{16}\bfseries\filcenter}
+  {\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}[block]
+  {\normalfont\fontsize{14}{16}\bfseries\filcenter}
+  {\thesubsubsection.}{0.5em}{}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red},
+    frame=single,
+    tabsize=4,
+    showstringspaces=false,
+    breaklines=true
+}
+
+\sloppy
+
+\onehalfspacing
+\setlength{\parindent}{1.25cm}
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+
+\onehalfspacing
+
+\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\
+Федеральное государственное автономное образовательное учреждение высшего образования \\
+«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского» (ННГУ) \\
+Институт информационных технологий, математики и механики
+
+\vspace{4cm}
+
+\textbf{ОТЧЕТ ПО ЛАБОРАТОРНОЙ РАБОТЕ} \\
+\textbf{«Умножение матриц с использованием алгоритма Штрассена»}
+\textbf{Вариант 3}
+
+\vspace{4cm}
+
+\begin{flushright}
+\textbf{Выполнил:} \\
+Студент 3 курса \\
+группы 3822Б1ПР1 \\
+Гнитиенко К.Ю.
+
+\vspace{1cm}
+
+\textbf{Преподаватель:} \\
+доцент кафедры ВВСП, к.т.н. \\
+Сысоев А.В.
+\end{flushright}
+
+\vspace{1cm}
+
+\begin{center}
+Нижний Новгород\\
+2025
+\end{center}
+
+\end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+
+Умножение матриц — одна из ключевых операций линейной алгебры, применяемая в компьютерной графике, системах искусственного интеллекта и научных вычислениях. Классическое умножение обладает кубической сложностью $O(n^3)$, что делает его неэффективным при работе с большими объемами данных.
+
+Одним из способов оптимизации данной операции является использование \textbf{алгоритма Штрассена}, предложенного в 1969 году. Этот алгоритм позволяет снизить асимптотическую сложность до $O(n^{\log_2 7}) \approx O(n^{2.807})$, тем самым ускоряя вычисления на больших матрицах.
+
+\section{Постановка задачи}
+
+Целью работы является реализация и исследование эффективности \textbf{алгоритма Штрассена} для умножения квадратных матриц. В рамках выполнения работы:
+
+\begin{itemize}
+    \item Реализован базовый (последовательный) алгоритм умножения матриц по алгоритму Штрассена;
+    \item Реализованы параллельные алгоритмы умножения матриц по алгоритму Штрассена;
+    \item Выполнено сравнение с классическим методом (Trivial Multiply);
+    \item Разработаны юнит-тесты с использованием Google Test;
+\end{itemize}
+
+\section{Описание алгоритма}
+
+Алгоритм Штрассена использует метод разбиения входных матриц на блоки и выполняет 7 умножений вместо 8, что снижает общую сложность.
+
+Даны две матрицы $A$ и $B$ размера $n \times n$, разбиваем их на блоки:
+
+\[
+A = \begin{bmatrix}
+A_{11} & A_{12} \\
+A_{21} & A_{22}
+\end{bmatrix}, \quad
+B = \begin{bmatrix}
+B_{11} & B_{12} \\
+B_{21} & B_{22}
+\end{bmatrix}
+\]
+
+Вычисляются промежуточные значения:
+
+\[
+\begin{aligned}
+M_1 &= (A_{11} + A_{22})(B_{11} + B_{22}) \\
+M_2 &= (A_{21} + A_{22})B_{11} \\
+M_3 &= A_{11}(B_{12} - B_{22}) \\
+M_4 &= A_{22}(B_{21} - B_{11}) \\
+M_5 &= (A_{11} + A_{12})B_{22} \\
+M_6 &= (A_{21} - A_{11})(B_{11} + B_{12}) \\
+M_7 &= (A_{12} - A_{22})(B_{21} + B_{22})
+\end{aligned}
+\]
+
+Итоговые блоки результата $C$:
+
+\[
+\begin{aligned}
+C_{11} &= M_1 + M_4 - M_5 + M_7 \\
+C_{12} &= M_3 + M_5 \\
+C_{21} &= M_2 + M_4 \\
+C_{22} &= M_1 - M_2 + M_3 + M_6
+\end{aligned}
+\]
+
+Данная схема позволяет сократить количество рекурсивных умножений, что критично при больших размерах матриц.
+
+\section{Описание реализации}
+
+Класс \texttt{StrassenAlg} реализует алгоритм Штрассена и включает следующие методы:
+
+\begin{itemize}
+    \item \texttt{PreProcessingImpl()} — считывание и расширение матриц до ближайшей степени двойки;
+    \item \texttt{StrassenMultiply()} — рекурсивная реализация алгоритма Штрассена;
+    \item \texttt{TrivialMultiply()} — классическое умножение матриц;
+    \item \texttt{RunImpl} — Содержит \texttt{StrassenMultiply()}, обрезка результата до исходного размера;
+    \item \texttt{AddMatrix()}, \texttt{SubMatrix()} — вспомогательные арифметические операции с матрицами.
+\end{itemize}
+
+\subsection*{Пример ключевой функции}
+\begin{lstlisting}[language=C++]
+void StrassenMultiply(const std::vector<double>& a,
+                      const std::vector<double>& b,
+                      std::vector<double>& c, int size) {
+  if (size <= TRIVIAL_MULTIPLICATION_BOUND_) {
+    TrivialMultiply(a, b, c, size);
+    return;
+  }
+  int half_size = size / 2;
+
+  std::vector<double> a11(half_size * half_size);
+  std::vector<double> a12(half_size * half_size);
+  std::vector<double> a21(half_size * half_size);
+  std::vector<double> a22(half_size * half_size);
+  std::vector<double> b11(half_size * half_size);
+  std::vector<double> b12(half_size * half_size);
+  std::vector<double> b21(half_size * half_size);
+  std::vector<double> b22(half_size * half_size);
+    
+  for (int i = 0; i < half_size; ++i) {
+    for (int j = 0; j < half_size; ++j) {
+      a11[(i * half_size) + j] = a[(i * size) + j];
+      a12[(i * half_size) + j] = a[(i * size) + j + half_size];
+      a21[(i * half_size) + j] = a[((i + half_size) * size) + j];
+      a22[(i * half_size) + j] = a[((i + half_size) * size) + j + half_size];
+    }
+  }
+    
+  for (int i = 0; i < half_size; ++i) {
+    for (int j = 0; j < half_size; ++j) {
+      b11[(i * half_size) + j] = b[(i * size) + j];
+      b12[(i * half_size) + j] = b[(i * size) + j + half_size];
+      b21[(i * half_size) + j] = b[((i + half_size) * size) + j];
+      b22[(i * half_size) + j] = b[((i + half_size) * size) + j + half_size];
+    }
+  }
+  
+  std::vector<double> d(half_size * half_size);
+  std::vector<double> d1(half_size * half_size);
+  std::vector<double> d2(half_size * half_size);
+  std::vector<double> h1(half_size * half_size);
+  std::vector<double> h2(half_size * half_size);
+  std::vector<double> v1(half_size * half_size);
+  std::vector<double> v2(half_size * half_size);
+  
+  // d = (a11 + a22) * (b11 + b22)
+  std::vector<double> temp_a(half_size * half_size);
+  std::vector<double> temp_b(half_size * half_size);
+  
+  AddMatrix(a11, a22, temp_a, half_size);
+  AddMatrix(b11, b22, temp_b, half_size);
+  StrassenMultiply(temp_a, temp_b, d, half_size);
+  
+  // d1 = (a12 - a22) * (b21 + b22)
+  SubMatrix(a12, a22, temp_a, half_size);
+  AddMatrix(b21, b22, temp_b, half_size);
+  StrassenMultiply(temp_a, temp_b, d1, half_size);
+    
+  // d2 = (a21 - a11) * (b11 + b12)
+  SubMatrix(a21, a11, temp_a, half_size);
+  AddMatrix(b11, b12, temp_b, half_size);
+  StrassenMultiply(temp_a, temp_b, d2, half_size);
+  
+  // h1 = (a11 + a12) * b22
+  AddMatrix(a11, a12, temp_a, half_size);
+  StrassenMultiply(temp_a, b22, h1, half_size);
+  
+  // h2 = (a21 + a22) * b11
+  AddMatrix(a21, a22, temp_a, half_size);
+  StrassenMultiply(temp_a, b11, h2, half_size);
+  
+  // v1 = a22 * (b21 - b11)
+  SubMatrix(b21, b11, temp_b, half_size);
+  StrassenMultiply(a22, temp_b, v1, half_size);
+  
+  // v2 = a11 * (b12 - b22)
+  SubMatrix(b12, b22, temp_b, half_size);
+  StrassenMultiply(a11, temp_b, v2, half_size);
+  
+  std::vector<double> c11(half_size * half_size);
+  std::vector<double> c12(half_size * half_size);
+  std::vector<double> c21(half_size * half_size);
+  std::vector<double> c22(half_size * half_size);
+  
+  AddMatrix(d, d1, c11, half_size);
+  AddMatrix(c11, v1, c11, half_size);
+  SubMatrix(c11, h1, c11, half_size);
+  AddMatrix(v2, h1, c12, half_size);
+  AddMatrix(v1, h2, c21, half_size);
+  AddMatrix(d, d2, c22, half_size);
+  AddMatrix(c22, v2, c22, half_size);
+  SubMatrix(c22, h2, c22, half_size);
+   
+  for (int i = 0; i < half_size; ++i) {
+    for (int j = 0; j < half_size; ++j) {
+      c[(i * size) + j] = c11[(i * half_size) + j];
+      c[(i * size) + j + half_size] = c12[(i * half_size) + j];
+      c[((i + half_size) * size) + j] = c21[(i * half_size) + j];
+      c[((i + half_size) * size) + j + half_size] = c22[(i * half_size) + j];
+    }
+  }
+}
+\end{lstlisting}
+
+\newpage
+
+\section{Описание OpenMP-версии алгоритма}
+
+В данной реализации была произведена параллелизация вычислений с помощью технологии OpenMP, которая позволяет упростить многопоточную обработку благодаря использованию директив компилятора.
+
+Параллелизм реализован на двух уровнях:
+\begin{enumerate}
+    \item Внутреннее умножение блоков (при малом размере) с помощью директивы \texttt{\#pragma omp parallel for};
+    \item Параллельное вычисление 7 рекурсивных вызовов (дополнительных матричных произведений) с использованием конструкции \texttt{\#pragma omp sections}.
+\end{enumerate}
+
+Такой подход позволяет эффективно задействовать все доступные вычислительные ядра при сохранении рекурсивной структуры алгоритма.
+
+\subsection*{Фрагмент функции TrivialMultiply}
+
+\begin{lstlisting}[language=C++]
+void TrivialMultiply(const std::vector<double>& a,
+                     const std::vector<double>& b,
+                     std::vector<double>& c, int size) {
+#pragma omp parallel for schedule(static)
+  for (int i = 0; i < size; ++i) {
+    for (int j = 0; j < size; ++j) {
+      c[(i * size) + j] = 0;
+      for (int k = 0; k < size; ++k) {
+        c[(i * size) + j] += a[(i * size) + k] * b[(k * size) + j];
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+\subsection*{Параллельные секции умножений в StrassenMultiply}
+
+Каждое из семи произведений реализовано в отдельной секции, выполняемой в параллельных потоках:
+
+\begin{lstlisting}[language=C++]
+#pragma omp parallel num_threads(7)
+{
+#pragma omp sections
+  {
+    #pragma omp section
+    { StrassenMultiply(...); }
+
+    #pragma omp section
+    { StrassenMultiply(...); }
+
+    // other sections...
+  }
+}
+\end{lstlisting}
+
+\subsection*{Параллелизация сборки результата}
+
+Финальная сборка блоков $C_{11}, C_{12}, C_{21}, C_{22}$ в результирующую матрицу также реализована в виде параллельного цикла:
+
+\begin{lstlisting}[language=C++]
+#pragma omp parallel for schedule(static)
+for (int i = 0; i < half_size; ++i) {
+  for (int j = 0; j < half_size; ++j) {
+    c[(i * size) + j] = c11[(i * half_size) + j];
+    c[(i * size) + j + half_size] = c12[(i * half_size) + j];
+    ...
+  }
+}
+\end{lstlisting}
+
+\subsection*{Особенности реализации}
+
+\begin{itemize}
+    \item Все основные вычисления распараллелены с использованием OpenMP;
+    \item Каждый из семи рекурсивных вызовов выполняется в отдельной секции, что обеспечивает максимальную загрузку потоков;
+    \item При малом размере (ниже порога) используется классическое умножение с параллельной реализацией;
+    \item Используется директива \texttt{schedule(static)} для равномерного распределения итераций.
+\end{itemize}
+
+\subsection*{Заключение по OpenMP-версии}
+
+OpenMP позволил существенно сократить время выполнения за счет эффективной параллельной загрузки всех доступных ядер. Реализация сохраняет структуру рекурсивного алгоритма Штрассена, обеспечивая при этом высокую степень параллелизма без необходимости вручную управлять потоками.
+
+\newpage
+\section{Описание TBB-версии алгоритма}
+
+Для реализации параллельной версии алгоритма Штрассена также была использована библиотека \textbf{Intel oneAPI Threading Building Blocks (TBB)}. Этот инструмент предоставляет высокоуровневые абстракции для эффективной организации параллелизма с автоматическим управлением задачами и балансировкой нагрузки.
+
+\subsection*{Основные особенности реализации}
+
+\begin{itemize}
+    \item Используется \texttt{tbb::parallel\_for} для параллельной обработки строк при тривиальном перемножении матриц;
+    \item Разделение исходных матриц на блоки также выполняется параллельно;
+    \item Для выполнения семи независимых рекурсивных вызовов используется \texttt{tbb::task\_group};
+    \item Конструкция \texttt{tbb::task\_arena} применяется для управления числом потоков.
+\end{itemize}
+
+\subsection*{Фрагмент TrivialMultiply с использованием TBB}
+
+\begin{lstlisting}[language=C++]
+tbb::parallel_for(0, size, [&](int i) {
+  for (int j = 0; j < size; ++j) {
+    double sum = 0.0;
+    for (int k = 0; k < size; ++k) {
+      sum += a[(i * size) + k] * b[(k * size) + j];
+    }
+    c[(i * size) + j] = sum;
+  }
+});
+\end{lstlisting}
+
+\subsection*{Параллельное вычисление семи подзадач}
+
+Для распараллеливания семи рекурсивных вызовов используется структура \texttt{tbb::task\_group}, каждая задача запускается через \texttt{tg.run(...)}, а затем осуществляется ожидание завершения всех задач с помощью \texttt{tg.wait()}:
+
+\begin{lstlisting}[language=C++]
+tbb::task_group tg;
+
+tg.run([&]() {
+  AddMatrix(a11, a22, temp_a, half_size);
+  AddMatrix(b11, b22, temp_b, half_size);
+  StrassenMultiply(temp_a, temp_b, d, half_size);
+});
+
+// d1, d2, h1, h2, v1, v2...
+
+tg.wait();
+\end{lstlisting}
+
+\subsection*{Сборка результирующей матрицы}
+
+Завершающая сборка матриц $C_{ij}$ в финальную матрицу $C$ выполняется с помощью \texttt{tbb::parallel\_for}:
+
+\begin{lstlisting}[language=C++]
+tbb::parallel_for(0, half_size, [&](int i) {
+  for (int j = 0; j < half_size; ++j) {
+    c[(i * size) + j] = c11[(i * half_size) + j];
+    c[(i * size) + j + half_size] = c12[(i * half_size) + j];
+    ...
+  }
+});
+\end{lstlisting}
+
+\subsection*{Инициализация task\_arena}
+
+Для запуска всего вычисления в управляемом окружении используется конструкция \texttt{tbb::task\_arena}, что гарантирует корректное задание числа потоков:
+
+\begin{lstlisting}[language=C++]
+oneapi::tbb::task_arena arena(ppc::util::GetPPCNumThreads());
+arena.execute([&] {
+  StrassenMultiply(input_1_, input_2_, output_, size_);
+});
+\end{lstlisting}
+
+\subsection*{Заключение по TBB-версии}
+
+TBB предоставляет мощный и гибкий способ организации параллелизма. Благодаря динамической балансировке нагрузки и автоматическому управлению задачами, эта версия демонстрирует высокую производительность при минимальных усилиях по управлению потоками вручную. Реализация хорошо масштабируется на многоядерных системах, особенно в условиях интенсивной загрузки.
+
+\newpage
+\section{Описание STL-версии алгоритма}
+
+В этой версии алгоритма Штрассена для параллелизации использовалась \textbf{стандартная библиотека потоков C++ (std::threads)}. Данный подход основан на ручном управлении потоками, что предоставляет высокий уровень контроля, но требует тщательной координации задач.
+
+\subsection*{Особенности реализации}
+
+\begin{itemize}
+    \item Все 7 рекурсивных вычислений (M1–M7) организованы в виде лямбда-функций;
+    \item Для управления выполнением задач реализована вспомогательная функция \texttt{ParallelizeTasks};
+    \item Потоки создаются вручную через \texttt{std::thread}, запускаются только при наличии свободных ресурсов;
+    \item Глубина рекурсии контролируется числом доступных потоков, передаваемых рекурсивно.
+\end{itemize}
+
+\subsection*{Фрагмент функции ParallelizeTasks}
+
+\begin{lstlisting}[language=C++]
+void ParallelizeTasks(const std::vector<std::function<void(int)>>& tasks,
+                      int avaliable_threads) {
+  std::vector<std::thread> threads;
+
+  for (int i = 0; i < threads_to_create; ++i) {
+    threads.emplace_back([&]() { tasks[i](subthreads); });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+}
+\end{lstlisting}
+
+\subsection*{Распараллеливание рекурсивных вызовов}
+
+Каждое из семи произведений обернуто в лямбда-функцию и добавляется в вектор задач:
+
+\begin{lstlisting}[language=C++]
+auto compute_d = [&](int threads) {
+  AddMatrix(a11, a22, temp_a, half_size);
+  AddMatrix(b11, b22, temp_b, half_size);
+  StrassenMultiply(temp_a, temp_b, d, half_size, threads);
+};
+
+std::vector<std::function<void(int)>> tasks = {
+  compute_d, compute_d1, compute_d2, compute_h1,
+  compute_h2, compute_v1, compute_v2
+};
+
+ParallelizeTasks(tasks, available_threads);
+\end{lstlisting}
+
+\subsection*{Управление числом потоков}
+
+Максимально допустимое количество потоков получается с помощью утилиты:
+
+\begin{lstlisting}[language=C++]
+int max_threads = ppc::util::GetPPCNumThreads();
+StrassenMultiply(..., size, max_threads);
+\end{lstlisting}
+
+В рекурсивных вызовах число потоков уменьшается, таким образом предотвращается избыточное создание потоков.
+
+\subsection*{Заключение по STL-версии}
+
+STL-реализация обеспечивает полный контроль над жизненным циклом потоков и позволяет гибко управлять ресурсами. Однако она требует ручного распределения задач и может быть менее эффективной в сравнении с OpenMP и TBB на высоких уровнях вложенности.
+
+Преимущества:
+\begin{itemize}
+    \item Гибкость;
+    \item Прямая поддержка в стандартной библиотеке C++.
+\end{itemize}
+
+Недостатки:
+\begin{itemize}
+    \item Повышенная сложность;
+    \item Необходимость ручного управления синхронизацией и планированием.
+\end{itemize}
+
+
+\newpage
+
+\section{Описание гибридной STL + MPI версии алгоритма}
+
+Для максимального использования вычислительных ресурсов реализована гибридная версия алгоритма Штрассена, использующая одновременно \textbf{распределённые вычисления (MPI)} и \textbf{многопоточность (std::thread)}. Такая схема позволяет распределить вычислительную нагрузку по нескольким процессам и задействовать все ядра внутри каждого процесса.
+
+\subsection*{Архитектура решения}
+
+\begin{itemize}
+  \item Главный процесс (ранг 0) выполняет разбиение задачи, распределяет блоки матриц и собирает финальный результат;
+  \item Остальные процессы получают задания по MPI и выполняют их с помощью локальной STL-параллелизации;
+  \item Каждый из семи блоков (M1–M7) умножается независимо и может быть обработан отдельным процессом;
+  \item При нехватке процессов, несколько блоков могут быть обработаны одним процессом;
+  \item Главный процесс также выполняет часть работы локально.
+\end{itemize}
+
+\subsection*{Распараллеливание с помощью MPI}
+
+\begin{lstlisting}[language=C++]
+// in main process:
+world_.isend(proc, tag, data);
+
+// in worker:
+world_.irecv(0, tag, data);
+\end{lstlisting}
+
+MPI используется для:
+\begin{itemize}
+    \item Отправки и получения блоков подматриц A и B;
+    \item Возврата результатов промежуточных умножений;
+    \item Синхронизации с помощью \texttt{barrier()}.
+\end{itemize}
+
+\subsection*{Локальное параллельное выполнение (STL)}
+
+Внутри каждого процесса используется STL-механизм многопоточности. Задачи определяются как лямбда-функции и передаются в \texttt{ParallelizeTasks}:
+
+\begin{lstlisting}[language=C++]
+std::vector<std::function<void(int)>> tasks = {
+    compute_d, compute_d1, ..., compute_v2
+};
+
+ParallelizeTasks(tasks, avaliable_threads);
+\end{lstlisting}
+
+\subsection*{Распределение задач между процессами}
+
+\begin{itemize}
+  \item Каждому процессу назначается 1 или более задач (из 7 возможных);
+  \item Распределение производится циклически (по модулю числа процессов);
+  \item Число потоков внутри каждого процесса контролируется переменной \texttt{max\_threads}.
+\end{itemize}
+
+\subsection*{Обработка на главном процессе (rank = 0)}
+
+\begin{itemize}
+  \item Формируются подматрицы A и B;
+  \item Вычисляются локальные задачи;
+  \item Осуществляется сборка результирующей матрицы из блоков $C_{11}, C_{12}, C_{21}, C_{22}$;
+  \item Проводится обрезка результата до исходного размера.
+\end{itemize}
+
+\subsection*{Работа дочерних процессов}
+
+\begin{itemize}
+  \item Получение задач, данных и метаданных по MPI;
+  \item Выполнение локального умножения с использованием \texttt{StrassenMultiply};
+  \item Отправка результата обратно главному процессу.
+\end{itemize}
+
+\subsection*{Заключение по STL + MPI версии}
+
+Данная версия алгоритма представляет собой наиболее масштабируемый и гибкий вариант. Она объединяет преимущества распределённых вычислений и параллелизма на уровне ядра.
+
+Преимущества:
+\begin{itemize}
+    \item Масштабируемость на кластерах;
+    \item Эффективная загрузка всех доступных ресурсов;
+    \item Балансировка нагрузки между процессами.
+\end{itemize}
+
+Недостатки:
+\begin{itemize}
+    \item Сложность реализации и отладки;
+    \item Затраты на коммуникации между процессами.
+\end{itemize}
+
+\newpage
+\section{Сравнительный анализ производительности}
+
+В таблице ниже представлены результаты времени выполнения тестов на производительность различных реализаций алгоритма Штрассена при фиксированном размере матрицы.
+
+\begin{table}[H]
+\centering
+\caption{Время выполнения (в секундах) для различных реализаций}
+\begin{tabular}{llr}
+\toprule
+\textbf{Реализация} & \textbf{Конфигурация} & \textbf{Время (с)} \\
+\midrule
+Последовательная (Seq)     & –                  & 5.593 \\
+OpenMP                     & 7 потоков          & 3.385 \\
+TBB                        & 1 поток            & 6.653 \\
+TBB                        & 2 потока           & 3.883 \\
+TBB                        & 3 потока           & 2.546 \\
+TBB                        & 7 потоков          & 1.662 \\
+STL                        & 1 поток            & 6.465 \\
+STL                        & 2 потока           & 4.396 \\
+STL                        & 3 потока           & 3.933 \\
+STL                        & 7 потоков          & 1.625 \\
+MPI + STL                  & 1 процесс (1 поток) & 5.864 \\
+MPI + STL                  & 2 процесса (2 потока) & 3.377 \\
+MPI + STL                  & 3 процесса (3 потока) & 2.317 \\
+MPI + STL                  & 7 процессов (7 потоков) & 1.745 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Заключение}
+
+В ходе работы были реализованы и сравнены несколько версий алгоритма Штрассена: последовательная, OpenMP, TBB, STL и гибридная STL+MPI.
+
+\begin{itemize}
+    \item Наихудшее время показали однопоточные версии TBB и STL, что ожидаемо из-за отсутствия параллелизма.
+    \item OpenMP показал неплохой результат с 7 потоками, но уступил в производительности оптимизированной версии STL и TBB.
+    \item Наиболее эффективными оказались версии STL и TBB при 7 потоках, показав минимальное среднее время выполнения — 1.625 и 1.662 секунд соответственно.
+    \item Гибридная реализация STL+MPI демонстрирует хорошую масштабируемость, позволяя ускорить выполнение на кластере при увеличении количества процессов.
+\end{itemize}
+
+Таким образом, при наличии многопроцессорной системы предпочтение следует отдавать гибридной реализации, а при использовании одного узла — вариантам с OpenMP или STL при максимальной загрузке потоков.
+
+
+\end{document}
