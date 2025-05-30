@@ -322,7 +322,7 @@ void TrivialMultiply(const std::vector<double>& a,
     #pragma omp section
     { StrassenMultiply(...); }
 
-    // остальные секции ...
+    // other sections...
   }
 }
 \end{lstlisting}
@@ -396,7 +396,7 @@ tg.run([&]() {
   StrassenMultiply(temp_a, temp_b, d, half_size);
 });
 
-// аналогично для d1, d2, h1, h2, v1, v2...
+// d1, d2, h1, h2, v1, v2...
 
 tg.wait();
 \end{lstlisting}
@@ -527,10 +527,10 @@ STL-реализация обеспечивает полный контроль 
 \subsection*{Распараллеливание с помощью MPI}
 
 \begin{lstlisting}[language=C++]
-// В главном процессе:
+// in main process:
 world_.isend(proc, tag, data);
 
-// В рабочем процессе:
+// in worker:
 world_.irecv(0, tag, data);
 \end{lstlisting}
 
