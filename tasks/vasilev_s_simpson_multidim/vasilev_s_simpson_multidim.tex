@@ -1,100 +1,72 @@
-\documentclass[14pt,a4paper]{extarticle}
-\renewcommand{\normalsize}{\fontsize{14pt}{16.8pt}\selectfont}
-\usepackage[T2A]{fontenc}
+\documentclass[a4paper,12pt]{article}
 \usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
 \usepackage[russian]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
 \usepackage{geometry}
-\usepackage{setspace}
-\usepackage{titlesec}
-\usepackage{indentfirst}
-\usepackage{amsmath}
 \usepackage{graphicx}
 \usepackage{float}
-\usepackage{framed}
+\usepackage{booktabs}
+\usepackage{titlesec}
+\usepackage{url}
 \usepackage{listings}
 \usepackage{xcolor}
+\hypersetup{hidelinks}
+\usepackage{siunitx}
+\usepackage{hyperref}
 \usepackage{tabularx}
-\usepackage{booktabs}
-\usepackage{multirow}
 
-\geometry{
-  a4paper,
-  left=30mm,
-  right=15mm,
-  top=20mm,
-  bottom=20mm
+\geometry{top=2cm, bottom=2cm, left=2cm, right=2cm}
+
+\sisetup{
+output-decimal-marker={,},
+group-digits = false
 }
-
-\titleformat{\section}[block]
-  {\normalfont\fontsize{14}{16}\bfseries\centering}
-  {\thesection.}{0.5em}{}
-\titleformat{\subsection}[block]
-  {\normalfont\fontsize{14}{16}\bfseries\filcenter}
-  {\thesubsection.}{0.5em}{}
-\titleformat{\subsubsection}[block]
-  {\normalfont\fontsize{14}{16}\bfseries\filcenter}
-  {\thesubsubsection.}{0.5em}{}
-
-\lstset{
-    basicstyle=\ttfamily\small,
-    keywordstyle=\color{blue},
-    commentstyle=\color{green},
-    stringstyle=\color{red},
-    frame=single,
-    tabsize=4,
-    showstringspaces=false,
-    breaklines=true
-}
-
-\sloppy
-
-\onehalfspacing
 
 \setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0pt}
+
+\titleformat{\section}{\normalfont\Large\bfseries\centering}{\thesection.}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection.}{1em}{}
+
+\lstset{
+	basicstyle=\ttfamily\small,
+	keywordstyle=\color{blue},
+	commentstyle=\color{green},
+	stringstyle=\color{red},
+	frame=single,
+	tabsize=4,
+	showstringspaces=false,
+	breaklines=true
+}
+
+\hypersetup{hidelinks}
 
 \begin{document}
 
 \begin{titlepage}
 \begin{center}
-
-\onehalfspacing
-
-\begin{center}
-    \textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\
-    Федеральное государственное автономное образовательное учреждение высшего образования \\
-    «Национальный исследовательский Нижегородский университет им. Н.И. Лобачевского» (ННГУ) \\
-    Институт информационных технологий, математики и механики
-\end{center}
-
-\vspace{4cm}
-
-\begin{center}
-    \textbf{ОТЧЕТ ПО ПРАКТИЧЕСКИМ РАБОТАМ} \vspace{0.5cm}\\
-    по курсу «ПАРАЛЛЕЛЬНОЕ ПРОГРАММИРОВАНИЕ» \vspace{0.5cm}\\
-    \textit{Задача: Вычисление многомерных интегралов с использованием многошаговой схемы (метод Симпсона)}
-\end{center}
-
-\vspace{4cm}
-
+\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\[0.5cm]
+\textbf{Федеральное государственное автономное образовательное учреждение высшего образования} \\[0.5cm]
+\textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»} \\[0.5cm]
+Институт информационных технологий, математики и механики \\
+\vfill
+{\Large
+\textbf{Отчёт по лабораторной работе на тему:} \\[0.5cm]
+\textbf{ Вычисление многомерных интегралов с использованием многошаговой схемы. Метод Симпсона} \\
+}
+\vfill
 \begin{flushright}
-    \textbf{ВЫПОЛНИЛ:} \\ 
-    Студент 3 курса 
-    группы 3822Б1ПР1 \\ 
-    Васильев С.А. \\
-
-    \vspace{1cm}
-
-    \textbf{ПРОВЕРИЛИ:} \\ 
-    Нестеров А.Ю. \\ 
-    Оболенский А.А.
-\end{flushright}
-
+Выполнил: студент группы 3822Б1ПР1 \\
+Васильев Сергей \\
 \vspace{1cm}
-
-\begin{center}
-    Нижний Новгород 2025\newpage
-\end{center}
-
+Преподаватель: \\
+Сысоев А.В., доцент, кандидат технических наук \\
+\end{flushright}
+\vfill
+Нижний Новгород \\
+2025
 \end{center}
 \end{titlepage}
 
