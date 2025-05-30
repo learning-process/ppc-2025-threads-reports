@@ -1,0 +1,197 @@
+\documentclass[12pt]{article}
+\usepackage[russian]{babel}
+\usepackage{graphicx} 
+\usepackage{times}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\lstdefinestyle{mystyle}{
+    keywordstyle=\color{purple},   
+    numberstyle=\tiny\color{gray},   
+    stringstyle=\color{green},    
+    basicstyle=\ttfamily\footnotesize, 
+    breakatwhitespace=false, 
+    breaklines=true,  
+    captionpos=b,   
+    keepspaces=true,  
+    numbers=left,      
+    showspaces=false,  
+    showstringspaces=false,   
+    tabsize=2          
+}
+
+\title{YasakovaSparseMatrixReport}
+\author{Ясакова Татьяна}
+\date{Май 2025}
+
+\begin{document}
+\begin{titlepage}
+\begin{center}
+\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\
+\textbf{Федеральное государственное автономное образовательное учреждение высшего образования \\ «Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»} \\
+Институт информационных технологий, математики и механики \\
+\vspace{3cm}
+{\Large
+\textbf{Отчёт по лабораторной работе:} \\[0.5cm]
+\textbf{"Умножение разреженных матриц. Элементы комплексного типа. Формат хранения матрицы – строковый (CRS)"} \\
+}
+\vspace{2cm}
+\begin{flushright}
+\textbf{Выполнила:} студентка группы 3822Б1ФИ2\\
+Ясакова Татьяна \\
+\vspace{0.5cm}
+\textbf{Преподаватель:} \\
+доцент кафедры ВВСП, к.т.н \\ Сысоев А.В.
+\end{flushright}
+\vspace{2.5cm}
+Нижний Новгород \\
+2025
+\end{center}
+\end{titlepage}
+
+\begin{center}
+    \section*{Введение}
+\end{center}
+\textbf{Разреженная матрица} — матрица, в которой большинство элементов равны нулю. Такие матрицы широко используются в научных вычислениях, машинном обучении, обработке графиков и других областях. Эффективная работа с разреженными матрицами требует специальных форматов хранения и алгоритмов обработки.
+
+В данной работе рассматривается умножение разреженных матриц с элементами типа \texttt{complex<double>} в формате CRS (Compressed Row Storage). Этот формат эффективен для хранения и обработки матриц с малым количеством ненулевых элементов, так как позволяет значительно сократить объем используемой памяти и ускорить вычисления.
+
+\newpage
+\begin{center}
+    \section*{Постановка задачи}
+\end{center}
+Необходимо реализовать алгоритм умножения двух разреженных матриц в формате CRS с поддержкой комплексных чисел. Основные этапы решения задачи:
+\begin{enumerate}
+    \item Реализовать структуру данных для хранения разреженной матрицы в формате CRS.
+    \item Разработать алгоритм умножения разреженных матриц.
+    \item Реализовать последовательную и параллельные версии алгоритма с использованием:
+    \begin{itemize}
+        \item OpenMP
+        \item TBB (Threading Building Blocks)
+        \item STL (std::thread)
+        \item MPI (Message Passing Interface)
+    \end{itemize}
+    \item Провести тестирование и сравнение производительности реализаций.
+\end{enumerate}
+
+\newpage
+\begin{center}
+    \section*{Описание алгоритма}
+\end{center}
+
+Формат CRS (Compressed Row Storage) представляет разреженную матрицу тремя массивами:
+\begin{itemize}
+    \item \texttt{data} — ненулевые элементы матрицы.
+    \item \texttt{columnIndices} — индексы столбцов для каждого элемента.
+    \item \texttt{rowPointers} — указатели на начало каждой строки в массивах \texttt{data} и \texttt{columnIndices}.
+\end{itemize}
+
+Пример матрицы:
+\[
+A = \begin{pmatrix}
+1 & 0 & 0 \\
+0 & 2 & 3 \\
+0 & 0 & 4
+\end{pmatrix}
+\]
+В формате CRS:
+\begin{itemize}
+    \item \texttt{data} = [1, 2, 3, 4]
+    \item \texttt{columnIndices} = [0, 1, 2, 2]
+    \item \texttt{rowPointers} = [0, 1, 3, 4]
+\end{itemize}
+
+Алгоритм умножения матриц в формате CRS включает следующие шаги:
+\begin{enumerate}
+    \item Проверка совместимости размеров матриц.
+    \item Итерация по строкам первой матрицы и столбцам второй матрицы.
+    \item Поиск совпадающих элементов для вычисления скалярного произведения строки и столбца.
+    \item Запись результата в результирующую матрицу.
+\end{enumerate}
+
+Сложность алгоритма зависит от количества ненулевых элементов и структуры матриц.
+
+\newpage
+\begin{center}
+    \section*{Описание схемы параллельного алгоритма}
+\end{center}
+
+Параллельные версии алгоритма реализованы с использованием различных технологий:
+
+\subsection*{OpenMP}
+Используются директивы \texttt{\#pragma omp parallel} и \texttt{\#pragma omp for} для распределения итераций цикла умножения матриц между потоками. Каждый поток сохраняет результаты в локальный буфер, который затем объединяется в общий результат.
+
+\subsection*{TBB}
+Применяется \texttt{tbb::parallel\_for} для параллельного выполнения цикла. Используется \texttt{tbb::blocked\_range} для разделения работы между потоками. Результаты также собираются в общую структуру.
+
+\subsection*{STL}
+Реализация использует \texttt{std::thread} для создания потоков. Работа разделяется между потоками вручную, каждый поток обрабатывает свой диапазон строк матрицы.
+
+\subsection*{MPI}
+Используется \texttt{boost::mpi} для распределения данных между процессами. Каждый процесс вычисляет свою часть результата, который затем собирается на главном процессе с помощью \texttt{boost::mpi::gatherv}.
+
+\newpage
+\begin{center}
+    \section*{Результаты экспериментов}
+\end{center}
+Тестирование проводилось на матрицах размерности 700x700 с плотностью заполнения 1/6. Результаты представлены в таблице:
+
+\begin{tabular}{|c|c|c|c|c|}
+    \hline
+    Технология & 1 поток & 2 потока & 4 потока & 8 потоков \\ \hline
+    Последовательная & 0.57 & - & - & - \\ \hline
+    OpenMP & 1.02 & 0.57 & 0.37 & 0.29 \\ \hline
+    TBB & 1.03 & 0.60 & 0.41 & 0.29 \\ \hline
+    STL & 1.03 & 0.59 & 0.40 & 0.30 \\ \hline
+    MPI + STL & 1.18 & 0.74 & 0.48 & 0.39 \\ \hline
+\end{tabular}
+
+\vspace{0.5cm}
+\textbf{Выводы:}
+\begin{itemize}
+    \item Параллельные реализации показывают значительное ускорение по сравнению с последовательной версией.
+    \item Наилучшие результаты достигаются при использовании 4-8 потоков.
+    \item OpenMP демонстрирует наиболее стабильную производительность.
+\end{itemize}
+
+\newpage
+\begin{center}
+    \section*{Заключение}
+\end{center}
+В ходе работы были реализованы последовательная и параллельные версии алгоритма умножения разреженных матриц в формате CRS. Параллельные реализации показали значительное ускорение, особенно при использовании OpenMP и TBB. Результаты подтверждают эффективность применения параллельных вычислений для обработки разреженных матриц.
+
+\newpage
+\begin{center}
+    \section*{Приложение}
+\end{center}
+
+\subsection*{Пример кода: структура CRS}
+\begin{lstlisting}[language=C++]
+struct SparseMatrixCRS {
+  std::vector<Complex> data;
+  std::vector<int> columnIndices;
+  std::vector<int> rowPointers;
+  int rowCount;
+  int columnCount;
+
+  void InsertElement(int row, Complex value, int col) {
+    for (int j = rowPointers[row]; j < rowPointers[row + 1]; ++j) {
+      if (columnIndices[j] == col) {
+        data[j] += value;
+        return;
+      }
+    }
+    columnIndices.emplace_back(col);
+    data.emplace_back(value);
+    for (int i = row + 1; i <= rowCount; ++i) {
+      rowPointers[i]++;
+    }
+  }
+};
+\end{lstlisting}
+
+\end{document}
