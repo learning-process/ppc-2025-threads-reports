@@ -1,0 +1,324 @@
+\documentclass[a4paper,14pt]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstset{
+    language=C++,
+    basicstyle=\ttfamily\footnotesize,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    breaklines=true,
+    frame=single,
+    tabsize=4
+}
+
+
+\begin{document}
+\begin{titlepage}
+    \centering
+    \large
+    Министерство науки и высшего образования Российской Федерации\\[0.5cm]
+    Федеральное государственное автономное образовательное учреждение высшего образования\\[0.5cm]
+    \textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»}\\
+    (ННГУ)\\[1cm]
+    Институт информационных технологий, математики и механики\\[0.5cm]
+    Направление подготовки: \textbf{«Программная инженерия»}\\[1.5cm]
+
+    \vfill
+    {\LARGE \textbf{Отчет по лабораторным работам }}\\[0.5cm]
+    {\Large курса «Параллельное программирование» }\\[0.5cm]
+    {\Large по задаче}\\[0.5cm]
+    {\LARGE \textbf{«Маркировка компонент на бинарном изображении»}}\\[0.5cm]
+    {\Large \textbf{Вариант №29}}\\[2.5cm]
+
+    \hfill\parbox{0.5\textwidth}{
+        \textbf{Выполнил:} \\
+        студент группы 3822Б1ПР1 \\
+        \textbf{Зайцев Артём}
+    }\\[0.5cm]
+
+    \hfill\parbox{0.5\textwidth}{
+        \textbf{Преподаватель:} \\
+        Сысоев А.В.
+
+    }\\[2cm]
+    
+    \vfill
+    { Нижний Новгород } \\
+    { 2025 }
+\end{titlepage}
+
+\section{Введение}
+
+Задача маркировки связных компонент (Connected Components Labeling) - фундаментальная операция в обработке изображений.
+
+Базовый алгоритм маркировки:
+\begin{enumerate}
+    \item Первый проход:
+    \begin{itemize}
+        \item[-] Сканирование изображения построчно
+        \item[-] Назначение временных меток
+        \item[-] Запись эквивалентностей
+    \end{itemize}
+    \item Второй проход:
+    \begin{itemize}
+        \item[-] Разрешение эквивалентностей
+        \item[-] Присвоение окончательных меток
+    \end{itemize}
+\end{enumerate}
+
+Для правильной обработки эквивалентностей используется Union-Find структура данных - DisjointSet. Она реализует логарифмически-сложный поиск элемента по нескольким множествам и логарифмическое объединение множеств в одно. 
+\begin{lstlisting}[caption=Disjoint Set (система непересекающихся множеств)]
+template <typename T>
+class DisjointSet {
+  std::vector<T> rank_, size_, parent_;
+
+ public:
+  DisjointSet(T n = 10) {
+    rank_.resize(n + 1, 0);
+    size_.resize(n + 1, 1);
+    for (unsigned long long i = 0; i <= n; i++) {
+      parent_.push_back(i);
+    }
+  }
+
+  T FindParent(T n) {
+    if (parent_[n] == n) return n;
+    return parent_[n] = FindParent(parent_[n]);
+  }
+
+  void UnionRank(T n1, T n2) {
+    T ulp_u = FindParent(n1);
+    T ulp_v = FindParent(n2);
+    if (ulp_u == ulp_v) return;
+    
+    if (rank_[ulp_u] < rank_[ulp_v]) {
+      parent_[ulp_u] = parent_[ulp_v];
+    } else {
+      parent_[ulp_v] = parent_[ulp_u];
+      if (rank_[ulp_u] == rank_[ulp_v]) rank_[ulp_v]++;
+    }
+  }
+};
+\end{lstlisting}
+
+\section{ Последовательная версия }
+В последовательной версии реализован наивный двухпроходный алгоритм с линейным пересчетом меток. Основная часть алгоритма, требующая внимания - первый растровый проход, представлена ниже:
+
+\begin{lstlisting}[caption=Основная логика последовательной версии]
+void LabelingRasterScan(std::map<std::uint16_t, std::set<std::uint16_t>>& eqs,
+                       std::uint16_t& current_label) {
+  for (uint32_t i = 0; i < image_.size(); i++) {
+    if (image_[i] == 0) continue;
+    
+    std::vector<std::uint16_t> neighbours;
+    for (int shift = 0; shift < 4; shift++) {
+      long x = ((long)i % width_) + (shift % 3 - 1);
+      long y = ((long)i / width_) + (shift / 3 - 1);
+      long neighbour_index = x + (y * width_);
+      if (x >= 0 && x < (long)width_ && y >= 0) {
+        if (labels_[neighbour_index] != 0) {
+          neighbours.push_back(labels_[neighbour_index]);
+        }
+      }
+    }
+
+    if (neighbours.empty()) {
+      labels_[i] = ++current_label;
+      eqs[current_label].insert(current_label);
+    } else {
+      labels_[i] = *std::min_element(neighbours.begin(), neighbours.end());
+      for (auto& first : neighbours) {
+        for (auto& second : neighbours) {
+          eqs[first].insert(second);
+        }
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+Когда все временные метки посчитаны, алгоритм генерирует DisjointSet из списка эквивалентностей, чтобы разделить метки на множества эквивалентных меток:
+
+\begin{lstlisting}[caption=Основная логика последовательной версии]
+void SecondRasterScan() {
+  DisjointSet<std::uint16_t> disjoint_labels(current_label + 1);
+  for (auto& statement : eqs) {
+    for (const auto& equal : statement.second) {
+      disjoint_labels.UnionRank(statement.first, equal);
+    }
+  }
+
+  replacements.resize(current_label + 1);
+  std::set<std::uint16_t> unique_labels;
+
+  for (std::uint16_t tmp_label = 1; tmp_label < current_label + 1; tmp_label++) {
+    replacements[tmp_label] = disjoint_labels.FindParent(tmp_label);
+    unique_labels.insert(replacements[tmp_label]);
+  }
+
+  std::uint16_t true_label = 0;
+  std::map<std::uint16_t, std::uint16_t> reps;
+  for (const auto& it : unique_labels) {
+    reps[it] = ++true_label;
+  }
+
+  for (uint32_t i = 0; i < replacements.size(); i++) {
+    replacements[i] = reps[replacements[i]];
+  }
+
+  for (uint32_t i = 0; i < size_; i++) {
+    labels_[i] = replacements[labels_[i]];
+  }
+}
+\end{lstlisting}
+
+После проделанных действий, мы получаем flat-массив, соответствующий искомой матрице меток.
+
+Характеристики:
+\begin{itemize}
+    \item Среднее время выполнения: 1112 мс
+    \item Простота реализации и отладки
+    \item Линейное потребление памяти
+\end{itemize}
+Замечание: здесь и далее среднее время выполнения приводится как среднее время однократного исполнения кода для входных данных объемом в 2 млн пикселей среди десяти тысяч повторений запуска. Замеры производились при запуске программы на 16 потоках и 2 процессах (где присутствует MPI)
+
+\section{Параллельные реализации}
+Все представленные параллельные реализации выполнены на основе последовательной версии. Повторяющиеся или незначительные участки кода в отчете указаны не будут.
+\subsection{OMP-версия}
+Ключевое отличие OMP-версии показано в листинге 4:
+
+\begin{lstlisting}[caption=Ключевые особенности OMP версии]
+#pragma omp declare reduction(merge:Vec16t : std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), [](const auto& x, const auto& y){return std::max(x, y);})) initializer(omp_priv = decltype(omp_orig)(omp_orig.size()))
+void Labeler::LabelingRasterScan(Equivalency& eqs_list, Vec16t& current_labels_list) {
+#ifndef _WIN32
+#pragma omp parallel if (static_cast<int>(height_) >= 2 * ppc::util::GetPPCNumThreads()) reduction(merge : lbls)
+#else
+#pragma omp parallel if (static_cast<int>(height_) >= 2 * ppc::util::GetPPCNumThreads())
+#endif
+  {
+    std::uint8_t id = omp_get_thread_num();
+    std::uint32_t i_begin = id * chunk_;
+    std::uint32_t i_end = i_begin + chunk_;
+    i_end = std::min(i_end, size_);
+
+    <sequential version FirstRasterScan>
+    }
+    
+  labels_ = std::move(lbls);
+\end{lstlisting}
+Можно заметить, что перед началом маркировки компонент исходное изображение делится на несколько других. После чего, метки параллельно считаются для каждого изображения. Затем они объединяются в единое изображение, величины меток сдвигаются в соответствии с наибольшей меткой предыдущего изображения из разбиения, после чего применяется второе сканирование: эквивалентности преобразуются в непересекающиеся множества эквивалентных меток и унифицируются на конечной матрице.
+
+Особенности:
+\begin{itemize}
+    \item Разделение изображения на горизонтальные полосы
+    \item Локальные хранилища эквивалентностей и меток для каждого потока
+    \item Среднее время выполнения: 805 мс
+\end{itemize}
+
+\subsection{TBB-версия}
+Реализация с использованием Intel Threading Building Blocks с точки зрения алгоритма распараллеливания ничем не отличается от версии OMP. Параллельный участок кода указан ниже.
+
+\begin{lstlisting}[caption=Параллельная обработка в TBB]
+oneapi::tbb::task_group tg;
+for (int i = 0; i < ppc::util::GetPPCNumThreads(); i++) {
+  tg.run([i, &lbls, &eqs, &ordinals, this] {
+    FirstScan(std::ref(lbls[i]), std::ref(eqs[i]), std::ref(ordinals[i]), width_);
+  });
+}
+tg.wait();
+\end{lstlisting}
+
+Функция FirstScan полный аналог функции LabelingRasterScan из вышерассмотренных версий программы
+
+Преимущества:
+\begin{itemize}
+    \item Более эффективное планирование по сравнению с OMP
+    \item Среднее время выполнения: 835 мс
+\end{itemize}
+
+\subsection{STL-версия}
+Реализация с использованием средств стандартной библиотеки аналогична TBB и OMP:
+
+\begin{lstlisting}[caption=Параллелизация через std::thread]
+std::vector<std::thread> threads_list;
+for (int i = 0; i < ppc::util::GetPPCNumThreads(); i++) {
+  threads_list.emplace_back(FirstScan, std::ref(lbls[i]), 
+                          std::ref(eqs[i]), std::ref(ordinals[i]), width_);
+}
+std::ranges::for_each(threads_list, [](auto& thread) { thread.join(); });
+\end{lstlisting}
+
+Особенности:
+\begin{itemize}
+    \item Высокие накладные расходы на управление потоками
+    \item Среднее время выполнения: 1003 мс
+\end{itemize}
+
+\subsection{Гибридная MPI+TBB версия}
+Комбинированная реализация отличается лишь двойный разделением: сначала по процессам, затем по потоком. В остальном код соответствует предыдущим программам: 
+
+\begin{lstlisting}[caption=Ключевые компоненты MPI+TBB]
+boost::mpi::scatterv(world_, image_.data(), counts_, displs_, 
+                    local_image.data(), local_height * width, 0);
+
+oneapi::tbb::parallel_for(HardRange(size_, chunk_), 
+                         FirstScan(image_, labels_, ordinals, width_, height_));
+
+boost::mpi::gatherv(world_, labels_.data(), static_cast<int>(labels_.size()),
+                   labels.data(), counts_, displs_, 0);
+\end{lstlisting}
+
+Особенности:
+\begin{itemize}
+    \item MPI для распределения работы между процессами
+    \item TBB для параллельной обработки внутри потоков
+    \item Сложная логика объединения результатов
+    \item Среднее время выполнения: 623 мс
+\end{itemize}
+
+\section{Сравнение производительности}
+
+\begin{table}[h]
+\centering
+\caption{Сравнение производительности реализаций}
+\label{tab:performance}
+\begin{tabular}{lcc}
+\toprule
+Версия & Время (мс) & Ускорение \\
+\midrule
+Seq & 1112 & 1.00x \\
+OMP & 805 & 1.98x \\
+TBB & 835 & 1.33x \\
+STL & 1003 & 1.08x \\
+MPI+TBB & 623 & 1.78x \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Ключевые наблюдения:
+\begin{itemize}
+    \item TBB показывает лучшую производительность на двух узлах
+    \item Гибридный подход MPI+TBB дает максимальное ускорение
+    \item OMP версия наиболее эффективна за счёт встроенной оптимизации для циклов
+\end{itemize}
+
+\section{Вывод}
+В ходе работы были реализованы и протестированы различные версии алгоритма маркировки связных компонент. Основные выводы:
+
+\begin{itemize}
+    \item Параллельные версии обеспечивают ускорение от 10\% до 40\%
+    \item Для задач на двух узлах оптимальна TBB-реализация
+\end{itemize}
+
+
+\end{document}
