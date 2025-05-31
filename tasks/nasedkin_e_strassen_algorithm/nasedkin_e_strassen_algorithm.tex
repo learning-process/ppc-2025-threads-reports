@@ -1,0 +1,692 @@
+\documentclass[14pt,a4paper]{extarticle}
+\renewcommand{\normalsize}{\fontsize{14pt}{16.8pt}\selectfont}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{framed}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
+
+\geometry{
+  a4paper,
+  left=30mm,
+  right=15mm,
+  top=20mm,
+  bottom=20mm
+}
+
+\titleformat{\section}[block]
+  {\normalfont\fontsize{14}{16}\bfseries\centering}
+  {\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]
+  {\normalfont\fontsize{14}{16}\bfseries\filcenter}
+  {\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}[block]
+  {\normalfont\fontsize{14}{16}\bfseries\filcenter}
+  {\thesubsubsection.}{0.5em}{}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green},
+    stringstyle=\color{red},
+    frame=single,
+    tabsize=4,
+    showstringspaces=false,
+    breaklines=true
+}
+
+\sloppy
+
+\onehalfspacing
+
+\setlength{\parindent}{1.25cm}
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+
+\onehalfspacing
+
+\begin{center}
+    \textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\
+    Федеральное государственное автономное образовательное учреждение высшего образования \\
+    «Национальный исследовательский Нижегородский университет им. Н.И. Лобачевского» (ННГУ) \\
+    Институт информационных технологий, математики и механики
+\end{center}
+
+\vspace{4cm}
+
+\begin{center}
+    \textbf{ОТЧЕТ ПО ПРАКТИЧЕСКИМ РАБОТАМ} \vspace{0.5cm} \\
+    по курсу «ПАРАЛЛЕЛЬНОЕ ПРОГРАММИРОВАНИЕ» \vspace{0.5cm} \\
+    \textit{Задача: Умножение матриц с использованием алгоритма Штрассена}
+\end{center}
+
+\vspace{4cm}
+
+\begin{flushright}
+    \textbf{ВЫПОЛНИЛ:} \\ 
+    Студент
+    группы 3822Б1ПР3 \\ 
+    Наседкин Е.Д. \\ 
+\end{flushright}
+
+\vspace{1cm}
+
+\begin{center}
+    Нижний Новгород \\
+    2025 \newpage
+\end{center}
+
+\end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+
+Умножение матриц является одной из фундаментальных операций в вычислительной математике, используемой в различных областях, таких как обработка сигналов, машинное обучение, компьютерная графика и решение систем линейных уравнений. Стандартный алгоритм умножения матриц имеет вычислительную сложность \(O(n^3)\), что делает его неэффективным для матриц большого размера. Алгоритм Штрассена, предложенный Фолькером Штрассеном в 1969 году, позволяет снизить сложность до \(O(n^{\log_2 7})\), что делает его более эффективным для больших матриц.
+
+Целью данной работы является реализация и исследование алгоритма Штрассена для умножения матриц с использованием различных технологий параллельного программирования.
+
+\section{Постановка задачи}
+
+Целью практической работы является разработка и экспериментальное исследование алгоритма Штрассена для умножения матриц. Задача включает реализацию последовательной версии алгоритма и его параллельных версий с использованием различных технологий параллельного программирования.
+
+В рамках работы необходимо:
+
+\begin{itemize}
+    \item Реализовать последовательный алгоритм Штрассена для умножения квадратных матриц.
+    \item Разработать параллельные версии алгоритма с использованием следующих технологий:
+    \begin{enumerate}
+        \item OpenMP;
+        \item Intel Threading Building Blocks (TBB);
+        \item Стандартная библиотека потоков C++ (STL threads);
+        \item MPI с вложенным использованием STL threads.
+    \end{enumerate}
+    \item Провести тестирование и сравнение различных реализаций по времени выполнения и корректности результатов.
+\end{itemize}
+
+Результатом работы должно стать сравнение производительности реализованных версий и выводы об эффективности применения различных технологий параллельного программирования в задаче умножения матриц.
+
+\section{Описание алгоритма}
+
+Алгоритм Штрассена основан на рекурсивном разбиении матриц на четыре подматрицы и выполнении семи умножений вместо восьми, как в стандартном алгоритме. Это достигается за счёт использования специальных комбинаций сложения и вычитания подматриц.
+
+Основные этапы алгоритма:
+
+\begin{enumerate}
+    \item Входные матрицы \(A\) и \(B\) размером \(n \times n\) разбиваются на четыре подматрицы размером \(\frac{n}{2} \times \frac{n}{2}\):
+    \[
+    A = \begin{bmatrix} A_{11} & A_{12} \\ A_{21} & A_{22} \end{bmatrix}, \quad
+    B = \begin{bmatrix} B_{11} & B_{12} \\ B_{21} & B_{22} \end{bmatrix}.
+    \]
+    \item Вычисляются семь промежуточных произведений:
+    \[
+    \begin{aligned}
+        P_1 &= (A_{11} + A_{22}) \cdot (B_{11} + B_{22}), \\
+        P_2 &= (A_{21} + A_{22}) \cdot B_{11}, \\
+        P_3 &= A_{11} \cdot (B_{12} - B_{22}), \\
+        P_4 &= A_{22} \cdot (B_{21} - B_{11}), \\
+        P_5 &= (A_{11} + A_{12}) \cdot B_{22}, \\
+        P_6 &= (A_{21} - A_{11}) \cdot (B_{11} + B_{12}), \\
+        P_7 &= (A_{12} - A_{22}) \cdot (B_{21} + B_{22}).
+    \end{aligned}
+    \]
+    \item Результирующая матрица \(C\) собирается из подматриц:
+    \[
+    \begin{aligned}
+        C_{11} &= P_1 + P_4 - P_5 + P_7, \\
+        C_{12} &= P_3 + P_5, \\
+        C_{21} &= P_2 + P_4, \\
+        C_{22} &= P_1 + P_3 - P_2 + P_6.
+    \end{aligned}
+    \]
+    \item Если размер матрицы не является степенью двойки, матрицы дополняются нулями до ближайшей степени двойки, а после вычислений результирующая матрица обрезается до исходного размера.
+    \item Для малых матриц (размером менее или равным 32) используется стандартное умножение матриц для оптимизации производительности.
+\end{enumerate}
+
+Алгоритм рекурсивно применяется к подматрицам, пока их размер не станет меньше порогового значения, после чего используется стандартное умножение.
+
+\section{Описание схемы параллельного алгоритма}
+
+Основная идея параллелизации заключается в следующем:
+
+\begin{itemize}
+    \item Разбиение матриц на подматрицы и вычисление промежуточных произведений распределяются между потоками или процессами.
+    \item Для технологий с общей памятью (OpenMP, TBB, STL threads) параллелизация осуществляется на уровне отдельных умножений подматриц.
+    \item Для распределённых систем (MPI) задачи распределяются между процессами, с учётом необходимости передачи данных между узлами.
+\end{itemize}
+
+Параллельные версии алгоритма используют модель параллелизма по задачам, где каждая задача соответствует вычислению одного из семи промежуточных произведений.
+
+\section{Описание OpenMP-версии алгоритма}
+
+Технология OpenMP позволяет распараллеливать вычисления с помощью директив компилятора. Основной акцент сделан на распараллеливание операций сложения, вычитания и умножения подматриц.
+
+Ключевые особенности реализации:
+
+\begin{itemize}
+    \item Параллелизация осуществляется с использованием директивы \texttt{\#pragma omp parallel for} для операций сложения и вычитания матриц, а также \texttt{\#pragma omp parallel sections} для одновременного вычисления семи промежуточных произведений (\(P_1, \ldots, P_7\)).
+    \item Разбиение матриц на подматрицы и их объединение также распараллелены с помощью \texttt{\#pragma omp parallel sections}.
+    \item Поскольку вычисления подматриц независимы, синхронизация между потоками минимальна, что снижает накладные расходы.
+    \item Для копирования входных и выходных данных используются параллельные циклы, что улучшает производительность на больших матрицах.
+\end{itemize}
+
+OpenMP обеспечивает простоту реализации и хорошую масштабируемость на системах с общей памятью, автоматически распределяя задачи между доступными потоками.
+
+\section{Описание TBB-версии алгоритма}
+
+Библиотека Intel oneAPI Threading Building Blocks (TBB) предоставляет высокоуровневые средства для организации параллелизма с автоматической балансировкой нагрузки.
+
+Ключевые особенности реализации:
+
+\begin{itemize}
+    \item Параллелизация осуществляется с помощью конструкции \texttt{tbb::parallel\_invoke}, которая распределяет вычисление семи промежуточных произведений между потоками.
+    \item TBB автоматически управляет пулом потоков, распределяя задачи для оптимального использования ресурсов.
+    \item Разбиение и объединение подматриц выполняется последовательно, так как эти операции менее вычислительно затратны по сравнению с умножением.
+\end{itemize}
+
+TBB обеспечивает гибкость и высокую производительность, особенно на многоядерных системах, благодаря динамическому распределению задач.
+
+\section{Описание STL-версии алгоритма}
+
+В данной реализации использовалась стандартная библиотека потоков C++ (STL threads) для создания низкоуровневой многопоточной версии алгоритма. Параллелизация организована вручную, с явным управлением потоками.
+
+Ключевые особенности реализации:
+
+\begin{itemize}
+    \item Число потоков определяется с помощью утилиты \texttt{ppc::util::GetPPCNumThreads()}.
+    \item Семь промежуточных произведений распределяются между потоками, создаваемыми с помощью \texttt{std::thread}.
+    \item Каждый поток выполняет задачу вычисления одного произведения, а результаты объединяются после завершения всех потоков с помощью \texttt{join()}.
+    \item Для предотвращения состояний гонки используется явное управление диапазонами задач.
+\end{itemize}
+
+STL threads предоставляют полный контроль над потоками, но требуют тщательной настройки для достижения оптимальной производительности.
+
+\section{Описание MPI-версии алгоритма}
+
+В данной версии использовалась библиотека Boost.MPI с вложенным применением STL threads для реализации распределённого параллелизма. Этот подход позволяет масштабировать вычисления на кластерные системы.
+
+Ключевые этапы реализации:
+
+\begin{itemize}
+    \item На нулевом процессе выполняется предварительная обработка входных матриц, включая их дополнение до размера, кратного степени двойки.
+    \item Входные матрицы и их размеры передаются всем процессам с помощью \texttt{boost::mpi::broadcast}.
+    \item Семь промежуточных произведений распределяются между процессами, где каждый процесс выполняет свои задачи с использованием STL threads для дополнительной параллелизации.
+    \item Результаты произведений собираются на нулевом процессе с помощью \texttt{world.recv}, после чего формируется результирующая матрица.
+    \item Синхронизация между процессами осуществляется с помощью \texttt{world.barrier()}.
+\end{itemize}
+
+Гибридный подход MPI + STL threads позволяет эффективно использовать ресурсы кластера, распределяя задачи между узлами и внутри каждого узла.
+
+\section{Анализ производительности вычислений}
+
+Для оценки производительности реализованных версий алгоритма были проведены измерения времени выполнения на матрицах размером 512x512. Тестирование включало измерение времени выполнения полной цепочки обработки (\texttt{PipelineRun}) и изолированного ядра вычислений (\texttt{TaskRun}). Все параллельные реализации тестировались с использованием 2 потоков или 2 процессов (для MPI + STL).
+
+\subsection{Сравнение производительности}
+
+Производительность оценивалась по следующим метрикам:
+\begin{itemize}
+    \item \texttt{PipelineRun} — время выполнения полной цепочки обработки (в секундах).
+    \item \texttt{TaskRun} — время выполнения основного вычислительного ядра (в секундах).
+    \item \textbf{Speedup} — коэффициент ускорения, рассчитанный как отношение времени \texttt{PipelineRun} последовательной версии к времени \texttt{PipelineRun} параллельной версии:
+    \[
+    \text{Speedup} = \frac{T_{\text{seq}}}{T_{\text{parallel}}}
+    \]
+\end{itemize}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabularx}{\textwidth}{|l|X|X|X|}
+\hline
+\textbf{Реализация} & \textbf{PipelineRun (с)} & \textbf{TaskRun (с)} & \textbf{Speedup} \\
+\hline
+TBB & 0.3213 & 0.3177 & 1.88 \\
+\hline
+OpenMP & 0.3411 & 0.3459 & 1.77 \\
+\hline
+Последовательная & 0.6040 & 0.5984 & 1.00 \\
+\hline
+STL threads & 0.5509 & 0.5433 & 1.10 \\
+\hline
+MPI + STL & 0.9746 & 0.8881 & 0.62 \\
+\hline
+\end{tabularx}
+\caption{Сравнение производительности реализаций алгоритма Штрассена}
+\end{table}
+
+\subsection{Анализ результатов}
+
+Результаты тестирования показывают, что:
+\begin{itemize}
+    \item TBB-реализация обеспечила наилучшую производительность с временем \texttt{PipelineRun} 0.3213 с и \texttt{TaskRun} 0.3177 с, что соответствует ускорению 1.88. Это обусловлено эффективным управлением потоками и динамической балансировкой нагрузки.
+    \item OpenMP-реализация близка по производительности к TBB (ускорение 1.77), благодаря простоте параллелизации и минимальной синхронизации.
+    \item Последовательная версия, как ожидалось, показала базовое время выполнения, служащее эталоном для расчёта ускорения.
+    \item STL threads дала скромное ускорение (1.10), что связано с накладными расходами на ручное управление потоками.
+    \item MPI + STL-реализация оказалась наименее эффективной (ускорение 0.62) из-за высоких затрат на коммуникацию между процессами, что делает её неподходящей для матриц размером 512x512.
+\end{itemize}
+
+Полученные данные подчёркивают преимущества технологий с общей памятью (TBB, OpenMP) для данной задачи.
+
+\section{Заключение}
+
+В ходе выполнения работы был реализован алгоритм Штрассена для умножения матриц в последовательной и параллельных версиях с использованием технологий OpenMP, TBB, STL threads и MPI. Каждая реализация была адаптирована для эффективного использования вычислительных ресурсов, будь то многоядерные процессоры или распределённые системы.
+
+Результаты тестирования подтвердили, что параллельные реализации на основе TBB и OpenMP обеспечивают значительное ускорение по сравнению с последовательной версией, особенно для матриц размером 512x512. TBB показала наилучшую производительность благодаря эффективному управлению потоками. Реализация на STL threads оказалась менее эффективной из-за ручного управления потоками, а MPI + STL threads продемонстрировала низкую производительность из-за накладных расходов на коммуникацию.
+
+Работа позволила углубить понимание методов параллельного программирования и их применения к вычислительно интенсивным задачам.
+
+\section{Список литературы}
+
+\begin{enumerate}
+    \item Штрассен В. \textit{Гауссово исключение не оптимально} // Numerische Mathematik, 1969.
+    \item Статья: \textit{Что такое OpenMP?}
+    \item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks}. — Нижний Новгород, 2007.
+    \item Статья: \textit{Технологии параллельного программирования. Message Passing Interface (MPI)}.
+\end{enumerate}
+
+\section{Приложение}
+
+В данном разделе приведены ключевые фрагменты реализации алгоритма Штрассена для умножения матриц с использованием различных технологий параллельного программирования. Представлены только основные вычислительные фрагменты (функции \texttt{StrassenMultiply} или эквивалентные).
+
+\subsection{Последовательная версия}
+\begin{lstlisting}[language=C++]
+std::vector<double> StrassenSequential::StrassenMultiply(
+    const std::vector<double>& a, const std::vector<double>& b, int size) {
+  if (size <= 32) {
+    return StandardMultiply(a, b, size);
+  }
+
+  int half_size = size / 2;
+  std::vector<double> a11(half_size * half_size);
+  std::vector<double> a12(half_size * half_size);
+  std::vector<double> a21(half_size * half_size);
+  std::vector<double> a22(half_size * half_size);
+  std::vector<double> b11(half_size * half_size);
+  std::vector<double> b12(half_size * half_size);
+  std::vector<double> b21(half_size * half_size);
+  std::vector<double> b22(half_size * half_size);
+
+  SplitMatrix(a, a11, 0, 0, size);
+  SplitMatrix(a, a12, 0, half_size, size);
+  SplitMatrix(a, a21, half_size, 0, size);
+  SplitMatrix(a, a22, half_size, half_size, size);
+  SplitMatrix(b, b11, 0, 0, size);
+  SplitMatrix(b, b12, 0, half_size, size);
+  SplitMatrix(b, b21, half_size, 0, size);
+  SplitMatrix(b, b22, half_size, half_size, size);
+
+  std::vector<double> p1 =
+      StrassenMultiply(AddMatrices(a11, a22, half_size), AddMatrices(b11, b22, half_size), half_size);
+  std::vector<double> p2 = StrassenMultiply(AddMatrices(a21, a22, half_size), b11, half_size);
+  std::vector<double> p3 = StrassenMultiply(a11, SubtractMatrices(b12, b22, half_size), half_size);
+  std::vector<double> p4 = StrassenMultiply(a22, SubtractMatrices(b21, b11, half_size), half_size);
+  std::vector<double> p5 = StrassenMultiply(AddMatrices(a11, a12, half_size), b22, half_size);
+  std::vector<double> p6 =
+      StrassenMultiply(SubtractMatrices(a21, a11, half_size), AddMatrices(b11, b12, half_size), half_size);
+  std::vector<double> p7 =
+      StrassenMultiply(SubtractMatrices(a12, a22, half_size), AddMatrices(b21, b22, half_size), half_size);
+
+  std::vector<double> c11 = AddMatrices(SubtractMatrices(AddMatrices(p1, p4, half_size), p5, half_size), p7, half_size);
+  std::vector<double> c12 = AddMatrices(p3, p5, half_size);
+  std::vector<double> c21 = AddMatrices(p2, p4, half_size);
+  std::vector<double> c22 = AddMatrices(SubtractMatrices(AddMatrices(p1, p3, half_size), p2, half_size), p6, half_size);
+
+  std::vector<double> result(size * size);
+  MergeMatrix(result, c11, 0, 0, size);
+  MergeMatrix(result, c12, 0, half_size, size);
+  MergeMatrix(result, c21, half_size, 0, size);
+  MergeMatrix(result, c22, half_size, half_size, size);
+
+  return result;
+}
+\end{lstlisting}
+
+\subsection{OpenMP-версия}
+\begin{lstlisting}[language=C++]
+std::vector<double> StrassenOmp::StrassenMultiply(const std::vector<double>& a, const std::vector<double>& b, int size) {
+  if (size <= 32) {
+    return StandardMultiply(a, b, size);
+  }
+
+  int half_size = size / 2;
+  std::vector<double> a11(half_size * half_size);
+  std::vector<double> a12(half_size * half_size);
+  std::vector<double> a21(half_size * half_size);
+  std::vector<double> a22(half_size * half_size);
+  std::vector<double> b11(half_size * half_size);
+  std::vector<double> b12(half_size * half_size);
+  std::vector<double> b21(half_size * half_size);
+  std::vector<double> b22(half_size * half_size);
+
+#pragma omp parallel sections
+  {
+#pragma omp section
+    SplitMatrix(a, a11, 0, 0, size);
+#pragma omp section
+    SplitMatrix(a, a12, 0, half_size, size);
+#pragma omp section
+    SplitMatrix(a, a21, half_size, 0, size);
+#pragma omp section
+    SplitMatrix(a, a22, half_size, half_size, size));
+#pragma omp section
+    SplitMatrix(b, b11, 0, 0, size);
+#pragma omp section
+    SplitMatrix(b, b12, 0, half_size, size);
+#pragma omp section
+    SplitMatrix(b, b21, half_size, 0, size);
+#pragma omp section
+    SplitMatrix(b, b22, half_size, half_size, size);
+  }
+
+  std::vector<double> p1;
+  std::vector<double> p2;
+  std::vector<double> p3;
+  std::vector<double> p4;
+  std::vector<double> p5;
+  std::vector<double> p6;
+  std::vector<double> p7;
+
+#pragma omp parallel sections
+  {
+#pragma omp section
+    p1 = StrassenMultiply(AddMatrices(a11, a22, half_size), AddMatrices(b11, b22, half_size), half_size);
+#pragma omp section
+    p2 = StrassenMultiply(AddMatrices(a21, a22, half_size), b11, half_size);
+#pragma omp section
+    p3 = StrassenMultiply(a11, SubtractMatrices(b12, b22, half_size), half_size);
+#pragma omp section
+    p4 = StrassenMultiply(a22, SubtractMatrices(b21, b11, half_size), half_size);
+#pragma omp section
+    p5 = StrassenMultiply(AddMatrices(a11, a12, half_size), b22, half_size);
+#pragma omp section
+    p6 = StrassenMultiply(SubtractMatrices(a21, a11, half_size), AddMatrices(b11, b12, half_size), half_size);
+#pragma omp section
+    p7 = StrassenMultiply(SubtractMatrices(a12, a22, half_size), AddMatrices(b21, b22, half_size), half_size);
+  }
+
+  std::vector<double> c11 = AddMatrices(SubtractMatrices(AddMatrices(p1, p4, half_size), p5, half_size), p7, half_size);
+  std::vector<double> c12 = AddMatrices(p3, p5, half_size);
+  std::vector<double> c21 = AddMatrices(p2, p4, half_size);
+  std::vector<double> c22 = AddMatrices(SubtractMatrices(AddMatrices(p1, p3, half_size), p2, half_size), p6, half_size);
+
+  std::vector<double> result(size * size);
+#pragma omp parallel sections
+  {
+#pragma omp section
+    MergeMatrix(result, c11, 0, 0, size);
+#pragma omp section
+    MergeMatrix(result, c12, 0, half_size, size);
+#pragma omp section
+    MergeMatrix(result, c21, half_size, 0, size);
+#pragma omp section
+    MergeMatrix(result, c22, half_size, half_size, size);
+  }
+
+  return result;
+}
+\end{lstlisting}
+
+\subsection{TBB-версия}
+\begin{lstlisting}[language=C++]
+std::vector<double> StrassenTbb::StrassenMultiply(const std::vector<double>& a, const std::vector<double>& b, int size) {
+  if (size <= 32) {
+    return StandardMultiply(a, b, size);
+  }
+
+  int half_size = size / 2;
+  int half_size_squared = half_size * half_size;
+
+  std::vector<double> a11(half_size_squared);
+  std::vector<double> a12(half_size_squared);
+  std::vector<double> a21(half_size_squared);
+  std::vector<double> a22(half_size_squared);
+  std::vector<double> b11(half_size_squared);
+  std::vector<double> b12(half_size_squared);
+  std::vector<double> b21(half_size_squared);
+  std::vector<double> b22(half_size_squared);
+
+  SplitMatrix(a, a11, 0, 0, size);
+  SplitMatrix(a, a12, 0, half_size, size);
+  SplitMatrix(a, a21, half_size, 0, size);
+  SplitMatrix(a, a22, half_size, half_size, size);
+  SplitMatrix(b, b11, 0, 0, size);
+  SplitMatrix(b, b12, 0, half_size, size);
+  SplitMatrix(b, b21, half_size, 0, size);
+  SplitMatrix(b, b22, half_size, half_size, size);
+
+  std::vector<double> p1(half_size_squared);
+  std::vector<double> p2(half_size_squared);
+  std::vector<double> p3(half_size_squared);
+  std::vector<double> p4(half_size_squared);
+  std::vector<double> p5(half_size_squared);
+  std::vector<double> p6(half_size_squared);
+  std::vector<double> p7(half_size_squared);
+
+  tbb::parallel_invoke(
+      [&]() { p1 = StrassenMultiply(AddMatrices(a11, a22, half_size), AddMatrices(b11, b22, half_size), half_size); },
+      [&]() { p2 = StrassenMultiply(AddMatrices(a21, a22, half_size), b11, half_size); },
+      [&]() { p3 = StrassenMultiply(a11, SubtractMatrices(b12, b22, half_size), half_size); },
+      [&]() { p4 = StrassenMultiply(a22, SubtractMatrices(b21, b11, half_size), half_size); },
+      [&]() { p5 = StrassenMultiply(AddMatrices(a11, a12, half_size), b22, half_size); },
+      [&]() {
+        p6 = StrassenMultiply(SubtractMatrices(a21, a11, half_size), AddMatrices(b11, b12, half_size), half_size);
+      },
+      [&]() {
+        p7 = StrassenMultiply(SubtractMatrices(a12, a22, half_size), AddMatrices(b21, b22, half_size), half_size);
+      });
+
+  std::vector<double> c11 = AddMatrices(SubtractMatrices(AddMatrices(p1, p4, half_size), p5, half_size), p7, half_size);
+  std::vector<double> c12 = AddMatrices(p3, p5, half_size);
+  std::vector<double> c21 = AddMatrices(p2, p4, half_size);
+  std::vector<double> c22 = AddMatrices(SubtractMatrices(AddMatrices(p1, p3, half_size), p2, half_size), p6, half_size);
+
+  std::vector<double> result(size * size);
+  MergeMatrix(result, c11, 0, 0, size);
+  MergeMatrix(result, c12, 0, half_size, size);
+  MergeMatrix(result, c21, half_size, 0, size);
+  MergeMatrix(result, c22, half_size, half_size, size);
+
+  return result;
+}
+\end{lstlisting}
+
+\subsection{STL (std::thread) версия}
+\begin{lstlisting}[language=C++]
+std::vector<double> StrassenStl::StrassenMultiply(const std::vector<double>& a, const std::vector<double>& b, int size,
+                                                  int num_threads) {
+  if (size <= 32) {
+    return StandardMultiply(a, b, size);
+  }
+
+  int half_size = size / 2;
+  int half_size_squared = half_size * half_size;
+
+  std::vector<double> a11(half_size_squared);
+  std::vector<double> a12(half_size_squared);
+  std::vector<double> a21(half_size_squared);
+  std::vector<double> a22(half_size_squared);
+  std::vector<double> b11(half_size_squared);
+  std::vector<double> b12(half_size_squared);
+  std::vector<double> b21(half_size_squared);
+  std::vector<double> b22(half_size_squared);
+
+  SplitMatrix(a, a11, 0, 0, size);
+  SplitMatrix(a, a12, 0, half_size, size);
+  SplitMatrix(a, a21, half_size, 0, size);
+  SplitMatrix(a, a22, half_size, half_size, size);
+  SplitMatrix(b, b11, 0, 0, size);
+  SplitMatrix(b, b12, 0, half_size, size);
+  SplitMatrix(b, b21, half_size, 0, size);
+  SplitMatrix(b, b22, half_size, half_size, size);
+
+  std::vector<double> p1(half_size_squared);
+  std::vector<double> p2(half_size_squared);
+  std::vector<double> p3(half_size_squared);
+  std::vector<double> p4(half_size_squared);
+  std::vector<double> p5(half_size_squared);
+  std::vector<double> p6(half_size_squared);
+  std::vector<double> p7(half_size_squared);
+
+  std::vector<std::function<void()>> tasks;
+  tasks.reserve(7);
+  tasks.emplace_back([&]() {
+    p1 = StrassenMultiply(AddMatrices(a11, a22, half_size), AddMatrices(b11, b22, half_size), half_size, num_threads);
+  });
+  tasks.emplace_back([&]() { p2 = StrassenMultiply(AddMatrices(a21, a22, half_size), b11, half_size, num_threads); });
+  tasks.emplace_back(
+      [&]() { p3 = StrassenMultiply(a11, SubtractMatrices(b12, b22, half_size), half_size, num_threads); });
+  tasks.emplace_back(
+      [&]() { p4 = StrassenMultiply(a22, SubtractMatrices(b21, b11, half_size), half_size, num_threads); });
+  tasks.emplace_back([&]() { p5 = StrassenMultiply(AddMatrices(a11, a12, half_size), b22, half_size, num_threads); });
+  tasks.emplace_back([&]() {
+    p6 = StrassenMultiply(SubtractMatrices(a21, a11, half_size), AddMatrices(b11, b12, half_size), half_size,
+                          num_threads);
+  });
+  tasks.emplace_back([&]() {
+    p7 = StrassenMultiply(SubtractMatrices(a12, a22, half_size), AddMatrices(b21, b22, half_size), half_size,
+                          num_threads);
+  });
+
+  std::vector<std::thread> threads;
+  threads.reserve(std::min(num_threads, static_cast<int>(tasks.size())));
+  size_t task_index = 0;
+
+  for (int i = 0; i < std::min(num_threads, static_cast<int>(tasks.size())); ++i) {
+    if (task_index < tasks.size()) {
+      threads.emplace_back(tasks[task_index]);
+      ++task_index;
+    }
+  }
+
+  while (task_index < tasks.size()) {
+    tasks[task_index]();
+    ++task_index;
+  }
+
+  for (auto& thread : threads) {
+    if (thread.joinable()) {
+      thread.join();
+    }
+  }
+
+  std::vector<double> c11 = AddMatrices(SubtractMatrices(AddMatrices(p1, p4, half_size), p5, half_size), p7, half_size);
+  std::vector<double> c12 = AddMatrices(p3, p5, half_size);
+  std::vector<double> c21 = AddMatrices(p2, p4, half_size);
+  std::vector<double> c22 = AddMatrices(SubtractMatrices(AddMatrices(p1, p3, half_size), p2, half_size), p6, half_size);
+
+  std::vector<double> result(size * size);
+  MergeMatrix(result, c11, 0, 0, size);
+  MergeMatrix(result, c12, 0, half_size, size);
+  MergeMatrix(result, c21, half_size, 0, size);
+  MergeMatrix(result, c22, half_size, half_size, size);
+
+  return result;
+}
+\end{lstlisting}
+
+\subsection{MPI + STL threads версия}
+\begin{lstlisting}[language=C++]
+void StrassenAll::StrassenWorker(int prod_idx, const std::vector<double> &a, const std::vector<double> &b, int size,
+                                 std::vector<double> &result, std::mutex &mtx) {
+  std::vector<double> local_result;
+  if (size <= 32) {
+    local_result = StandardMultiply(a, b, size);
+  } else {
+    int half_size = size / 2;
+    std::vector<double> a11(half_size * half_size);
+    std::vector<double> a12(half_size * half_size);
+    std::vector<double> a21(half_size * half_size);
+    std::vector<double> a22(half_size * half_size);
+    std::vector<double> b11(half_size * half_size);
+    std::vector<double> b12(half_size * half_size);
+    std::vector<double> b21(half_size * half_size);
+    std::vector<double> b22(half_size * half_size);
+
+    SplitMatrix(a, a11, 0, 0, size);
+    SplitMatrix(a, a12, 0, half_size, size);
+    SplitMatrix(a, a21, half_size, 0, size);
+    SplitMatrix(a, a22, half_size, half_size, size);
+    SplitMatrix(b, b11, 0, 0, size);
+    SplitMatrix(b, b12, 0, half_size, size);
+    SplitMatrix(b, b21, half_size, 0, size);
+    SplitMatrix(b, b22, half_size, half_size, size);
+
+    std::vector<std::vector<double>> inputs_a(7);
+    std::vector<std::vector<double>> inputs_b(7);
+    switch (prod_idx) {
+      case 0:
+        inputs_a[0] = AddMatrices(a11, a22, half_size);
+        inputs_b[0] = AddMatrices(b11, b22, half_size);
+        break;
+      case 1:
+        inputs_a[1] = AddMatrices(a21, a22, half_size);
+        inputs_b[1] = b11;
+        break;
+      case 2:
+        inputs_a[2] = a11;
+        inputs_b[2] = SubtractMatrices(b12, b22, half_size);
+        break;
+      case 3:
+        inputs_a[3] = a22;
+        inputs_b[3] = SubtractMatrices(b21, b11, half_size);
+        break;
+      case 4:
+        inputs_a[4] = AddMatrices(a11, a12, half_size);
+        inputs_b[4] = b22;
+        break;
+      case 5:
+        inputs_a[5] = SubtractMatrices(a21, a11, half_size);
+        inputs_b[5] = AddMatrices(b11, b12, half_size);
+        break;
+      case 6:
+        inputs_a[6] = SubtractMatrices(a12, a22, half_size);
+        inputs_b[6] = AddMatrices(b21, b22, half_size);
+        break;
+      default:
+        break;
+    }
+
+    local_result.resize(half_size * half_size);
+    if (size <= 32) {
+      local_result = StandardMultiply(inputs_a[prod_idx], inputs_b[prod_idx], half_size);
+    } else {
+      std::vector<std::thread> threads;
+      size_t num_threads = ppc::util::GetPPCNumThreads();
+      threads.reserve(num_threads);
+      std::mutex local_mtx;
+      for (size_t t = 0; t < num_threads; ++t) {
+        threads.emplace_back([&inputs_a, &inputs_b, prod_idx, half_size, &local_result, &local_mtx]() {
+          auto temp = StrassenMultiply(inputs_a[prod_idx], inputs_b[prod_idx], half_size);
+          std::lock_guard<std::mutex> lock(local_mtx);
+          local_result = temp;
+        });
+      }
+      for (auto &t : threads) {
+        t.join();
+      }
+    }
+  }
+
+  std::lock_guard<std::mutex> lock(mtx);
+  result = local_result;
+}
+\end{lstlisting}
+
+\end{document}
