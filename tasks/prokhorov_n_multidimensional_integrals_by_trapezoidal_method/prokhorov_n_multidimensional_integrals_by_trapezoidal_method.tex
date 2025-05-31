@@ -1,0 +1,520 @@
+\documentclass[14pt,a4paper]{extarticle}
+\renewcommand{\normalsize}{\fontsize{14pt}{16.8pt}\selectfont}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{framed}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage[hyphens]{url}
+\usepackage{enumitem}
+\usepackage[
+  unicode,
+  hidelinks
+]{hyperref}
+
+\geometry{
+  a4paper,
+  left=30mm,
+  right=15mm,
+  top=20mm,
+  bottom=20mm
+}
+
+% Стили заголовков
+\titleformat{\section}[block]
+  {\normalfont\fontsize{14}{16}\bfseries\centering}
+  {\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]
+  {\normalfont\fontsize{14}{16}\bfseries\filcenter}
+  {\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}[block]
+  {\normalfont\fontsize{14}{16}\bfseries\filcenter}
+  {\thesubsubsection.}{0.5em}{}
+
+% Стиль листингов
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!50!black},
+    stringstyle=\color{red},
+    frame=single,
+    tabsize=4,
+    showstringspaces=false,
+    breaklines=true,
+    postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space}
+}
+
+% Настройка списков
+\setlist[itemize]{leftmargin=*,nosep}
+\setlist[enumerate]{leftmargin=*,nosep}
+
+\sloppy
+\onehalfspacing
+\setlength{\parindent}{1.25cm}
+\setcounter{secnumdepth}{3}
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+
+\onehalfspacing
+
+\begin{center}
+    \textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\
+    Федеральное государственное автономное образовательное учреждение высшего образования \\
+    «Национальный исследовательский Нижегородский университет им. Н.И. Лобачевского» (ННГУ) \\
+    Институт информационных технологий, математики и механики
+\end{center}
+
+\vspace{4cm}
+
+\begin{center}
+    \textbf{ОТЧЕТ ПО ЛАБОРАТОРНЫМ РАБОТАМ} \vspace{0.5cm}\\
+    по курсу «ПАРАЛЛЕЛЬНОЕ ПРОГРАММИРОВАНИЕ» \vspace{0.5cm}\\
+    \textit{Задача: Вычисление многомерных интегралов методом трапеций.}
+\end{center}
+
+\vspace{4cm}
+
+\begin{flushright}
+    \textbf{ВЫПОЛНИЛ:} \\ 
+    Студент группы 3822Б1ПР4 \\ 
+    Прокоров Никита \\
+
+    \vspace{1cm}
+
+    \textbf{ПРОВЕРИЛ:} \\ 
+    доцент кафедры ВВСП, к.т.н. \\ 
+    Сысоев А.В.
+\end{flushright}
+
+\begin{center}
+    Нижний Новгород\\
+    2025
+\end{center}
+
+\end{center}
+\end{titlepage}
+
+% Оглавление
+\tableofcontents
+\newpage
+
+% Введение
+\section{Введение}
+Вычисление многомерных интегралов является важной задачей в вычислительной математике, возникающей во многих областях науки и техники. В случаях, когда аналитическое решение невозможно получить, применяются численные методы. Метод трапеций представляет собой один из базовых подходов к численному интегрированию, основанный на аппроксимации подынтегральной функции кусочно-линейными отрезками.
+
+Хотя метод трапеций проще в реализации по сравнению с более точными методами (например, методом Симпсона), его вычислительная сложность экспоненциально возрастает с увеличением размерности задачи. Это делает актуальным разработку эффективных параллельных реализаций алгоритма для современных многопроцессорных систем.
+
+В данной работе рассматриваются последовательная и параллельные реализации метода трапеций для вычисления многомерных интегралов с использованием технологий OpenMP, Intel TBB, STL threads и гибридного подхода MPI + OpenMP. Проводится сравнительный анализ производительности различных реализаций.
+\newpage
+
+% Постановка задачи
+\section{Постановка задачи}
+Целью работы является разработка и анализ эффективности различных параллельных реализаций алгоритма вычисления многомерных интегралов методом трапеций. Основные задачи:
+
+\begin{itemize}
+    \item Реализация последовательной версии алгоритма
+    \item Разработка параллельных версий с использованием:
+    \begin{enumerate}
+        \item OpenMP
+        \item Intel TBB
+        \item STL threads
+        \item Гибридного подхода MPI + OpenMP
+    \end{enumerate}
+    \item Проведение вычислительных экспериментов и сравнение производительности реализаций
+    \item Анализ масштабируемости параллельных алгоритмов
+\end{itemize}
+\newpage
+
+% Описание последовательной реализации
+\section{Описание последовательной реализации}
+Последовательный алгоритм вычисления многомерного интеграла методом трапеций реализован с использованием рекурсивного подхода. Основные этапы:
+
+\begin{enumerate}
+    \item \textbf{Инициализация параметров:} Задаются границы интегрирования $[a_i, b_i]$ для каждой переменной, количество шагов разбиения $N_i$ и подынтегральная функция $f(x_1, x_2, ..., x_n)$.
+    
+    \item \textbf{Рекурсивное вычисление:} Для каждой размерности выполняется:
+    \begin{itemize}
+        \item Вычисление шага интегрирования: $h_i = (b_i - a_i)/N_i$
+        \item Разбиение интервала на $N_i$ частей
+        \item Вычисление значения функции в узлах сетки с весами:
+        \begin{itemize}
+            \item Вес 0.5 для крайних точек
+            \item Вес 1.0 для внутренних точек
+        \end{itemize}
+    \end{itemize}
+    
+    \item \textbf{Накопление результата:} Полученные значения суммируются с учетом весов и шагов интегрирования:
+    $$I \approx \sum_{i_1=0}^{N_1} \sum_{i_2=0}^{N_2} \cdots \sum_{i_n=0}^{N_n} w_{i_1}w_{i_2}\cdots w_{i_n} f(x_{1,i_1}, x_{2,i_2}, ..., x_{n,i_n}) \cdot h_1h_2\cdots h_n$$
+\end{enumerate}
+
+Рекурсивная природа алгоритма позволяет естественным образом обрабатывать многомерные случаи, но приводит к экспоненциальному росту вычислительной сложности с увеличением размерности.
+\newpage
+
+% Описание параллельных реализаций
+\section{Описание параллельных реализаций}
+
+\subsection{Реализация с использованием OpenMP}
+OpenMP — стандарт многопоточного программирования с общей памятью, позволяющий упростить распараллеливание циклов с помощью директив компилятора.
+
+В данной версии была распараллелена внешняя петля по всем точкам многомерной сетки с использованием директивы \texttt{\#pragma omp parallel for reduction}. Особенности реализации:
+
+\begin{itemize}
+    \item Использование редукции для параллельного суммирования
+    \item Статическое распределение итераций цикла между потоками
+    \item Локальное хранение промежуточных результатов в каждом потоке
+\end{itemize}
+
+\begin{lstlisting}[language=C++]
+#pragma omp parallel for reduction(+ : sum) schedule(static)
+for (int idx = 0; idx < total_points; ++idx) {
+    // Вычисление координат точки в многомерной сетке
+    // Вычисление весов
+    sum += weight * func(point);
+}
+\end{lstlisting}
+
+\subsection{Реализация с использованием Intel TBB}
+Intel Threading Building Blocks (TBB) — библиотека шаблонов C++ для параллельного программирования.
+
+В данной реализации используется \texttt{tbb::parallel\_reduce} для рекурсивного параллелизма. Особенности:
+
+\begin{itemize}
+    \item Автоматическое управление пулом потоков
+    \item Оптимизированное распределение нагрузки
+    \item Рекурсивное разделение задачи по измерениям
+\end{itemize}
+
+\begin{lstlisting}[language=C++]
+sum = tbb::parallel_reduce(
+    tbb::blocked_range<int>(0, steps[current_dim] + 1), 0.0,
+    [&](const tbb::blocked_range<int>& r, double local_sum) {
+        for (int i = r.begin(); i != r.end(); ++i) {
+            local_sum += weight * RecursiveIntegration(...);
+        }
+        return local_sum;
+    },
+    std::plus<>());
+\end{lstlisting}
+
+\subsection{Реализация с использованием STL threads}
+STL threads — стандартная библиотека потоков C++.
+
+Реализация использует явное создание потоков и ручное распределение работы. Особенности:
+
+\begin{itemize}
+    \item Явное создание и управление потоками
+    \item Ручное разделение диапазонов вычислений
+    \item Использование \texttt{std::accumulate} для редукции
+\end{itemize}
+
+\begin{lstlisting}[language=C++]
+std::vector<std::thread> threads(num_threads);
+for (int t = 0; t < num_threads; ++t) {
+    threads[t] = std::thread([&, t]() {
+        partial_sums[t] = ComputePartialSum(...);
+    });
+}
+// Синхронизация и суммирование результатов
+\end{lstlisting}
+
+\subsection{Гибридная реализация (MPI + OpenMP)}
+Гибридная реализация сочетает распределенные вычисления через MPI с многопоточностью OpenMP:
+
+\begin{itemize}
+    \item MPI-процессы распределяют измерения между узлами
+    \item OpenMP используется для параллелизации внутри узла
+    \item \texttt{boost::mpi::all\_reduce} для глобального суммирования
+\end{itemize}
+
+\begin{lstlisting}[language=C++]
+#pragma omp parallel for reduction(+ : local_sum)
+for (int i = start; i < end; ++i) {
+    local_sum += weight * SequentialIntegration(...);
+}
+
+boost::mpi::all_reduce(world, local_sum, global_sum, std::plus<>());
+\end{lstlisting}
+\newpage
+
+% Результаты экспериментов
+\section{Результаты экспериментов}
+Для сравнения производительности реализаций были проведены эксперименты с различными размерностями и количеством потоков/процессов. Технические характеристики тестовой системы:
+
+\begin{itemize}
+    \item Процессор: Intel Core i7 (6 ядер, 12 потоков)
+    \item ОЗУ: 32 ГБ DDR4
+    \item ОС: Windows 11
+\end{itemize}
+
+\subsection{Таблица производительности}
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Реализация} & \textbf{Потоки/Процессы} & \textbf{2D (с)} & \textbf{3D (с)} \\
+\hline
+Последовательная & 1 & 1.25 & 15.42 \\
+\hline
+OpenMP & 4 & 0.38 & 4.21 \\
+\hline
+TBB & 4 & 0.42 & 4.65 \\
+\hline
+STL threads & 4 & 0.45 & 5.03 \\
+\hline
+MPI+OpenMP & 4×4 & 0.21 & 2.38 \\
+\hline
+\end{tabular}
+\caption{Время выполнения для различных реализаций}
+\end{table}
+
+\subsection{Анализ результатов}
+\begin{itemize}
+    \item OpenMP показывает лучшую производительность среди одноузловых реализаций
+    \item TBB демонстрирует сопоставимую с OpenMP производительность
+    \item STL threads менее эффективен из-за накладных расходов
+    \item Гибридная реализация MPI+OpenMP обеспечивает максимальное ускорение
+    \item Рост размерности задачи приводит к существенному увеличению времени вычислений
+\end{itemize}
+\newpage
+
+% Заключение
+\section{Заключение}
+В ходе работы были реализованы и протестированы различные параллельные версии алгоритма вычисления многомерных интегралов методом трапеций. Наибольшую эффективность показала гибридная реализация MPI+OpenMP, которая позволяет распределять вычисления между несколькими узлами кластера и параллельно использовать ресурсы каждого узла.
+
+Для задач с небольшой размерностью (2-3 измерения) достаточно использования OpenMP или TBB, которые обеспечивают хорошее ускорение на многоядерных процессорах. STL threads требует больше усилий для реализации и менее эффективен.
+
+Дальнейшие направления работы могут включать:
+\begin{itemize}
+    \item Оптимизацию работы с памятью для задач высокой размерности
+    \item Исследование адаптивных методов интегрирования
+    \item Разработку динамической балансировки нагрузки для гибридной реализации
+\end{itemize}
+\newpage
+
+% Список литературы
+\section{Список литературы}
+
+\begin{enumerate}
+    \item OpenMP Architecture Review Board. \textit{OpenMP Specifications}. \url{https://www.openmp.org/specifications/}
+    
+    \item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью.}
+    
+    \item Многопоточность, новые возможности стандарта C++11. \\ 
+    \url{https://web.archive.org/web/20200608173050/http://www.quizful.net/post/multithreading-cpp11}
+    
+    \item Технологии параллельного программирования. Message Passing Interface (MPI). \\ 
+    \url{https://parallel.ru/vvv/mpi.html#p1}
+\end{enumerate}
+\newpage
+
+% Приложение
+\section{Приложение}
+
+\subsection{Последовательная реализация}
+\begin{lstlisting}[language=C++]
+double SequentialTrapezoidalIntegration(
+    const std::function<double(const std::vector<double>&)>& func,
+    const std::vector<double>& lower, 
+    const std::vector<double>& upper,
+    const std::vector<int>& steps, 
+    size_t current_dim, 
+    std::vector<double> point) {
+    
+    if (current_dim == lower.size()) {
+        return func(point);
+    }
+
+    double h = (upper[current_dim] - lower[current_dim]) / steps[current_dim];
+    double sum = 0.0;
+
+    point.push_back(0.0);
+    for (int i = 0; i <= steps[current_dim]; ++i) {
+        point[current_dim] = lower[current_dim] + i * h;
+        double weight = (i == 0 || i == steps[current_dim]) ? 0.5 : 1.0;
+        sum += weight * SequentialTrapezoidalIntegration(
+            func, lower, upper, steps, current_dim + 1, point);
+    }
+
+    return sum * h;
+}
+\end{lstlisting}
+
+\subsection{OpenMP реализация}
+\begin{lstlisting}[language=C++]
+double ParallelIntegrationOpenMP(
+    const std::function<double(const std::vector<double>&)>& func,
+    const std::vector<double>& lower,
+    const std::vector<double>& upper,
+    const std::vector<int>& steps) {
+    
+    int total_points = 1;
+    std::vector<double> h(steps.size());
+    for (size_t i = 0; i < steps.size(); ++i) {
+        h[i] = (upper[i] - lower[i]) / steps[i];
+        total_points *= (steps[i] + 1);
+    }
+
+    double sum = 0.0;
+
+    #pragma omp parallel for reduction(+ : sum) schedule(static)
+    for (int idx = 0; idx < total_points; ++idx) {
+        std::vector<double> point(steps.size());
+        int temp = idx;
+        double weight = 1.0;
+
+        for (int dim = steps.size() - 1; dim >= 0; --dim) {
+            int i = temp % (steps[dim] + 1);
+            temp /= (steps[dim] + 1);
+            point[dim] = lower[dim] + i * h[dim];
+            if (i == 0 || i == steps[dim]) {
+                weight *= 0.5;
+            }
+        }
+        sum += weight * func(point);
+    }
+
+    double volume = 1.0;
+    for (size_t i = 0; i < steps.size(); ++i) {
+        volume *= h[i];
+    }
+
+    return sum * volume;
+}
+\end{lstlisting}
+
+\subsection{TBB реализация}
+\begin{lstlisting}[language=C++]
+double ParallelTrapezoidalIntegrationTBB(
+    const std::function<double(const std::vector<double>&)>& func,
+    const std::vector<double>& lower, 
+    const std::vector<double>& upper,
+    const std::vector<int>& steps, 
+    size_t current_dim, 
+    std::vector<double>& point) {
+    
+    if (current_dim == lower.size()) {
+        return func(point);
+    }
+
+    double h = (upper[current_dim] - lower[current_dim]) / steps[current_dim];
+    
+    return tbb::parallel_reduce(
+        tbb::blocked_range<int>(0, steps[current_dim] + 1), 0.0,
+        [&](const tbb::blocked_range<int>& r, double local_sum) {
+            for (int i = r.begin(); i != r.end(); ++i) {
+                auto local_point = point;
+                local_point[current_dim] = lower[current_dim] + i * h;
+                double weight = (i == 0 || i == steps[current_dim]) ? 0.5 : 1.0;
+                local_sum += weight * ParallelTrapezoidalIntegrationTBB(
+                    func, lower, upper, steps, current_dim + 1, local_point);
+            }
+            return local_sum;
+        },
+        std::plus<>()) * h;
+}
+\end{lstlisting}
+
+\subsection{STL threads реализация}
+\begin{lstlisting}[language=C++]
+void ThreadIntegrationSTL(
+    const std::function<double(const std::vector<double>&)>& func,
+    const std::vector<double>& lower,
+    const std::vector<double>& upper,
+    const std::vector<int>& steps,
+    size_t current_dim,
+    const std::vector<double>& new_point,
+    double h, int start, int end,
+    std::vector<double>& partial_sums) {
+    
+    auto local_point = new_point;
+    for (int i = start; i < end; ++i) {
+        local_point[current_dim] = lower[current_dim] + i * h;
+        double weight = (i == 0 || i == steps[current_dim]) ? 0.5 : 1.0;
+        partial_sums[i] = weight * TrapezoidalIntegration(
+            func, lower, upper, steps, current_dim + 1, local_point);
+    }
+}
+
+double ParallelIntegrationSTL(
+    const std::function<double(const std::vector<double>&)>& func,
+    const std::vector<double>& lower,
+    const std::vector<double>& upper,
+    const std::vector<int>& steps,
+    size_t current_dim,
+    const std::vector<double>& new_point,
+    double h) {
+    
+    std::vector<double> partial_sums(steps[current_dim] + 1, 0.0);
+    const int num_threads = std::min(GetNumThreads(), 4);
+    std::vector<std::thread> threads(num_threads);
+    int chunk_size = (steps[current_dim] + 1) / num_threads;
+
+    for (int t = 0; t < num_threads; ++t) {
+        int start = t * chunk_size;
+        int end = (t == num_threads - 1) ? steps[current_dim] + 1 : (t + 1) * chunk_size;
+        threads[t] = std::thread(ThreadIntegrationSTL, std::ref(func), 
+            std::ref(lower), std::ref(upper), std::ref(steps),
+            current_dim, std::ref(new_point), h, start, end, 
+            std::ref(partial_sums));
+    }
+
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    return std::accumulate(partial_sums.begin(), partial_sums.end(), 0.0) * h;
+}
+\end{lstlisting}
+
+\subsection{MPI + OpenMP реализация}
+\begin{lstlisting}[language=C++]
+double ParallelTrapezoidalIntegrationMPI(
+    const std::function<double(const std::vector<double>&)>& func,
+    const std::vector<double>& lower,
+    const std::vector<double>& upper,
+    const std::vector<int>& steps,
+    const boost::mpi::communicator& world) {
+    
+    int rank = world.rank();
+    int size = world.size();
+
+    int total_points = steps[0] + 1;
+    int points_per_process = total_points / size;
+    int remainder = total_points % size;
+
+    int start = (rank * points_per_process) + std::min(rank, remainder);
+    int end = start + points_per_process + (rank < remainder ? 1 : 0);
+
+    double h = (upper[0] - lower[0]) / steps[0];
+    double local_sum = 0.0;
+
+    #pragma omp parallel for reduction(+ : local_sum)
+    for (int i = start; i < end; ++i) {
+        double x = lower[0] + (i * h);
+        std::vector<double> point = {x};
+        double weight = (i == 0 || i == steps[0]) ? 0.5 : 1.0;
+        local_sum += weight * SequentialTrapezoidalIntegration(
+            func, lower, upper, steps, point);
+    }
+
+    double global_sum = 0.0;
+    boost::mpi::all_reduce(world, local_sum, global_sum, std::plus<>());
+
+    return global_sum;
+}
+\end{lstlisting}
+\end{document}
