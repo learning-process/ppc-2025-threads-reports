@@ -1,0 +1,410 @@
+\documentclass[14pt,a4paper]{extarticle}
+\renewcommand{\normalsize}{\fontsize{14pt}{16.8pt}\selectfont}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{framed}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
+
+\geometry{
+  a4paper,
+  left=30mm,
+  right=15mm,
+  top=20mm,
+  bottom=20mm
+}
+
+\titleformat{\section}[block]
+  {\normalfont\fontsize{14}{16}\bfseries\centering}
+  {\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]
+  {\normalfont\fontsize{14}{16}\bfseries\filcenter}
+  {\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}[block]
+  {\normalfont\fontsize{14}{16}\bfseries\filcenter}
+  {\thesubsubsection.}{0.5em}{}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red},
+    frame=single,
+    tabsize=4,
+    showstringspaces=false,
+    breaklines=true
+}
+
+\sloppy
+
+\onehalfspacing
+\setlength{\parindent}{1.25cm}
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+
+\onehalfspacing
+
+\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\
+Федеральное государственное автономное образовательное учреждение высшего образования \\
+«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского» (ННГУ) \\
+Институт информационных технологий, математики и механики
+
+\vspace{4cm}
+
+\textbf{ОТЧЕТ ПО ЛАБОРАТОРНОЙ РАБОТЕ} \\
+\textbf{«Повышение контраста полутонового изображения посредством линейной растяжки гистограммы»} \\
+\textbf{Вариант 28}
+
+\vspace{4cm}
+
+\begin{flushright}
+\textbf{Выполнила:} \\
+Студентка 3 курса \\
+группы 3822Б1ФИ3 \\
+Козлова Е.Д.
+
+\vspace{1cm}
+
+\textbf{Преподаватель:} \\
+доцент кафедры ВВСП, к.т.н. \\
+Сысоев А.В.
+\end{flushright}
+
+\vspace{1cm}
+
+\begin{center}
+Нижний Новгород\\
+2025
+\end{center}
+
+\end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+
+Повышение контраста изображения — важная, широко распространенная задача в обработке изображений. Линейная растяжка гистограммы — один из простых и эффективных методов повышения контраста, который перераспределяет значения пикселей изображения для использования всего доступного диапазона яркостей.
+
+Цель работы: реализация и исследование различных версий алгоритма линейной растяжки гистограммы (последовательной, OpenMP, TBB, STL и MPI + OpenMP) для повышения контраста полутонового изображения.
+
+\section{Постановка задачи}
+
+Требуется реализовать алгоритм линейной растяжки гистограммы для полутонового изображения, включая:
+
+\begin{itemize}
+    \item Последовательную версию алгоритма;
+    \item Параллельные версии с использованием OpenMP, TBB и STL;
+    \item Версию с использованием MPI и OpenMP;
+    \item Провести тестирование и сравнение производительности реализаций.
+\end{itemize}
+
+\section{Описание алгоритма}
+
+Алгоритм линейной растяжки гистограммы состоит из следующих шагов:
+
+\begin{enumerate}
+    \item Нахождение минимального ($min$) и максимального ($max$) значений яркости в изображении;
+    \item Нормализация каждого пикселя по формуле:
+    \[
+    I_{new}(x,y) = \frac{I(x,y) - min}{max - min} \times 255
+    \]
+    \item Ограничение значений пикселей диапазоном [0, 255];
+    \item Если все пиксели имеют одинаковую яркость ($min = max$), изображение остается неизменным.
+\end{enumerate}
+
+\section{Описание реализации}
+
+Реализация включает следующие компоненты:
+
+\begin{itemize}
+    \item Класс \texttt{TestTaskSequential}:
+    \begin{itemize}
+        \item \texttt{PreProcessingImpl()}: загрузка данных изображения;
+        \item \texttt{RunImpl()}: вычисление новых значений пикселей;
+        \item \texttt{PostProcessingImpl()}: сохранение результата.
+    \end{itemize}
+\end{itemize}
+
+\subsection*{Пример кода для последовательной версии}
+\begin{lstlisting}[language=C++]
+bool TestTaskSequential::RunImpl() {
+  int min_value = *std::ranges::min_element(input_);
+  int max_value = *std::ranges::max_element(input_);
+
+  if (min_value == max_value) {
+    std::ranges::copy(input_, output_.begin());
+    return true;
+  }
+
+  for (size_t i = 0; i < input_.size(); ++i) {
+    output_[i] = static_cast<int>(((input_[i] - min_value) / (double)(max_value - min_value)) * 255);
+    output_[i] = std::clamp(output_[i], 0, 255);
+  }
+  return true;
+}
+\end{lstlisting}
+
+\section{Описание OpenMP версии алгоритма}
+
+Параллелизация выполнена с помощью директивы \texttt{\#pragma omp parallel for schedule(static)}, которая распределяет итерации цикла между потоками блоками равного размера (static scheduling). Распределение происходит один раз в начале выполнения цикла, каждый поток получает непрерывный блок итераций
+
+\subsection*{Пример кода OpenMP версии}
+\begin{lstlisting}[language=C++]
+#pragma omp parallel for schedule(static)
+for (int i = 0; i < (int)input_.size(); ++i) {
+  output_[i] = static_cast<uint8_t>(((input_[i] - min_value) / (double)(max_value - min_value)) * 255);
+  output_[i] = std::clamp(static_cast<int>(output_[i]), 0, 255);
+}
+\end{lstlisting}
+
+\section{Описание TBB версии алгоритма}
+
+Реализация с использованием библиотеки Intel Threading Building Blocks (TBB). Основные особенности реализации:
+
+\begin{itemize}
+\item \texttt{tbb::parallel\_for} - основной алгоритм параллельного выполнения, обеспечивающий автоматическое распределение работы между потоками
+\item \texttt{tbb::task\_arena} - механизм управления областью выполнения задач и количеством рабочих потоков
+\item \texttt{tbb::blocked\_range} - шаблонный класс для представления диапазона итераций
+\end{itemize}
+
+\subsection{Детали реализации}
+
+\begin{itemize}
+\item Создание task arena с контролируемым числом потоков:
+\item Число потоков задается через \texttt{ppc::util::GetPPCNumThreads()}
+\item task arena обеспечивает изоляцию группы потоков для выполнения задач
+\end{itemize}
+
+\subsection*{Пример кода TBB версии}
+\begin{lstlisting}[language=C++]
+oneapi::tbb::task_arena task_arena(ppc::util::GetPPCNumThreads());
+task_arena.execute([&] {
+  tbb::parallel_for(tbb::blocked_range<int>(0, (int)input_.size()), [&](const tbb::blocked_range<int>& r) {
+    for (int i = r.begin(); i < r.end(); ++i) {
+      output_[i] = static_cast<uint8_t>(((input_[i] - min_value) / static_cast<double>(max_value - min_value)) * 255.0);
+      output_[i] = std::clamp(static_cast<int>(output_[i]), 0, 255);
+    }
+  });
+});
+\end{lstlisting}
+
+\section{Описание STL версии алгоритма}
+
+Реализация с использованием стандартной библиотеки C++ (STL) предоставляет низкоуровневый контроль над многопоточностью через класс \texttt{std::thread}. Данная версия демонстрирует явное управление потоками и распределением работы.
+
+\begin{itemize}
+\item \texttt{std::thread} - базовый механизм создания и управления потоками
+\item Статическое распределение работы - разделение изображения на блоки строк
+\item Явная синхронизация через \texttt{join()} для ожидания завершения потоков
+\item Лямбда-функции для инкапсуляции рабочей нагрузки
+\end{itemize}
+
+\subsection*{Пример кода STL версии}
+\begin{lstlisting}[language=C++]
+int min_value = *std::ranges::min_element(input_);
+  if (min_value < 0) {
+    throw "incorrect value";
+  }
+  int max_value = *std::ranges::max_element(input_);
+
+  if (min_value == max_value) {
+    std::ranges::copy(input_, output_.begin());
+    return true;
+  }
+
+  auto normalize_pixel = [=](int value) {
+    return std::clamp(static_cast<int>(((value - min_value) / static_cast<double>(max_value - min_value)) * 255), 0,
+                      255);
+  };
+
+  size_t num_threads = ppc::util::GetPPCNumThreads();
+  num_threads = std::clamp(num_threads, static_cast<size_t>(1), height_);
+  std::vector<std::thread> threads(num_threads);
+
+  size_t rows_per_thread = height_ / num_threads;
+  size_t leftover_rows = height_ % num_threads;
+
+  auto process_rows = [&](size_t start_row, size_t end_row) {
+    for (size_t row = start_row; row < end_row; ++row) {
+      for (size_t col = 0; col < width_; ++col) {
+        size_t idx = (row * width_) + col;
+        output_[idx] = normalize_pixel(input_[idx]);
+      }
+    }
+  };
+
+  size_t current_row = 0;
+  for (size_t t = 0; t < num_threads; ++t) {
+    size_t end_row = current_row + rows_per_thread + (t < leftover_rows ? 1 : 0);
+    threads[t] = std::thread(process_rows, current_row, end_row);
+    current_row = end_row;
+  }
+
+  for (auto &thread : threads) {
+    if (thread.joinable()) {
+      thread.join();
+    }
+  }
+\end{lstlisting}
+
+\section{Описание MPI + OpenMP версии алгоритма}
+
+Данная версия алгоритма представляет собой комбинированное решение, сочетающее преимущества распределенных вычислений через MPI (Message Passing Interface) и многопоточную обработку средствами OpenMP. Главный процесс (ранг 0) распределяет данные между процессами, каждый из которых обрабатывает свою часть изображения с использованием OpenMP.
+
+\subsection*{Основные особенности реализации}
+Данная реализация сочетает два уровня параллелизма, обеспечивая эффективную обработку на кластерных системах:
+
+\begin{itemize}
+\item \textbf{MPI-уровень (межпроцессный)}:
+\begin{itemize}
+\item Использование \texttt{scatterv} для неравномерного распределения данных с учетом остатка
+\item Применение \texttt{all\_reduce} с операциями минимума/максимума для нахождения глобальных границ гистограммы
+\item Сбор результатов через \texttt{gatherv} с сохранением исходной структуры данных
+\end{itemize}
+
+\item \textbf{OpenMP-уровень (внутрипроцессный)}:
+\begin{itemize}
+    \item Директива \texttt{\#pragma omp parallel for} для параллелизации обработки локальных данных
+    \item Статическое распределение итераций (\texttt{schedule(static)})
+\end{itemize}
+\end{itemize}
+
+\subsection*{Пример кода}
+\begin{lstlisting}[language=C++]
+int rank = world_.rank();
+  int proc_count = world_.size();
+
+  size_t input_size = 0;
+  if (rank == 0) {
+    input_size = input_.size();
+  }
+
+  boost::mpi::broadcast(world_, input_size, 0);
+  input_.resize(input_size);
+  boost::mpi::broadcast(world_, input_.data(), (int)input_.size(), 0);
+
+  int local_size = (int)input_size / proc_count;
+  int remainder = (int)input_size % proc_count;
+  std::vector<int> counts(proc_count, local_size);
+  for (int i = 0; i < remainder; ++i) {
+    counts[i]++;
+  }
+
+  std::vector<int> displs(proc_count, 0);
+  for (int i = 1; i < proc_count; ++i) {
+    displs[i] = displs[i - 1] + counts[i - 1];
+  }
+
+  std::vector<uint8_t> local_input(counts[rank]);
+
+  boost::mpi::scatterv(world_, input_.data(), counts, displs, local_input.data(), counts[rank], 0);
+
+  uint8_t local_min = 255;
+  uint8_t local_max = 0;
+  if (!local_input.empty()) {
+    local_min = *std::ranges::min_element(local_input);
+    local_max = *std::ranges::max_element(local_input);
+  }
+
+  uint8_t global_min = 0;
+  uint8_t global_max = 0;
+
+  boost::mpi::all_reduce(world_, local_min, global_min, boost::mpi::minimum<uint8_t>());
+  boost::mpi::all_reduce(world_, local_max, global_max, boost::mpi::maximum<uint8_t>());
+  boost::mpi::broadcast(world_, global_max, 0);
+  boost::mpi::broadcast(world_, global_min, 0);
+
+  std::vector<uint8_t> local_output(local_input.size());
+
+  if (global_min == global_max) {
+    std::ranges::copy(local_input, local_output.data());
+  } else {
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < static_cast<int>(local_input.size()); ++i) {
+      local_output[i] = static_cast<uint8_t>(((local_input[i] - global_min) / (double)(global_max - global_min)) * 255);
+      local_output[i] = std::clamp(static_cast<int>(local_output[i]), 0, 255);
+    }
+  }
+
+  std::vector<uint8_t> gathered;
+  if (rank == 0) {
+    gathered.resize(input_size);
+  }
+
+  boost::mpi::gatherv(world_, local_output.data(), counts[rank], gathered.data(), counts, displs, 0);
+
+  if (rank == 0) {
+    output_ = std::move(gathered);
+  }
+\end{lstlisting}
+
+\newpage
+
+\section{Результаты экспериментов}
+
+Проведено тестирование различных реализаций алгоритма. Результаты представлены в таблице:
+
+\begin{table}[H]
+\centering
+\caption{Сравнение времени выполнения (в секундах) различных реализаций алгоритма}
+\label{tab:performance}
+\begin{tabular}{lrrrr}
+\toprule
+& \multicolumn{4}{c}{\textbf{Кол-во потоков-процессов}} \\
+\cmidrule(lr){2-5}
+\textbf{Реализация} & \textbf{1} & \textbf{2} & \textbf{3} & \textbf{5} \\
+\midrule
+Последовательная версия & 1.05 & - & - & - \\
+OpenMP & 0.62 & 0.50 & 0.44 & 0.41 \\
+TBB & 0.66 & 0.52 & 0.48 & 0.43 \\
+STL & 1.09 & 0.84 & 0.75 & 0.67 \\
+MPI+OpenMP & 1.06 & 0.73 & 0.70 & 0.68 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Анализ результатов}
+
+На основе полученных результатов можно сделать следующие выводы:
+
+\begin{itemize}
+    \item Все параллельные реализации показывают лучшую производительность по сравнению с последовательной версией (1.05 с)
+    \item Наилучший результат показала реализация на OpenMP с 5 потоками (0.41 с)
+    \item Реализация на TBB демонстрирует сравнимую с OpenMP производительность
+    \item STL версия показывает худшие результаты при малом числе потоков, но догоняет другие реализации при 5 потоках
+    \item MPI+OpenMP реализация демонстрирует хорошие результаты, но уступает чистой OpenMP версии
+    \item Наибольший прирост производительности наблюдается при переходе от 1 к 2 потокам
+\end{itemize}
+
+\newpage
+\section{Заключение}
+
+В ходе работы были реализованы и протестированы различные версии алгоритма линейной растяжки гистограммы:
+
+\begin{itemize}
+    \item Наилучшие результаты показала OpenMP реализация с 5 потоками (0.41 с)
+    \item TBB реализация демонстрирует сравнимую производительность с OpenMP
+    \item STL версия требует больше потоков для достижения аналогичной производительности
+    \item MPI+OpenMP реализация эффективна для распределенных систем и больших входных размеров
+    \item Наблюдается хорошая масштабируемость алгоритма при увеличении числа потоков
+\end{itemize}
+
+Полученные результаты подтверждают эффективность параллельных реализаций для задачи повышения контраста изображений.
+
+\end{document}
