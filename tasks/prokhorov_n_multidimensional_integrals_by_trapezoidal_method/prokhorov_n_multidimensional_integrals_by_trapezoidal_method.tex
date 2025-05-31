@@ -182,8 +182,18 @@ OpenMP — стандарт многопоточного программиро�
 \begin{lstlisting}[language=C++]
 #pragma omp parallel for reduction(+ : sum) schedule(static)
 for (int idx = 0; idx < total_points; ++idx) {
-    // Вычисление координат точки в многомерной сетке
-    // Вычисление весов
+    double weight = 1.0;
+    std::vector<double> point(steps.size());
+    int temp = idx;
+    
+    for (int dim = steps.size() - 1; dim >= 0; --dim) {
+        int i = temp % (steps[dim] + 1);
+        temp /= (steps[dim] + 1);
+        point[dim] = lower[dim] + i * h[dim];
+        if (i == 0 || i == steps[dim]) {
+            weight *= 0.5;
+        }
+    }
     sum += weight * func(point);
 }
 \end{lstlisting}
@@ -204,11 +214,15 @@ sum = tbb::parallel_reduce(
     tbb::blocked_range<int>(0, steps[current_dim] + 1), 0.0,
     [&](const tbb::blocked_range<int>& r, double local_sum) {
         for (int i = r.begin(); i != r.end(); ++i) {
-            local_sum += weight * RecursiveIntegration(...);
+            auto local_point = point;
+            local_point[current_dim] = lower[current_dim] + i * h;
+            double weight = (i == 0 || i == steps[current_dim]) ? 0.5 : 1.0;
+            local_sum += weight * ParallelTrapezoidalIntegrationTBB(
+                func, lower, upper, steps, current_dim + 1, local_point);
         }
         return local_sum;
     },
-    std::plus<>());
+    std::plus<>()) * h;
 \end{lstlisting}
 
 \subsection{Реализация с использованием STL threads}
@@ -224,12 +238,28 @@ STL threads — стандартная библиотека потоков C++.
 
 \begin{lstlisting}[language=C++]
 std::vector<std::thread> threads(num_threads);
+std::vector<double> partial_sums(num_threads, 0.0);
+
 for (int t = 0; t < num_threads; ++t) {
-    threads[t] = std::thread([&, t]() {
-        partial_sums[t] = ComputePartialSum(...);
+    int start = t * chunk_size;
+    int end = (t == num_threads - 1) ? steps[current_dim] + 1 : (t + 1) * chunk_size;
+    
+    threads[t] = std::thread([&, start, end, t]() {
+        for (int i = start; i < end; ++i) {
+            auto local_point = point;
+            local_point[current_dim] = lower[current_dim] + i * h;
+            double weight = (i == 0 || i == steps[current_dim]) ? 0.5 : 1.0;
+            partial_sums[t] += weight * TrapezoidalIntegration(
+                func, lower, upper, steps, current_dim + 1, local_point);
+        }
     });
 }
-// Синхронизация и суммирование результатов
+
+for (auto& thread : threads) {
+    thread.join();
+}
+
+return std::accumulate(partial_sums.begin(), partial_sums.end(), 0.0) * h;
 \end{lstlisting}
 
 \subsection{Гибридная реализация (MPI + OpenMP)}
@@ -242,12 +272,32 @@ for (int t = 0; t < num_threads; ++t) {
 \end{itemize}
 
 \begin{lstlisting}[language=C++]
+int rank = world.rank();
+int size = world.size();
+
+int total_points = steps[0] + 1;
+int points_per_process = total_points / size;
+int remainder = total_points % size;
+
+int start = (rank * points_per_process) + std::min(rank, remainder);
+int end = start + points_per_process + (rank < remainder ? 1 : 0);
+
+double h = (upper[0] - lower[0]) / steps[0];
+double local_sum = 0.0;
+
 #pragma omp parallel for reduction(+ : local_sum)
 for (int i = start; i < end; ++i) {
-    local_sum += weight * SequentialIntegration(...);
+    double x = lower[0] + (i * h);
+    std::vector<double> point = {x};
+    double weight = (i == 0 || i == steps[0]) ? 0.5 : 1.0;
+    local_sum += weight * SequentialTrapezoidalIntegration(
+        func, lower, upper, steps, 1, point);
 }
 
+double global_sum = 0.0;
 boost::mpi::all_reduce(world, local_sum, global_sum, std::plus<>());
+
+return global_sum * h;
 \end{lstlisting}
 \newpage
 
@@ -505,13 +555,13 @@ double ParallelTrapezoidalIntegrationMPI(
         std::vector<double> point = {x};
         double weight = (i == 0 || i == steps[0]) ? 0.5 : 1.0;
         local_sum += weight * SequentialTrapezoidalIntegration(
-            func, lower, upper, steps, point);
+            func, lower, upper, steps, 1, point);
     }
 
     double global_sum = 0.0;
     boost::mpi::all_reduce(world, local_sum, global_sum, std::plus<>());
 
-    return global_sum;
+    return global_sum * h;
 }
 \end{lstlisting}
 \end{document}
