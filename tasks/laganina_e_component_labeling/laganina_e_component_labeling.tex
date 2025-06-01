@@ -245,7 +245,7 @@
     \item \texttt{LabelConnectedComponents()} — выполняет процесс маркировки, а именно прямой и обратный проход алгоритма.
     \item \texttt{InitializeParents()} — инициализирует массив родителей. Использует директиву \texttt{\#pragma omp parallel for schedule(static)} для параллелизма инициализации по пикселям. Статическое распределение блоков пикселей между потоками.:
 
-    \begin{lstlisting}[caption={Параллельная по пикселям инициализация в методе InitializeParents},label={all}]
+    \begin{lstlisting}[caption={Параллельная по пикселям инициализация в методе InitializeParents},label={all00}]
 #pragma omp parallel for schedule(static)
   for (int i = 0; i < size; ++i) {
     parent[i] = (binary_[i] != 0) ? i : -1;
@@ -253,7 +253,7 @@
     \end{lstlisting}
     \item \texttt{ProcessSweep()} —выполняет проход в заданном направлении. Использует директиву \texttt{\#pragma omp parallel for reduction(|| : local\_changed) schedule(static)} для параллелизма по строкам. Редукция флага изменений через логическое или, cтатическое распределение строк:
 
-    \begin{lstlisting}[caption={Параллельная по по строкам редукция флага изменений в методе ProcessSweep},label={all}]
+    \begin{lstlisting}[caption={Параллельная по по строкам редукция флага изменений в методе ProcessSweep},label={all0}]
 #pragma omp parallel for reduction(|| : local_changed) schedule(static)
  for (int row_idx = 0; row_idx < m_; ++row_idx) {
     local_changed |= ProcessRow(row_idx, reverse, parent);
@@ -263,7 +263,7 @@
     \item \texttt{UnionNodes()} -объединяет компоненты.
      \item \texttt{FinalizeRoots()} —финализирует корневые элементы. Использует директиву \texttt{\#pragma omp parallel for schedule(static)} для параллельного обновления родительских ссылок, статическое распределение нагрузки по потокам:
 
-    \begin{lstlisting}[caption={Параллельное обновление родительских ссылок в методе FinalizeRoots},label={all}]
+    \begin{lstlisting}[caption={Параллельное обновление родительских ссылок в методе FinalizeRoots},label={all1}]
 #pragma omp parallel for schedule(static)
   for (int i = 0; i < size; ++i) {
     if (parent[i] != -1) {
@@ -273,7 +273,7 @@
   \end{lstlisting}
   \item \texttt{AssignLabels()} —назначает уникальные метки. Использует директиву \texttt{\#pragma omp for nowait} для параллельного сбора корней в локальные буферы, директиву \texttt{\#pragma omp critical} для атомарного назначения меток в критической секции и директиву \texttt{\#pragma omp parallel for} для параллельной замены корней на метки:
 
-    \begin{lstlisting}[caption={Параллельный сбор корней в локальные буферы в методе AssignLabels},label={all}]
+    \begin{lstlisting}[caption={Параллельный сбор корней в локальные буферы в методе AssignLabels},label={all2}]
     #pragma omp for nowait
     for (int i = 0; i < m_ * n_; ++i) {
       if (parent[i] != -1 && parent[i] == i) {
@@ -281,7 +281,7 @@
       }
      } 
   \end{lstlisting}
-   \begin{lstlisting}[caption={Атомарное назначение меток в критической секции в методе AssignLabels},label={all}]
+   \begin{lstlisting}[caption={Атомарное назначение меток в критической секции в методе AssignLabels},label={all}3]
     #pragma omp critical
     {
       for (int root : local_roots) {
@@ -291,7 +291,7 @@
       }
     }
   \end{lstlisting}
-  \begin{lstlisting}[caption={Параллельная замена корней на метки в методе AssignLabels},label={all}]
+  \begin{lstlisting}[caption={Параллельная замена корней на метки в методе AssignLabels},label={all4}]
     for (int i = 0; i < m_ * n_; ++i) {
     binary_[i] = parent[i] != -1 ? labels[parent[i]] : 0;
   }
@@ -318,7 +318,7 @@
     \item \texttt{LabelConnectedComponents()} —организует процесс маркировки, а именнно  основную обработку(вызов \texttt{ProcessComponent}) и назначение меток.
     \item \texttt{ProcessComponents()} — запускает параллельную обработку блоков. Использует TBB примитив \texttt{tbb::parallel\_for} c 2D диапазоном для разделения изображения на блоки:
 
-    \begin{lstlisting}[caption={Разделение изображения на блоки методе ProcessComponents},label={all}]
+    \begin{lstlisting}[caption={Разделение изображения на блоки методе ProcessComponents},label={all5}]
     tbb::parallel_for(
     tbb::blocked_range2d<int>(0, rows_, 16, 0, cols_, 64),
     [&](const auto& r) { ProcessRange(r, uf); }
@@ -328,7 +328,7 @@
     \item \texttt{ProcessRow()}-Обрабатывает строку в блоке(вычисляет линейный индекс пикселя,пропускает фоновые пиксели $(0)$.
     \item \texttt{CheckAllNeighbors()}-проверяет 4-связность(проверяет всех 4 соседей,вызывает объединение компонент через \texttt{UnionFind}.
    \item \texttt{AssignFinalLabels()}-назначает уникальные метки, использует TBB примитивы  \texttt{tbb::parallel\_for} для параллельных циклов и \texttt{tbb::concurrent\_unordered\_map} для потокобезопасного сбора меток.
-     \begin{lstlisting}[caption={Параллельная реализация метода AssignFinalLabels},label={all}]
+     \begin{lstlisting}[caption={Параллельная реализация метода AssignFinalLabels},label={all6}]
     tbb::concurrent_unordered_map<int, int> label_map;
   tbb::parallel_for(0, size, [&](int i) {
     if (data_[i]) data_[i] = uf.Find(i) + 1;
@@ -369,7 +369,7 @@
    \item \texttt{RunImpl()} — запускает основной алгоритм.
    \item \texttt{LabelConnectedComponents()} — выполняет процесс маркировки, а именно прямой и обратный проход алгоритма.
    \item \texttt{InitializeParents()}-bнициализирует массив родителей с использованием потоков.Статическое разделение пикселей между потоками.Вычисление размера чанков для балансировки нагрузки.
-   \begin{lstlisting}[caption={Статическое разделение пикселей и вычисление размера чанков},label={all}]
+   \begin{lstlisting}[caption={Статическое разделение пикселей и вычисление размера чанков},label={all7}]
   const int chunk_size = (size + num_threads - 1) / num_threads;
   std::vector<std::thread> threads;
   for (int t = 0; t < num_threads; ++t) {
@@ -384,7 +384,7 @@
   }
 \end{lstlisting}
   \item \texttt{ProcessSweep()}-обрабатывает проход в заданном направлении. Параллелизм-разделение строк между потоками по блокам. Синхронизация- использоване \texttt{std::atomic<bool>}для флага изменений.
-  \begin{lstlisting}[caption={Параллелизм в методе ProcessSweep},label={all}]
+  \begin{lstlisting}[caption={Параллелизм в методе ProcessSweep},label={all8}]
  std::atomic<bool> global_changed(false);
 
   std::vector<std::thread> threads;
@@ -405,7 +405,7 @@
   \end{lstlisting}
   \item \texttt{ProcessRow()}-обработака пикселей в строке.
   \item \texttt{FinalizeRoots()}-обновляет родительские ссылки до корней.Статическое разделение пикселей.
-  \begin{lstlisting}[caption={Обновление родительских ссылок в методе FinalizeRoots},label={all}]
+  \begin{lstlisting}[caption={Обновление родительских ссылок в методе FinalizeRoots},label={all9}]
    for (int t = 0; t < num_threads; ++t) {
     const int start = t * chunk_size;
     const int end = std::min(start + chunk_size, size);
@@ -420,7 +420,7 @@
   }
   \end{lstlisting}
   \item \texttt{AssignLabels()}-назначает уникальные метки с использованием асинхронных задач(\texttt{std::async}). Подсчет корней в каждом блоке,назначение временных меток,распространение меток на все пиксели.
-  \begin{lstlisting}[caption={Назначение уникальных меток в методе AssignLabels},label={all}]
+  \begin{lstlisting}[caption={Назначение уникальных меток в методе AssignLabels},label={all10}]
    for (int t = 0; t < num_threads; ++t) {
       const int start = t * chunk_size;
       const int end = std::min(start + chunk_size, size);
@@ -455,17 +455,17 @@
 Основные особенности реализации:
 \begin{itemize}
      \itemДинамическое управление потоками.
-     \begin{lstlisting}[caption={Динамическое управление потоками},label={all}]
+     \begin{lstlisting}[caption={Динамическое управление потоками},label={all11}]
      int num_threads = std::min(ppc::util::GetPPCNumThreads(),
                          static_cast<int>(std::thread::hardware_concurrency()));
      \end{lstlisting}
      \itemСтатическое разделение данных.
-      \begin{lstlisting}[caption={Статическое разделение данных},label={all}]
+      \begin{lstlisting}[caption={Статическое разделение данных},label={all12}]
       const int chunk_size = (size + num_threads - 1) / num_threads;
       \end{lstlisting}
       \itemАсинхронные задачи.
-      \begin{lstlisting}[caption={Асинхронные задачи},label={all}]
-      auto future = std::async(std::launch::async, [&] { /* задача */ });
+      \begin{lstlisting}[caption={Асинхронные задачи},label={all13}]
+      auto future = std::async(std::launch::async, [&] { /* task*/ });
       \end{lstlisting}
     \item \textbf{Преимущества}:Стандартность(не требует внешних библиотек),гибкость(полный контроль над потоками),балансировка( статическое распределение нагрузки),масштабируемость(автоматическое использование ядер).
     \item \textbf{Недостатки}: сложное управление потоками,явная синхронизация \texttt{(join(), wait())},отсутствие автоматической редукции переменных.
@@ -482,7 +482,7 @@
     \item \texttt{ValidationImpl()} — Проверяет корректность входных данных только на процессе с номером 0.
     \item \texttt{PreProcessingImpl()}-Инициализация данных только на процессе с номером 0.
      \item \texttt{ RunImpl()} -основной метод, организующий распределённую обработку.
-      \begin{lstlisting}[caption={Распределенная обработка изображения},label={all}]
+      \begin{lstlisting}[caption={Распределенная обработка изображения},label={all14}]
      if (world_.rank() == 0) {
     int delta = (m_ + world_.size() - 1) / world_.size();
     sizes.resize(world_.size());
@@ -513,10 +513,10 @@
   return true;
  \end{lstlisting}
   \item \texttt{LabelConnectedComponents()}-локальная маркировка с использованием OpenMP-директивы  \texttt{\#pragma omp parallel for} аналогично  OpenMP реализации.
-  \begin{lstlisting}[caption={локальная маркировка с использованием OpenMP},label={all}]
+  \begin{lstlisting}[caption={локальная маркировка с использованием OpenMP},label={all15}]
   #pragma omp parallel for
   for (int i = 0; i < size; ++i) {
-    // Инициализация родителей
+    // Initialize parent
   }
   \end{lstlisting}
   \item\texttt{RelabelImage()}-глобальная перемаркировка на процессе 0.
