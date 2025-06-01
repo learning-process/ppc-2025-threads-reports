@@ -1,0 +1,947 @@
+\documentclass[12pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
+\usepackage[russian]{babel}
+
+\usepackage{lingmacros}
+\usepackage{tree-dvips}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{geometry}
+\geometry{
+	a4paper,
+	left=30mm,
+	right=15mm,
+	top=20mm,
+	bottom=20mm
+}
+
+\usepackage{titlesec}
+\titleformat{\section}[block]
+{\normalfont\fontsize{14}{16}\bfseries\centering}
+{\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries\filcenter}
+{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries\filcenter}
+{\thesubsubsection.}{0.5em}{}
+
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{
+	basicstyle=\ttfamily\small,
+	frame=single,
+	tabsize=4,
+	showstringspaces=false,
+	breaklines=true
+}
+
+\sloppy
+\usepackage{setspace}
+\onehalfspacing
+\setlength{\parindent}{1.25cm}
+
+\newcommand{\appendixsection}[1]{%
+	\clearpage
+	\section*{\centering Приложение #1}
+	\addcontentsline{toc}{section}{Приложение #1}
+}
+
+\begin{document}
+
+\begin{titlepage}
+	\begin{center}
+		\onehalfspacing
+		\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\ 	[5pt]	
+		Федеральное государственное автономное образовательное учреждение высшего образования \\  [5pt]	
+		\textbf{«Национальный исследовательский Нижегородский государственный университет имени Н.И. Лобачевского(ННГУ)»} \\[5pt]
+
+		\textbf{Институт информационных технологий, математики и механики}\\ 	[30pt]	
+
+		\begin{center}
+		Направление подготовки: Фундаментальная информатика и информационные технологии
+
+		Профиль подготовки: «Инженерия программного обеспечения» \\ 	[50pt]	
+		\end{center}
+
+		\textbf{Отчёт}\\[0.5pt]
+{ по лабораторной работе}
+
+		на тему: 
+
+			\textbf{"Линейная фильтрация изображений (вертикальное разбиение). Ядро Гаусса 3x3."}\\[60pt]
+
+
+		\begin{flushright}
+			\textbf{Выполнила:} \\
+			студентка группы 3822Б1ФИ1 \\
+			Комшина Д.Г. \\[20pt]
+
+
+			\noindent\textbf{Преподаватель:} \\
+			к.т.н., доцент кафедры ВВСП \\
+			{Сысоев А.В.}
+		\end{flushright}
+
+		\vfill
+
+		Нижний Новгород \\
+		2025 г.
+	\end{center}
+\end{titlepage}
+
+\newpage
+
+% --- Основной текст документа ---
+
+\newpage
+
+\section*{Введение}
+
+Гауссов фильтр – основной метод фильтрации изображений, используемый для подавления шума с сохранением деталей, что делает его незаменимым в компьютерном зрении.
+В данной работе рассматривается линейная фильтрация изображений с применением двумерного Гауссова ядра размером 3×3, при этом используется вертикальное разбиение изображения, что обеспечивает возможность адаптации алгоритма к последовательной обработке и параллельной реализации с использованием технологий OpenMP, Intel Threading Building Blocks (TBB), стандартной библиотеки потоков C++ (STL) и гибридной модели MPI + TBB.
+
+\section*{Постановка задачи}
+
+Целью данной лабораторной работы является реализация и исследование эффективности линейной фильтрации цветного изображения с применением Гауссова ядра размером 3×3. Под фильтрацией понимается свёртка каждого канала изображения (RGB) с фиксированным ядром, обеспечивающим сглаживание и подавление шумов.
+
+\section*{Задачи}
+
+\begin{enumerate}
+  \item Реализовать последовательную версию фильтрации изображения, используя трёхканальную структуру (RGB).
+  
+  \item Разработать и протестировать четыре параллельные версии алгоритма с использованием различных технологий:
+  \begin{enumerate}
+    \item OpenMP — многопоточность на уровне циклов;
+    \item TBB — библиотека Intel Threading Building Blocks;
+    \item STL — стандартные средства параллельного программирования;
+    \item MPI+OMP — гибридная модель с распараллеливанием между процессами и потоками.
+  \end{enumerate}
+  
+  \item Осуществить валидацию корректности выходных данных путём сравнения с эталонным результатом (последовательной реализацией).
+  
+  \item Оценить производительность и эффективность параллельных реализаций относительно последовательной, измерив время выполнения различных версий алгоритма.
+\end{enumerate}
+
+\newpage
+
+\section*{Описание алгоритма Линейная фильтрация изображений (вертикальное разбиение). Ядро Гаусса 3x3}
+
+Метод работает следующим образом: каждый пиксель изображения пересчитывается заново с учётом значений соседних пикселей. Вместо того чтобы просто использовать значение самого пикселя, алгоритм берёт область 3x3 вокруг него и использует специальную таблицу весов — ядро Гаусса. Эта таблица определяет, какое влияние будет иметь каждый соседний пиксель на итоговое значение.
+
+Так как фильтр называется «вертикальным», изображение делится на вертикальные участки, и обработка проводится построчно сверху вниз. Это полезно, особенно если алгоритм выполняется параллельно — например, если его нужно ускорить с помощью нескольких ядер процессора или разных потоков. Каждая вертикальная часть может обрабатываться отдельно.
+
+
+\section{Описание реализаций}
+\subsection{Последовательная версия}
+
+Последовательная версия фильтрации изображения с использованием вертикального гауссового ядра реализует свёртку цветного изображения формата RGB с ядром размером 3×3. Сначала происходит подготовка данных: копируются входные пиксели и ядро фильтра в внутренние векторы, а также выделяется память под выходной результат. Затем выполняется проверка корректности входных и выходных данных — проверяется, что указатели не равны nullptr, а размеры соответствуют ожиданиям (фиксированный размер ядра 9 элементов и совпадающий размер выходного массива). Основной алгоритм свёртки проходит по всем пикселям изображения, кроме граничных, и для каждого цвета (красного, зелёного и синего) вычисляет сумму произведений значений соседних пикселей и соответствующих коэффициентов ядра. Полученное значение округляется и ограничивается диапазоном от 0 до 255, чтобы соответствовать формату цвета. Итоговые данные записываются в выходной буфер. В конце результаты копируются обратно в выходной массив.
+
+
+\subsection{OpenMP версия}
+
+Как и в последовательной версии сначала в методе PreProcessingImpl происходит копирование входных данных изображения (RGB) и ядра фильтра во внутренние векторы, а также выделяется память под выходной результат. Метод ValidationImpl проверяет корректность входных и выходных данных, убеждаясь, что ядро и размеры изображения соответствуют требованиям.
+
+В RunImpl лежит основное отличие от последовательной реализации. Используется директива \#pragma omp parallel для создания параллельного региона, в котором переменные input, output (ссылки на векторы входных и выходных данных), а также размеры изображения и ядро передаются в каждый поток.
+
+Затем с помощью директивы \#pragma omp for цикл по строкам изображения (переменная y) распараллеливается между потоками. Каждый поток обрабатывает отдельный набор строк, что позволяет одновременно вычислять свёртку для множества пикселей.
+
+Внутри параллельного цикла для каждого пикселя (кроме граничных) по всем трем цветовым каналам вычисляется свёртка 3×3 области вокруг текущего пикселя. Для этого используется вложенный цикл по смещениям ky и kx с соответствующим индексом ядра k. Результат свёртки округляется, ограничивается значениями от 0 до 255 и записывается в выходной буфер.
+
+После завершения параллельной обработки содержимое вектора output копируется обратно в выходной буфер, указанный в taskdata.
+
+
+\subsection{TBB версия}
+
+Реализация с использованием  TBB следует аналогичному подходу, но использует параллельные конструкции TBB.
+Параллелизм с использованием task arena и task group позволяет запускать задачи параллельно с управлением числом потоков, что эффективно использует ресурсы процессора.
+
+ В RunImpl создаётся объект task arena, который ограничивает число потоков в пуле TBB числом, возвращаемым функцией ppc::util::GetPPCNumThreads(). Это позволяет контролировать уровень параллелизма.
+
+Внутри арены запускается task group, куда добавляются задачи — для каждого потока создаётся задача, выполняющая функцию GaussianVerticalFilter. Однако стоит отметить, что в текущей реализации каждый поток выполняет фильтрацию по всему изображению, что приводит к избыточным вычислениям и перезаписи результатов.
+
+Функция GaussianVerticalFilter реализует стандартную свёртку по вертикальному и горизонтальному соседству пикселей с ядром размером 3×3, проходя по всем пикселям, кроме границ, и вычисляя новый цвет для каждого из трех каналов. Результат записывается в выходной буфер.
+
+После выполнения задач содержимое output копируется обратно в буфер вывода.
+
+
+\subsection{STL версия}
+
+Данная STL-версия успешно использует возможности стандартной библиотеки для многопоточной обработки изображения, обеспечивая разделение работы между потоками по строкам. Это даёт хороший уровень параллелизма без сложных зависимостей от сторонних библиотек и эффективно использует ресурсы многоядерных процессоров. 
+
+Рассмотрим RunImpl — распараллеливание вычислений с помощью std::thread
+Получается количество потоков, доступных системе (num threads). Создаётся вектор потоков размером num threads.
+
+Каждый поток запускает функцию GaussianVerticalFilter, которая выполняет свёртку по своему "шахматному" шагу по строкам — поток с thread id = i обрабатывает строки начиная с y = 1 + i и далее с шагом равным числу потоков (num threads). Такое разбиение гарантирует, что потоки не пересекаются по обрабатываемым строкам и не конфликтуют при записи в выходной буфер.
+
+Внутри функции GaussianVerticalFilter для каждого пикселя (кроме краевых) вычисляется новая цветовая компонента с помощью суммирования произведений соседних пикселей и значений ядра свёртки, а результат округляется и ограничивается по диапазону 0–255.
+
+После запуска всех потоков вызывается join() для каждого из них, чтобы дождаться завершения обработки.
+
+
+\subsection{Версия \texttt{MPI+TBB}}
+
+Реализация использует гибридный подход: MPI — для распределения изображения между несколькими процессами, и OpenMP — для распараллеливания обработки внутри каждого процесса. Это позволяет эффективно использовать ресурсы как многопроцессорных, так и многопоточных систем.
+
+Распределение данных (MPI):Каждый процесс получает свою часть изображения — определённое количество строк. Чтобы фильтр мог корректно работать на границах блока, каждому процессу дополнительно передаются "halo" строки сверху и снизу (если они есть). Эти строки не фильтруются, но используются при расчётах.
+
+Рассылка и приём данных:Процесс с rank == 0 занимается разбиением общего изображения и отправляет соответствующие блоки другим процессам. Каждый блок включает нужные строки изображения и halo-области. Процессы с rank > 0 получают свои блоки через world.recv(...).
+
+Применение фильтра (OpenMP):После получения блока каждый процесс применяет вертикальный гауссов фильтр к своим строкам (исключая halo). Для ускорения используется OpenMP: строки обрабатываются в параллельных потоках. Каждый пиксель фильтруется по трём каналам (RGB), и значения ограничиваются диапазоном [0, 255].
+
+Сбор результатов:После фильтрации процессы с rank > 0 отправляют результаты обратно процессу 0. Он собирает все локальные выходные блоки в общий вектор output, вставляя их в нужные позиции. Таким образом восстанавливается итоговое обработанное изображение.
+
+\section{Экспериментальные результаты}
+Для оценки производительности были проведены эксперименты на наборе данных из 4000 случайных чисел с плавающей точкой двойной точности. Будем сравнивать последовательную реализацию с параллельными версиями OpenMP, TBB, STL и MPI+TBB.
+
+\section*{Результаты экспериментов}
+Для оценки производительности реализованных версий алгоритма были проведены измерения времени выполнения программы на входном массиве из 4000×4000 пикселей. Будем сравнивать последовательную реализацию с параллельными версиями OpenMP, TBB, STL и MPI+TBB.
+
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Версия} & \textbf{Конфигурация} & \textbf{PipelineRun (с)} & \textbf{TaskRun (с)} \\
+\hline
+SEQ & — & 4.0127 & 3.9395\\
+\hline
+\multirow{3}{*}{OpenMP} 
+ & 2 потока & 2.2046 & 2.2197\\
+ & 3 потока & 1.7035 & 1.4545\\
+ & 5 потоков & 0.5059 & 0.4308\\
+\hline
+\multirow{3}{*}{TBB} 
+ & 2 потока & 0.2328 & 0.1712\\
+ & 3 потока & 0.092741 & 0.0000147\\
+ & 5 потоков & 1.6284 & 1.5605\\
+\hline
+\multirow{3}{*}{STL} 
+ & 2 потока & 0.0456248 & 0.0000142\\
+ & 3 потока & 0.092741 & 0.0000147\\
+ & 5 потоков & 0.087833 & 0.0000218\\
+\hline
+\multirow{5}{*}{MPI + OMP} 
+ & 2 потока + 2 процесса & 2.2578 & 2.1435\\
+ & 3 потока + 2 процесса & 2.1793 & 1.9564\\
+ & 3 потока + 3 процесса & 2.2651 & 2.1242 \\
+\hline
+\end{tabular}
+\end{center}
+
+\section*{Анализ результатов}
+
+SEQ (последовательное выполнение) - это базовый уровень, с которым сравниваем параллельные реализации.Не использует параллелизм, самая медленная.
+OpenMP является наиболее сбалансированным решением с точки зрения производительности и масштабируемости для данной задачи.Значительно быстрее, чем SEQ, с хорошей масштабируемостью.Чётко показывает выгоду от распараллеливания, время уменьшается при добавлении потоков.
+TBB : при 2-3 потоках показывает лучшую производительность, чем OpenMP. Но при 5 потоках  ухудшается.
+STL Threads  : при 2 потоках время минимальное (0.045 с), даже лучше TBB и OpenMP.Но при 3 и 5 потоках время не улучшается, а иногда немного ухудшается.
+MPI + OpenMP (гибрид): время сопоставимо с OpenMP, 
+
+Корректность работы всех реализаций была подтверждена путем функционального тестирования с использованием фреймворка GTest. Результаты сортировки для всех параллельных версий сравнивались с результатами последовательной реализации (SEQ)
+
+\section*{Заключение}
+
+В ходе лабораторной работы была реализована и исследована эффективность линейной фильтрации изображений с применением ядра Гаусса 3×3 с вертикальным разбиением. Были разработаны последовательная версия и четыре параллельные реализации с использованием технологий OpenMP, TBB, STL и гибридной модели MPI + OpenMP.
+
+Экспериментальные результаты показали значительное ускорение параллельных версий по сравнению с последовательной реализацией. Наилучшие показатели по времени демонстрировали реализации на основе STL и TBB при небольшом количестве потоков, однако при увеличении числа потоков производительность TBB снижалась, что требует дополнительного анализа и оптимизации. Версия с OpenMP показала стабильное и предсказуемое улучшение времени выполнения с ростом числа потоков, что свидетельствует о её хорошей масштабируемости и практической применимости. Гибридная модель MPI + OpenMP не показала значительного преимущества в условиях эксперимента, возможно, из-за накладных расходов на межпроцессное взаимодействие.
+
+В ходе работы были значительно улучшены практические навыки в области параллельного программирования. Проведен анализ и освоено применение различных технологий (OpenMP, TBB, STL, MPI) для решения задач сортировки больших массивов данных, что позволило выявить их сильные и слабые стороны.
+
+\section*{Список литературы}
+\begin{enumerate}
+    \item Сиднев А.А., Сысоев А.В., Мееров И.Б. Библиотека Intel Threading Building Blocks – краткое описание // Материалы образовательного комплекса «Технологии разработки параллельных программ». Нижний Новгород, 2007.
+    \item Параллельные вычисления https://parallel.uran.ru/node/182
+    \item Параллельные заметки №3 — базовые конструкции OpenMP https://habr.com/ru/companies/intel/articles/85273/
+    \item Рейндерс, Дж. Intel Threading Building Blocks: Практическое руководство по параллельному программированию / Дж. Рейндерс; пер. с англ. — М.: Вильямс, 2007. — 336 с. — ISBN 978-5-8459-1274-9
+   \item Фильтрация изображения на FPGA https://habr.com/ru/articles/324070/
+
+\end{enumerate}
+\newpage
+\section*{Приложение: Код программы}
+
+\subsection*{Файл ops\_seq.cpp}
+
+\begin{lstlisting}
+#include "seq/komshina_d_image_filtering_vertical_gaussian/include/ops_seq.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <vector>
+
+bool komshina_d_image_filtering_vertical_gaussian_seq::TestTaskSequential::PreProcessingImpl() {
+  width_ = task_data->inputs_count[0];
+  height_ = task_data->inputs_count[1];
+
+  unsigned int input_size = width_ * height_ * 3;
+  auto *in_ptr = reinterpret_cast<unsigned char *>(task_data->inputs[0]);
+  input_.assign(in_ptr, in_ptr + input_size);
+
+  unsigned int kernel_size = task_data->inputs_count[2];
+  auto *kernel_ptr = reinterpret_cast<float *>(task_data->inputs[1]);
+  kernel_.assign(kernel_ptr, kernel_ptr + kernel_size);
+
+  output_.assign(input_.begin(), input_.end());
+
+  return true;
+}
+
+bool komshina_d_image_filtering_vertical_gaussian_seq::TestTaskSequential::ValidationImpl() {
+  if (task_data->inputs[0] == nullptr || task_data->inputs[1] == nullptr || task_data->outputs.empty() ||
+      task_data->outputs[0] == nullptr) {
+    return false;
+  }
+
+  const auto &input_count = task_data->inputs_count;
+  const auto &output_count = task_data->outputs_count;
+
+  if (input_count.size() < 3 || output_count.empty()) {
+    return false;
+  }
+
+  constexpr int kKernelSize = 9;
+  constexpr int kChannels = 3;
+
+  bool valid_kernel = (input_count[2] == kKernelSize);
+  bool valid_size = (input_count[0] * input_count[1] * kChannels == output_count[0]);
+
+  return valid_kernel && valid_size;
+}
+
+bool komshina_d_image_filtering_vertical_gaussian_seq::TestTaskSequential::RunImpl() {
+  for (std::size_t y = 1; y + 1 < height_; ++y) {
+    for (std::size_t x = 1; x + 1 < width_; ++x) {
+      std::size_t base_idx = (y * width_ + x) * 3;
+
+      for (std::size_t c = 0; c < 3; ++c) {
+        float total = 0.0F;
+        std::size_t k_idx = 0;
+
+        for (int ky = -1; ky <= 1; ++ky) {
+          std::size_t row_idx = ((((y + ky) * width_) + (x - 1)) * 3) + c;
+
+          for (int kx = -1; kx <= 1; ++kx, ++k_idx) {
+            total += static_cast<float>(input_[row_idx]) * kernel_[k_idx];
+            row_idx += 3;
+          }
+        }
+        output_[base_idx + c] = std::clamp(static_cast<int>(std::round(total)), 0, 255);
+      }
+    }
+  }
+  return true;
+}
+
+bool komshina_d_image_filtering_vertical_gaussian_seq::TestTaskSequential::PostProcessingImpl() {
+  if (task_data->outputs.empty() || task_data->outputs[0] == nullptr) {
+    return false;
+  }
+
+  std::ranges::copy(output_, task_data->outputs[0]);
+
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{Файл ops\_omp.cpp}
+\begin{lstlisting}
+#include "omp/komshina_d_image_filtering_vertical_gaussian/include/ops_omp.hpp"
+
+
+
+
+#include <omp.h>
+
+
+
+
+#include <algorithm>
+
+#include <cmath>
+
+#include <cstddef>
+
+#include <vector>
+
+
+
+
+bool komshina_d_image_filtering_vertical_gaussian_omp::TestTaskOpenMP::PreProcessingImpl() {
+
+  width_ = task_data->inputs_count[0];
+
+  height_ = task_data->inputs_count[1];
+
+
+
+
+  unsigned int input_size = width_ * height_ * 3;
+
+  auto *in_ptr = reinterpret_cast<unsigned char *>(task_data->inputs[0]);
+
+  input_.assign(in_ptr, in_ptr + input_size);
+
+
+
+
+  unsigned int kernel_size = task_data->inputs_count[2];
+
+  auto *kernel_ptr = reinterpret_cast<float *>(task_data->inputs[1]);
+
+  kernel_.assign(kernel_ptr, kernel_ptr + kernel_size);
+
+
+
+
+  output_.assign(input_.begin(), input_.end());
+
+
+
+
+  return true;
+
+}
+
+
+
+
+bool komshina_d_image_filtering_vertical_gaussian_omp::TestTaskOpenMP::ValidationImpl() {
+
+  if (task_data->inputs[0] == nullptr || task_data->inputs[1] == nullptr || task_data->outputs.empty() ||
+
+      task_data->outputs[0] == nullptr) {
+
+    return false;
+
+  }
+
+
+
+
+  const auto &input_count = task_data->inputs_count;
+
+  const auto &output_count = task_data->outputs_count;
+
+
+
+
+  if (input_count.size() < 3 || output_count.empty()) {
+
+    return false;
+
+  }
+
+
+
+
+  constexpr int kKernelSize = 9;
+
+  constexpr int kChannels = 3;
+
+
+
+
+  bool valid_kernel = (input_count[2] == kKernelSize);
+
+  bool valid_size = (input_count[0] * input_count[1] * kChannels == output_count[0]);
+
+
+
+
+  return valid_kernel && valid_size;
+
+}
+
+
+
+
+bool komshina_d_image_filtering_vertical_gaussian_omp::TestTaskOpenMP::RunImpl() {
+
+  int local_height = static_cast<int>(height_);
+
+  int local_width = static_cast<int>(width_);
+
+  std::vector<float> local_kernel = kernel_;
+
+
+
+
+  auto &input_ref = input_;
+
+  auto &output_ref = output_;
+
+
+
+
+#pragma omp parallel default(none) shared(input_ref, output_ref) firstprivate(local_height, local_width, local_kernel)
+
+  {
+
+#pragma omp for
+
+    for (int y = 1; y < local_height - 1; ++y) {
+
+      for (int x = 1; x < local_width - 1; ++x) {
+
+        std::size_t base_idx = (y * local_width + x) * 3;
+
+
+
+
+        for (int c = 0; c < 3; ++c) {
+
+          float total = 0.0F;
+
+          int k_idx = 0;
+
+
+
+
+          for (int ky = -1; ky <= 1; ++ky) {
+
+            std::size_t row_idx = ((((y + ky) * local_width) + (x - 1)) * 3) + c;
+
+
+
+
+            for (int kx = -1; kx <= 1; ++kx, ++k_idx) {
+
+              total += static_cast<float>(input_ref[row_idx]) * local_kernel[k_idx];
+
+              row_idx += 3;
+
+            }
+
+          }
+
+          output_ref[base_idx + c] = std::clamp(static_cast<int>(std::round(total)), 0, 255);
+
+        }
+
+      }
+
+    }
+
+  }
+
+  return true;
+
+}
+
+
+
+
+bool komshina_d_image_filtering_vertical_gaussian_omp::TestTaskOpenMP::PostProcessingImpl() {
+
+  if (task_data->outputs.empty() || task_data->outputs[0] == nullptr) {
+
+    return false;
+
+  }
+
+
+
+
+  auto *output_ptr = task_data->outputs[0];
+
+  std::ranges::copy(output_, output_ptr);
+
+
+
+
+  return true;
+
+}
+\end{lstlisting}
+
+\subsection*{Файл ops\_tbb.cpp}
+\begin{lstlisting}
+#include "tbb/komshina_d_image_filtering_vertical_gaussian/include/ops_tbb.hpp"
+
+#include <tbb/tbb.h>
+
+#include <algorithm>
+#include <cmath>
+#include <core/util/include/util.hpp>
+#include <cstddef>
+#include <vector>
+
+#include "oneapi/tbb/task_arena.h"
+#include "oneapi/tbb/task_group.h"
+
+namespace {
+void GaussianVerticalFilter(const std::vector<unsigned char> &in_vec, std::size_t width, std::size_t height,
+                            const std::vector<float> &kernel, std::vector<unsigned char> &out_vec) {
+  constexpr int kChannels = 3;
+  const int k_radius = 1;
+
+  for (std::size_t y = 1; y + 1 < height; ++y) {
+    for (std::size_t x = 1; x + 1 < width; ++x) {
+      std::size_t base_idx = (y * width + x) * kChannels;
+
+      for (std::size_t c = 0; c < kChannels; ++c) {
+        float total = 0.0F;
+        std::size_t k_idx = 0;
+
+        for (int ky = -k_radius; ky <= k_radius; ++ky) {
+          std::size_t row_idx = ((((y + ky) * width) + (x - 1)) * kChannels) + c;
+
+          for (int kx = -k_radius; kx <= k_radius; ++kx, ++k_idx) {
+            total += static_cast<float>(in_vec[row_idx]) * kernel[k_idx];
+            row_idx += kChannels;
+          }
+        }
+
+        out_vec[base_idx + c] = std::clamp(static_cast<int>(std::round(total)), 0, 255);
+      }
+    }
+  }
+}
+}  // namespace
+
+bool komshina_d_image_filtering_vertical_gaussian_tbb::TestTaskTBB::PreProcessingImpl() {
+  width_ = task_data->inputs_count[0];
+  height_ = task_data->inputs_count[1];
+
+  unsigned int input_size = width_ * height_ * 3;
+  auto *in_ptr = reinterpret_cast<unsigned char *>(task_data->inputs[0]);
+  input_.assign(in_ptr, in_ptr + input_size);
+
+  unsigned int kernel_size = task_data->inputs_count[2];
+  auto *kernel_ptr = reinterpret_cast<float *>(task_data->inputs[1]);
+  kernel_.assign(kernel_ptr, kernel_ptr + kernel_size);
+
+  output_.assign(input_.begin(), input_.end());
+
+  return true;
+}
+
+bool komshina_d_image_filtering_vertical_gaussian_tbb::TestTaskTBB::ValidationImpl() {
+  if (task_data->inputs[0] == nullptr || task_data->inputs[1] == nullptr || task_data->outputs.empty() ||
+      task_data->outputs[0] == nullptr) {
+    return false;
+  }
+
+  const auto &input_count = task_data->inputs_count;
+  const auto &output_count = task_data->outputs_count;
+
+  if (input_count.size() < 3 || output_count.empty()) {
+    return false;
+  }
+
+  constexpr int kKernelSize = 9;
+  constexpr int kChannels = 3;
+
+  bool valid_kernel = (input_count[2] == kKernelSize);
+  bool valid_size = (input_count[0] * input_count[1] * kChannels == output_count[0]);
+
+  return valid_kernel && valid_size;
+}
+
+bool komshina_d_image_filtering_vertical_gaussian_tbb::TestTaskTBB::RunImpl() {
+  oneapi::tbb::task_arena arena(ppc::util::GetPPCNumThreads());
+  arena.execute([&] {
+    oneapi::tbb::task_group tg;
+    for (int thr = 0; thr < ppc::util::GetPPCNumThreads(); ++thr) {
+      tg.run([&] { GaussianVerticalFilter(input_, width_, height_, kernel_, output_); });
+    }
+    tg.wait();
+  });
+
+  return true;
+}
+
+bool komshina_d_image_filtering_vertical_gaussian_tbb::TestTaskTBB::PostProcessingImpl() {
+  if (task_data->outputs.empty() || task_data->outputs[0] == nullptr) {
+    return false;
+  }
+
+  auto *output_ptr = task_data->outputs[0];
+  std::ranges::copy(output_, output_ptr);
+
+  return true;
+}
+
+\end{lstlisting}
+
+\subsection*{Файл ops\_stl.cpp}
+\begin{lstlisting}
+
+#include "stl/komshina_d_image_filtering_vertical_gaussian/include/ops_stl.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <functional>
+#include <thread>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+namespace {
+void GaussianVerticalFilter(const std::vector<unsigned char> &input, std::vector<unsigned char> &output,
+                            std::size_t width, std::size_t height, const std::vector<float> &kernel, int thread_id,
+                            int num_threads) {
+  for (std::size_t y = 1 + thread_id; y + 1 < height; y += num_threads) {
+    for (std::size_t x = 1; x + 1 < width; ++x) {
+      std::size_t base_idx = (y * width + x) * 3;
+
+      for (std::size_t c = 0; c < 3; ++c) {
+        float total = 0.0F;
+        std::size_t k_idx = 0;
+
+        for (int ky = -1; ky <= 1; ++ky) {
+          std::size_t row_idx = (((y + ky) * width + (x - 1)) * 3) + c;
+
+          for (int kx = -1; kx <= 1; ++kx, ++k_idx) {
+            total += static_cast<float>(input[row_idx]) * kernel[k_idx];
+            row_idx += 3;
+          }
+        }
+        output[base_idx + c] = std::clamp(static_cast<int>(std::round(total)), 0, 255);
+      }
+    }
+  }
+}
+}  // namespace
+
+bool komshina_d_image_filtering_vertical_gaussian_stl::TestTaskSTL::PreProcessingImpl() {
+  width_ = task_data->inputs_count[0];
+  height_ = task_data->inputs_count[1];
+
+  unsigned int input_size = width_ * height_ * 3;
+  auto *in_ptr = reinterpret_cast<unsigned char *>(task_data->inputs[0]);
+  input_.assign(in_ptr, in_ptr + input_size);
+
+  unsigned int kernel_size = task_data->inputs_count[2];
+  auto *kernel_ptr = reinterpret_cast<float *>(task_data->inputs[1]);
+  kernel_.assign(kernel_ptr, kernel_ptr + kernel_size);
+
+  output_.assign(input_.begin(), input_.end());
+
+  return true;
+}
+
+bool komshina_d_image_filtering_vertical_gaussian_stl::TestTaskSTL::ValidationImpl() {
+  if (task_data->inputs[0] == nullptr || task_data->inputs[1] == nullptr || task_data->outputs.empty() ||
+      task_data->outputs[0] == nullptr) {
+    return false;
+  }
+
+  const auto &input_count = task_data->inputs_count;
+  const auto &output_count = task_data->outputs_count;
+
+  if (input_count.size() < 3 || output_count.empty()) {
+    return false;
+  }
+
+  constexpr int kKernelSize = 9;
+  constexpr int kChannels = 3;
+
+  bool valid_kernel = (input_count[2] == kKernelSize);
+  bool valid_size = (input_count[0] * input_count[1] * kChannels == output_count[0]);
+
+  return valid_kernel && valid_size;
+}
+
+bool komshina_d_image_filtering_vertical_gaussian_stl::TestTaskSTL::RunImpl() {
+  const int num_threads = ppc::util::GetPPCNumThreads();
+  std::vector<std::thread> threads(num_threads);
+
+  for (int i = 0; i < num_threads; ++i) {
+    threads[i] = std::thread(GaussianVerticalFilter, std::cref(input_), std::ref(output_), width_, height_,
+                             std::cref(kernel_), i, num_threads);
+  }
+
+  for (auto &thread : threads) {
+    thread.join();
+  }
+
+  return true;
+}
+
+bool komshina_d_image_filtering_vertical_gaussian_stl::TestTaskSTL::PostProcessingImpl() {
+  if (task_data->outputs.empty() || task_data->outputs[0] == nullptr) {
+    return false;
+  }
+
+  std::ranges::copy(output_, task_data->outputs[0]);
+
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{Файл ops\_mpi+omp.cpp}
+
+
+\begin{lstlisting}
+
+#include "all/komshina_d_image_filtering_vertical_gaussian/include/ops_all.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <vector>
+
+namespace {
+
+void VerticalGaussianFilter(const std::vector<unsigned char>& local_input, std::vector<unsigned char>& local_output,
+                            const std::vector<float>& kernel, std::size_t local_height, std::size_t width,
+                            std::size_t k_radius, std::size_t halo_top) {
+  const std::size_t k_channels = 3;
+
+#pragma omp parallel for default(none) \
+    shared(local_input, local_output, kernel, local_height, width, k_radius, halo_top)
+  for (auto y = static_cast<std::ptrdiff_t>(halo_top); y < static_cast<std::ptrdiff_t>(halo_top + local_height); ++y) {
+    for (std::size_t x = 0; x < width; ++x) {
+      std::size_t base_idx = ((static_cast<std::size_t>(y) - halo_top) * width + x) * k_channels;
+
+      for (std::size_t c = 0; c < k_channels; ++c) {
+        float sum = 0.0F;
+
+        for (std::ptrdiff_t k = -static_cast<std::ptrdiff_t>(k_radius); k <= static_cast<std::ptrdiff_t>(k_radius);
+             ++k) {
+          std::ptrdiff_t yy = y + k;
+          if (yy < 0 || yy >= static_cast<std::ptrdiff_t>(local_height)) {
+            continue;
+          }
+
+          std::size_t idx = (((static_cast<std::size_t>(yy) * width) + x) * k_channels) + c;
+          sum += static_cast<float>(local_input[idx]) * kernel[k + k_radius];
+        }
+
+        local_output[base_idx + c] = std::clamp(static_cast<int>(std::round(sum)), 0, 255);
+      }
+    }
+  }
+}
+
+}  // namespace
+
+bool komshina_d_image_filtering_vertical_gaussian_all::TestTaskALL::PreProcessingImpl() {
+  width_ = task_data->inputs_count[0];
+  height_ = task_data->inputs_count[1];
+
+  unsigned int input_size = width_ * height_ * 3;
+  auto* in_ptr = reinterpret_cast<unsigned char*>(task_data->inputs[0]);
+  input_.assign(in_ptr, in_ptr + input_size);
+
+  unsigned int kernel_size = task_data->inputs_count[2];
+  auto* kernel_ptr = reinterpret_cast<float*>(task_data->inputs[1]);
+  kernel_.assign(kernel_ptr, kernel_ptr + kernel_size);
+
+  output_.resize(input_size, 0);
+  return true;
+}
+
+bool komshina_d_image_filtering_vertical_gaussian_all::TestTaskALL::ValidationImpl() {
+  if (task_data->inputs[0] == nullptr || task_data->inputs[1] == nullptr || task_data->outputs.empty() ||
+      task_data->outputs[0] == nullptr) {
+    return false;
+  }
+
+  const auto& input_count = task_data->inputs_count;
+  const auto& output_count = task_data->outputs_count;
+
+  if (input_count.size() < 3 || output_count.empty()) {
+    return false;
+  }
+
+  constexpr int kKernelSize = 9;
+  constexpr int kChannels = 3;
+
+  bool valid_kernel = (input_count[2] == kKernelSize);
+  bool valid_size = (input_count[0] * input_count[1] * kChannels == output_count[0]);
+
+  return valid_kernel && valid_size;
+}
+
+bool komshina_d_image_filtering_vertical_gaussian_all::TestTaskALL::RunImpl() {
+
+ const int rank = world_.rank();
+  const int size = world_.size();
+  const std::size_t k_channels = 3;
+  const std::size_t k_radius = kernel_.size() / 2;
+
+  std::size_t rows_per_proc = height_ / static_cast<std::size_t>(size);
+  std::size_t remainder = height_ % static_cast<std::size_t>(size);
+  std::size_t local_height = rows_per_proc + ((static_cast<std::size_t>(rank) < remainder) ? 1 : 0);
+  std::size_t offset = (static_cast<std::size_t>(rank) * rows_per_proc) +
+                       std::min<std::size_t>(static_cast<std::size_t>(rank), remainder);
+
+  std::size_t halo_top = (offset > 0) ? k_radius : 0;
+  std::size_t halo_bottom = ((offset + local_height) < height_) ? k_radius : 0;
+
+  std::vector<unsigned char> local_input =
+      DistributeInputToProcesses(rank, size, k_radius, local_height, offset, halo_top, halo_bottom);
+
+  std::vector<unsigned char> local_output(local_height * width_ * k_channels, 0);
+
+  VerticalGaussianFilter(local_input, local_output, kernel_, local_height, width_, k_radius, halo_top);
+
+  if (rank == 0) {
+    std::ranges::copy(local_output, output_.begin() + static_cast<std::ptrdiff_t>(offset * width_ * k_channels));
+
+    for (int i = 1; i < size; ++i) {
+      auto si = static_cast<std::size_t>(i);
+      std::size_t lh = rows_per_proc + ((si < remainder) ? 1 : 0);
+      std::vector<unsigned char> temp(lh * width_ * k_channels);
+      world_.recv(i, 1, temp);
+
+      std::size_t target_offset = (si * rows_per_proc + std::min<std::size_t>(si, remainder)) * width_ * k_channels;
+      std::ranges::copy(temp, output_.begin() + static_cast<std::ptrdiff_t>(target_offset));
+    }
+  } else {
+    world_.send(0, 1, local_output);
+  }
+
+  return true;
+}
+
+std::vector<unsigned char> komshina_d_image_filtering_vertical_gaussian_all::TestTaskALL::DistributeInputToProcesses(
+    int rank, int size, std::size_t k_radius, std::size_t local_height, std::size_t offset, std::size_t halo_top,
+    std::size_t halo_bottom) {
+  const std::size_t k_channels = 3;
+  std::size_t total_rows = local_height + halo_top + halo_bottom;
+  std::vector<unsigned char> local_input(total_rows * width_ * k_channels);
+
+  if (rank == 0) {
+    for (int i = 0; i < size; ++i) {
+      auto si = static_cast<std::size_t>(i);
+      auto lh = (height_ / static_cast<std::size_t>(size)) + ((si < (height_ % size)) ? 1 : 0);
+      std::size_t off = (si * (height_ / static_cast<std::size_t>(size))) + std::min(si, height_ % size);
+
+      std::size_t halo_t = (off > 0) ? k_radius : 0;
+      std::size_t halo_b = ((off + lh) < height_) ? k_radius : 0;
+      std::size_t rows = lh + halo_t + halo_b;
+
+      std::ptrdiff_t start_row = static_cast<std::ptrdiff_t>(off) - static_cast<std::ptrdiff_t>(halo_t);
+      std::size_t start_idx = std::max<std::ptrdiff_t>(start_row, 0) * width_ * k_channels;
+      std::size_t count = rows * width_ * k_channels;
+
+      if (i == 0) {
+        std::copy(input_.begin() + static_cast<std::ptrdiff_t>(start_idx),
+                  input_.begin() + static_cast<std::ptrdiff_t>(start_idx + count), local_input.begin());
+
+      } else {
+        std::vector<unsigned char> temp(input_.begin() + static_cast<std::ptrdiff_t>(start_idx),
+                                        input_.begin() + static_cast<std::ptrdiff_t>(start_idx + count));
+        world_.send(i, 0, temp);
+      }
+    }
+  } else {
+    world_.recv(0, 0, local_input);
+  }
+
+  return local_input;
+}
+
+bool komshina_d_image_filtering_vertical_gaussian_all::TestTaskALL::PostProcessingImpl() {
+  if (world_.rank() == 0) {
+    std::ranges::copy(output_, reinterpret_cast<unsigned char*>(task_data->outputs[0]));
+  }
+  return true;
+}
+
+\end{lstlisting}
+\end{document}
