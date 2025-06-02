@@ -1,11 +1,24 @@
 \documentclass[12pt]{article}
-\usepackage[russian]{babel}
+\usepackage{cmap}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
 \usepackage{graphicx}
 \usepackage{geometry}
 \usepackage{amsmath}
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{appendix}
+\usepackage{pscyr}
+\renewcommand{\rmdefault}{ftm}
+\usepackage{lmodern}
+\usepackage{hyperref}
+\hypersetup{
+    unicode=true,
+    bookmarksopen=true,
+    bookmarksnumbered=true,
+    pdfencoding=unicode
+}
 
 \geometry{a4paper, left=25mm, right=15mm, top=20mm, bottom=20mm}
 
@@ -13,20 +26,88 @@
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
 \definecolor{codepurple}{rgb}{0.58,0,0.82}
 \lstdefinestyle{mystyle}{
-basicstyle=\ttfamily\footnotesize,
-commentstyle=\color{codegreen},
-keywordstyle=\color{magenta},
-numberstyle=\tiny\color{codegray},
-stringstyle=\color{codepurple},
-breakatwhitespace=false,
-breaklines=true,
-keepspaces=true,
-numbers=left,
-numbersep=5pt,
-showspaces=false,
-showstringspaces=false,
-showtabs=false,
-tabsize=4
+    basicstyle=\ttfamily\footnotesize,
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    breakatwhitespace=false,
+    breaklines=true,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4,
+    extendedchars=true,
+    literate=
+    {а}{{\selectfont\char224}}1
+    {б}{{\selectfont\char225}}1
+    {в}{{\selectfont\char226}}1
+    {г}{{\selectfont\char227}}1
+    {д}{{\selectfont\char228}}1
+    {е}{{\selectfont\char229}}1
+    {ё}{{\"e}}1
+    {ж}{{\selectfont\char230}}1
+    {з}{{\selectfont\char231}}1
+    {и}{{\selectfont\char232}}1
+    {й}{{\selectfont\char233}}1
+    {к}{{\selectfont\char234}}1
+    {л}{{\selectfont\char235}}1
+    {м}{{\selectfont\char236}}1
+    {н}{{\selectfont\char237}}1
+    {о}{{\selectfont\char238}}1
+    {п}{{\selectfont\char239}}1
+    {р}{{\selectfont\char240}}1
+    {с}{{\selectfont\char241}}1
+    {т}{{\selectfont\char242}}1
+    {у}{{\selectfont\char243}}1
+    {ф}{{\selectfont\char244}}1
+    {х}{{\selectfont\char245}}1
+    {ц}{{\selectfont\char246}}1
+    {ч}{{\selectfont\char247}}1
+    {ш}{{\selectfont\char248}}1
+    {щ}{{\selectfont\char249}}1
+    {ъ}{{\selectfont\char250}}1
+    {ы}{{\selectfont\char251}}1
+    {ь}{{\selectfont\char252}}1
+    {э}{{\selectfont\char253}}1
+    {ю}{{\selectfont\char254}}1
+    {я}{{\selectfont\char255}}1
+    {А}{{\selectfont\char192}}1
+    {Б}{{\selectfont\char193}}1
+    {В}{{\selectfont\char194}}1
+    {Г}{{\selectfont\char195}}1
+    {Д}{{\selectfont\char196}}1
+    {Е}{{\selectfont\char197}}1
+    {Ё}{{\"E}}1
+    {Ж}{{\selectfont\char198}}1
+    {З}{{\selectfont\char199}}1
+    {И}{{\selectfont\char200}}1
+    {Й}{{\selectfont\char201}}1
+    {К}{{\selectfont\char202}}1
+    {Л}{{\selectfont\char203}}1
+    {М}{{\selectfont\char204}}1
+    {Н}{{\selectfont\char205}}1
+    {О}{{\selectfont\char206}}1
+    {П}{{\selectfont\char207}}1
+    {Р}{{\selectfont\char208}}1
+    {С}{{\selectfont\char209}}1
+    {Т}{{\selectfont\char210}}1
+    {У}{{\selectfont\char211}}1
+    {Ф}{{\selectfont\char212}}1
+    {Х}{{\selectfont\char213}}1
+    {Ц}{{\selectfont\char214}}1
+    {Ч}{{\selectfont\char215}}1
+    {Ш}{{\selectfont\char216}}1
+    {Щ}{{\selectfont\char217}}1
+    {Ъ}{{\selectfont\char218}}1
+    {Ы}{{\selectfont\char219}}1
+    {Ь}{{\selectfont\char220}}1
+    {Э}{{\selectfont\char221}}1
+    {Ю}{{\selectfont\char222}}1
+    {Я}{{\selectfont\char223}}1
 }
 \lstset{style=mystyle}
 
@@ -99,9 +180,9 @@ tabsize=4
 \section{Реализация}
 \subsection{Общий алгоритм}
 \begin{enumerate}
-\item Распределение данных между процессами с помощью \texttt{MPI_Scatterv}
+\item Распределение данных между процессами с помощью \texttt{MPI\_Scatterv}
 \item Параллельная сортировка Шелла внутри каждого процесса с использованием TBB
-\item Сбор отсортированных частей с помощью \texttt{MPI_Gatherv}
+\item Сбор отсортированных частей с помощью \texttt{MPI\_Gatherv}
 \item Простое слияние отсортированных частей в процессе с рангом 0
 \end{enumerate}
 
@@ -111,27 +192,27 @@ tabsize=4
 \begin{lstlisting}[language=C++, caption=Фрагмент кода MPI]
 boost::mpi::communicator world_, group_;
 if (rank >= total_size) {
-world_.split(1);
-return true;
+    world_.split(1);
+    return true;
 }
 group_ = world_.split(0);
 \end{lstlisting}
 
 \subsubsection{TBB}
-Параллельная сортировка Шелла с использованием \texttt{tbb::parallel_for}:
+Параллельная сортировка Шелла с использованием \texttt{tbb::parallel\_for}:
 \begin{lstlisting}[language=C++, caption=Фрагмент кода TBB]
 for (int gap = n / 2; gap > 0; gap /= 2) {
-tbb::parallel_for(0, gap, [&](int k) {
-for (int i = k + gap; i < n; i += gap) {
-int temp = buffer[i];
-int j = i;
-while (j >= gap && buffer[j - gap] > temp) {
-buffer[j] = buffer[j - gap];
-j -= gap;
-}
-buffer[j] = temp;
-}
-});
+    tbb::parallel_for(0, gap, [&](int k) {
+        for (int i = k + gap; i < n; i += gap) {
+            int temp = buffer[i];
+            int j = i;
+            while (j >= gap && buffer[j - gap] > temp) {
+                buffer[j] = buffer[j - gap];
+                j -= gap;
+            }
+            buffer[j] = temp;
+        }
+    });
 }
 \end{lstlisting}
 
@@ -140,9 +221,9 @@ buffer[j] = temp;
 \begin{lstlisting}[language=C++, caption=Фрагмент кода простого слияния]
 std::priority_queue<Element, std::vector<Element>, decltype(comp)> min_heap(comp);
 for (int i = 0; i < num_procs; ++i) {
-if (counts_[i] > 0) {
-min_heap.emplace(gathered[displs[i]], i, 0);
-}
+    if (counts_[i] > 0) {
+        min_heap.emplace(gathered[displs[i]], i, 0);
+    }
 }
 \end{lstlisting}
 
@@ -154,7 +235,7 @@ min_heap.emplace(gathered[displs[i]], i, 0);
 \item Обратно отсортированный массив: проверка корректности сортировки
 \item Массив с дубликатами: проверка устойчивости алгоритма
 \item Массив с отрицательными числами: проверка работы с отрицательными значениями
-\item Массив с экстремальными значениями: проверка обработки INT32_MIN и INT32_MAX
+\item Массив с экстремальными значениями: проверка обработки INT32\_MIN и INT32\_MAX
 \item Массив со случайным порядком: проверка общего случая
 \item Массив из одного элемента: проверка граничного условия
 \end{itemize}
@@ -188,85 +269,85 @@ MPI + TBB (4 процесса, 8 потоков) & 0.42 \\ \hline
 \subsection{Основная реализация}
 \begin{lstlisting}[language=C++, caption=Фрагмент кода из ops_all.cpp]
 bool ShellSortAll::RunImpl() {
-const int rank = world_.rank();
-int total_size = rank == 0 ? static_cast<int>(input_.size()) : 0;
-boost::mpi::broadcast(world_, total_size, 0);
+    const int rank = world_.rank();
+    int total_size = rank == 0 ? static_cast<int>(input_.size()) : 0;
+    boost::mpi::broadcast(world_, total_size, 0);
 
-if (rank >= total_size) {
-    world_.split(1);
-    return true;
-}
+    if (rank >= total_size) {
+        world_.split(1);
+        return true;
+    }
 
-group_ = world_.split(0);
-int num_procs = group_.size();
-counts_ = std::vector<int>(num_procs, total_size / num_procs);
-std::vector<int> displs(num_procs, 0);
-for (int i = 0; i < total_size % num_procs; ++i) {
-    counts_[i]++;
-}
-for (int i = 1; i < num_procs; ++i) {
-    displs[i] = displs[i - 1] + counts_[i - 1];
-}
+    group_ = world_.split(0);
+    int num_procs = group_.size();
+    counts_ = std::vector<int>(num_procs, total_size / num_procs);
+    std::vector<int> displs(num_procs, 0);
+    for (int i = 0; i < total_size % num_procs; ++i) {
+        counts_[i]++;
+    }
+    for (int i = 1; i < num_procs; ++i) {
+        displs[i] = displs[i - 1] + counts_[i - 1];
+    }
 
-const int n = counts_[rank];
-std::vector<int> buffer(n);
-boost::mpi::scatterv(group_, input_.data(), counts_, displs, buffer.data(), n, 0);
+    const int n = counts_[rank];
+    std::vector<int> buffer(n);
+    boost::mpi::scatterv(group_, input_.data(), counts_, displs, buffer.data(), n, 0);
 
-for (int gap = n / 2; gap > 0; gap /= 2) {
-    tbb::parallel_for(0, gap, [&](int k) {
-        for (int i = k + gap; i < n; i += gap) {
-            int temp = buffer[i];
-            int j = i;
-            while (j >= gap && buffer[j - gap] > temp) {
-                buffer[j] = buffer[j - gap];
-                j -= gap;
+    for (int gap = n / 2; gap > 0; gap /= 2) {
+        tbb::parallel_for(0, gap, [&](int k) {
+            for (int i = k + gap; i < n; i += gap) {
+                int temp = buffer[i];
+                int j = i;
+                while (j >= gap && buffer[j - gap] > temp) {
+                    buffer[j] = buffer[j - gap];
+                    j -= gap;
+                }
+                buffer[j] = temp;
             }
-            buffer[j] = temp;
-        }
-    });
-}
-input_ = buffer;
+        });
+    }
+    input_ = buffer;
 
-std::vector<int> gathered;
-if (group_.rank() == 0) {
-    gathered.resize(task_data->inputs_count[0]);
-}
+    std::vector<int> gathered;
+    if (group_.rank() == 0) {
+        gathered.resize(task_data->inputs_count[0]);
+    }
 
-boost::mpi::gatherv(group_, input_, gathered.data(), counts_, 0);
+    boost::mpi::gatherv(group_, input_, gathered.data(), counts_, 0);
 
-if (group_.rank() == 0) {
-    SimpleMerge(num_procs, gathered, displs, total_size);
-}
+    if (group_.rank() == 0) {
+        SimpleMerge(num_procs, gathered, displs, total_size);
+    }
 
-return true;
+    return true;
 }
 \end{lstlisting}
 
 \subsection{Функциональные тесты}
 \begin{lstlisting}[language=C++, caption=Фрагмент кода из func_all.cpp]
 TEST(kovalchuk_a_shell_sort_func, Test_ReverseSorted) {
-std::vector<int> input = {10, 7, 5, 3, 1};
-std::vector<int> output(input.size());
-boost::mpi::communicator world;
+    std::vector<int> input = {10, 7, 5, 3, 1};
+    std::vector<int> output(input.size());
+    boost::mpi::communicator world;
 
-auto task_data = std::make_shared<ppc::core::TaskData>();
-if (world.rank() == 0) {
-    task_data->inputs.emplace_back(reinterpret_cast<uint8_t*>(input.data()));
-    task_data->inputs_count.emplace_back(input.size());
-    task_data->outputs.emplace_back(reinterpret_cast<uint8_t*>(output.data()));
-    task_data->outputs_count.emplace_back(output.size());
-}
+    auto task_data = std::make_shared<ppc::core::TaskData>();
+    if (world.rank() == 0) {
+        task_data->inputs.emplace_back(reinterpret_cast<uint8_t*>(input.data()));
+        task_data->inputs_count.emplace_back(input.size());
+        task_data->outputs.emplace_back(reinterpret_cast<uint8_t*>(output.data()));
+        task_data->outputs_count.emplace_back(output.size());
+    }
 
-auto task = std::make_shared<kovalchuk_a_shell_sort_all::ShellSortAll>(task_data);
-ASSERT_TRUE(task->Validation());
-task->PreProcessing();
-task->Run();
-task->PostProcessing();
+    auto task = std::make_shared<kovalchuk_a_shell_sort_all::ShellSortAll>(task_data);
+    ASSERT_TRUE(task->Validation());
+    task->PreProcessing();
+    task->Run();
+    task->PostProcessing();
 
-if (world.rank() == 0) {
-    std::vector<int> expected = {1, 3, 5, 7, 10};
-    EXPECT_EQ(expected, output);
-}
+    if (world.rank() == 0) {
+        std::vector<int> expected = {1, 3, 5, 7, 10};
+        EXPECT_EQ(expected, output);
+    }
 }
 \end{lstlisting}
 \end{appendices}
