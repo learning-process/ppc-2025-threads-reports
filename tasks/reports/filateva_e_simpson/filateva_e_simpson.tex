@@ -13,6 +13,24 @@
 \usepackage{xcolor} 
 \usepackage{listings}
 \usepackage{bookmark}
+\usepackage{refcount}
+\usepackage{etoolbox}
+\usepackage{auxhook}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    pdftitle={Отчет по методу Симпсона},
+    pdfauthor={Филатьева Елизавета},
+    pdfsubject={Параллельное программирование},
+    pdfkeywords={Симпсон, параллельное программирование, OpenMP, TBB, STL, MPI}
+}
+
+\makeatletter
+\@addtoreset{section}{part}
+\makeatother
 
 \definecolor{codegreen}{rgb}{0,0.6,0}
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
