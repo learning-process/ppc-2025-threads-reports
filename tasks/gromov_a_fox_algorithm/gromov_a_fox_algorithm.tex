@@ -1,0 +1,333 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{geometry}
+\usepackage{multirow}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{tocloft}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{float}
+
+\geometry{a4paper, left=25mm, right=15mm, top=20mm, bottom=20mm}
+
+\lstset{
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{blue},
+  commentstyle=\itshape\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=8pt,
+  backgroundcolor=\color{gray!10},
+  showspaces=false,
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  captionpos=b
+}
+
+\renewcommand{\cftsecaftersnum}{.}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\titleformat{\section}{\large\bfseries}{\thesection.}{1em}{}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \large
+    Министерство науки и высшего образования Российской Федерации\\[0.3cm]
+    Федеральное государственное автономное образовательное учреждение высшего образования\\[0.3cm]
+    \textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»}\\
+    (ННГУ)\\[0.8cm]
+    Институт информационных технологий, математики и механики\\[0.3cm]
+    Направление подготовки: \textbf{«Программная инженерия»}\\[1.5cm]
+
+    \vspace{1cm}
+
+    {\LARGE \textbf{ОТЧЕТ}}\\[0.3cm]
+    {\Large по задаче}\\[0.3cm]
+    {\LARGE \textbf{«Умножение плотных матриц. Элементы типа double. Блочная схема, алгоритм Фокса.}}\\[5.0cm]
+
+    \hfill\parbox{0.5\textwidth}{
+        \textbf{Выполнил:} \\
+        студент группы 3822Б1ПР3 \\
+        \textbf{Громов А.С.}
+    }\\[5cm]
+
+    Нижний Новгород\\
+    2025
+\end{titlepage}
+
+
+\thispagestyle{empty}
+\clearpage
+\pagenumbering{arabic}
+\setcounter{page}{2}
+\tableofcontents
+\clearpage
+\setcounter{page}{3}
+
+\section{Введение}
+
+\hspace*{1.25em}Умножение матриц — ключевая операция в вычислительных науках, применяемая в обработке данных, машинном обучении и моделировании физических процессов. Стандартный алгоритм умножения матриц имеет сложность $O(n^3)$, что ограничивает его эффективность для больших матриц. Для повышения производительности применяются блочные методы, такие как алгоритм Фокса, который оптимизирован для параллельных вычислений за счёт разбиения матриц на блоки и поэтапной обработки.
+
+Алгоритм Фокса позволяет эффективно распределять вычисления между потоками или процессами, что особенно актуально для современных многоядерных систем и кластеров. Данная работа посвящена реализации и анализу последовательной и параллельных версий этого алгоритма с использованием технологий STL, TBB, OMP и гибридной модели MPI + TBB.
+
+Цель работы — разработка, тестирование и сравнение производительности различных реализаций алгоритма Фокса для умножения матриц, а также выявление их преимуществ и ограничений в контексте масштабируемости и эффективности.
+
+\section{Постановка задачи}
+
+\hspace*{1.25em}Целью исследования является создание и анализ реализаций алгоритма Фокса для умножения квадратных матриц с акцентом на параллельные вычисления.
+
+Задачи работы:
+\begin{itemize}
+    \item Реализовать последовательную версию алгоритма Фокса;
+    \item Разработать параллельные версии с использованием:
+    \begin{itemize}
+        \item STL
+        \item Intel TBB
+        \item OpenMP
+        \item MPI + TBB
+    \end{itemize}
+    \item Провести тестирование реализаций;
+    \item Сравнить производительность реализаций по времени.
+\end{itemize}
+
+\section{Описание алгоритма}
+
+Алгоритм Фокса разбивает матрицы $A$ и $B$ размером $n \times n$ на блоки размером $b \times b$, где $b$ — делитель $n$. Вычисления выполняются поэтапно, на каждом этапе обновляя результирующую матрицу $C$. Алгоритм включает следующие шаги:
+
+\begin{enumerate}
+    \item Разбиение матриц $A$ и $B$ на блоки размером $b \times b$. Матрица $C$ инициализируется нулями.
+    \item Для каждого этапа $s$ (от 0 до $\lceil n/b \rceil - 1$):
+    \begin{itemize}
+        \item Выбираются блоки $A_{ik}$ и $B_{kj}$ для текущего этапа.
+        \item Выполняется умножение блоков: $C_{ij} += A_{ik} \cdot B_{kj}$.
+    \end{itemize}
+    \item После всех этапов матрица $C$ содержит результат произведения $A \cdot B$.
+\end{enumerate}
+
+\section{Описание параллельных реализаций алгоритма}
+
+\subsection{Последовательная реализация}
+
+Последовательная реализация выполняется включает следующие этапы:
+
+\begin{enumerate}
+    \item \textbf{Предобработка.} Входные данные копируются в векторы \texttt{A\_} и \texttt{B\_}. Проверяется корректность размеров матриц и выбирается размер блока $b \leq n/2$, являющийся делителем $n$.
+    \item \textbf{Вычисления.} Для каждого этапа и блока выполняется умножение $A_{ik} \cdot B_{kj}$ с накоплением результата в \texttt{output\_}.
+    \item \textbf{Постобработка.} Результат копируется в выходной буфер.
+\end{enumerate}
+
+\subsection{OpenMP}
+
+Реализация с OpenMP распараллеливает вычисления блоков:
+
+\begin{enumerate}
+  \item \textbf{Предобработка.} Аналогична последовательной версии.
+    \item \textbf{Вычисления.} Внешний цикл по этапам остаётся последовательным, так как каждый этап зависит от предыдущего. Внутренние циклы по индексам блоков ($i$, $j$) распараллеливаются с помощью директивы:
+    \begin{lstlisting}
+#pragma omp parallel for default(none) shared(...)
+    \end{lstlisting}
+    Каждый поток обрабатывает независимый набор блоков, вычисляя произведение $A_{ik} \cdot B_{kj}$ для своей области. Директива \texttt{default(none)} обеспечивает явное указание общих переменных, минимизируя ошибки. Синхронизация не требуется, так как блоки независимы, а накопление результатов в \texttt{output\_} потокобезопасно благодаря отсутствию конфликтов записи.
+    \item \textbf{Постобработка.} Результат копируется в выходной буфер.
+\end{enumerate}
+
+Преимущества: простота параллелизации, эффективное использование памяти.
+
+\subsection{Intel TBB}
+
+Реализация с Intel TBB использует следующий подход:
+
+\begin{enumerate}
+  \item \textbf{Предобработка.} Выбирается размер блока, близкий к $\sqrt{n}$, для оптимального распределения задач.
+    \item \textbf{Вычисления.} Используется конструкция \texttt{tbb::parallel\_for} для распределения задач по индексам блоков:
+    \begin{lstlisting}
+tbb::parallel_for(0, num_blocks * num_blocks, [&](int index) {...});
+    \end{lstlisting}
+    Каждый индекс соответствует блоку $(i, j)$, где $i = \text{index} / \text{num\_blocks}$, $j = \text{index} \mod \text{num\_blocks}$. Для каждого блока выполняются все этапы с ротацией индекса $k = (i + \text{step}) \mod \text{num\_blocks}$. TBB автоматически распределяет задачи между потоками, используя планировщик с учётом доступных ядер. Внутренний цикл по этапам выполняется последовательно внутри каждой задачи, но сами задачи параллельны. Синхронизация не требуется, так как каждый блок обновляет свою область в \texttt{output\_}.
+    \item \textbf{Постобработка.} Результат копируется в выходной буфер.
+\end{enumerate}
+
+Преимущества: автоматическое управление задачами, высокая масштабируемость.
+
+\subsection{STL}
+
+Реализация с \texttt{std::thread}:
+
+\begin{enumerate}
+    \item \textbf{Предобработка.} Аналогична TBB, с выбором оптимального размера блока.
+    \item \textbf{Вычисления.} Для каждого этапа создаются потоки
+    \begin{lstlisting}
+std::vector<std::thread> threads;
+for (int t = 0; t < num_threads; ++t) {
+  threads.emplace_back([&, t, stage]() {...});
+}
+    \end{lstlisting}
+    Каждый поток обрабатывает подмножество блоков, определяемое через \texttt{task\_id}, где $i = (\text{task\_id} / \text{num\_block\_cols}) \cdot \text{block\_size}$, $j = (\text{task\_id} \mod \text{num\_block\_cols}) \cdot \text{block\_size}$. Задачи распределяются циклически (\texttt{task\_id += num\_threads}), обеспечивая равномерную нагрузку. После завершения потоков выполняется синхронизация через \texttt{join()}, чтобы гарантировать завершение всех вычислений перед следующим этапом.
+    \item \textbf{Постобработка.} Результат копируется в выходной буфер.
+\end{enumerate}
+
+Преимущества: полный контроль над потоками.
+
+\subsection{MPI + TBB}
+
+Гибридная реализация комбинирует MPI и TBB:
+
+\begin{enumerate}
+    \item \textbf{Предобработка.} На процессе с рангом 0 матрицы распределяются по процессам через \texttt{boost::mpi::scatter}, разбивая их на блоки размером $b \times b$.
+    \item \textbf{Вычисления.} Каждый процесс выполняет локальный алгоритм Фокса, используя TBB для параллельного умножения блоков внутри функции \texttt{MultBlocks}:
+    \begin{lstlisting}
+tbb::parallel_for(tbb::blocked_range<int>(0, block_size), [...]);
+    \end{lstlisting}
+    TBB распределяет итерации по строкам блока между потоками, используя \texttt{tbb::auto\_partitioner} для оптимального балансирования. Процессы обмениваются блоками матриц $A$ и $B$ через \texttt{mpi\_comm.send/recv}, с барьером \texttt{mpi\_comm.barrier()} для синхронизации этапов. Каждый процесс обновляет свою часть результирующей матрицы \texttt{local\_matrix\_c}.
+    \item \textbf{Постобработка.} Результаты собираются на процессе 0 через \texttt{boost::mpi::gather} и объединяются в итоговую матрицу.
+\end{enumerate}
+
+Преимущества: масштабируемость, эффективное использование ресурсов.
+
+\section{Результаты экспериментов}
+
+\hspace*{1.25em}Для оценки производительности реализаций были проведены тесты с матрицами размером $n=400$. В таблице приведены значения времени выполнения (в секундах) для режимов \texttt{PipelineRun} и \texttt{TaskRun}, а также ускорение относительно последовательной версии.
+
+\subsection{Таблица производительности}
+
+\renewcommand{\arraystretch}{1.4}
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Версия} & \textbf{Конфигурация} & \textbf{Pipeline (с)} & \textbf{Task (с)} & \textbf{Ускорение} \\
+\hline
+\textbf{SEQ} & — & 5.614 & 0.103 & 1.00 \\
+\hline
+\multirow{3}{*}{OMP} 
+  & 2 потока & 1.673 & 0.700 & 1.47 \\
+  & 4 потока & 1.647 & 0.065 & 1.58 \\
+\hline
+\multirow{3}{*}{TBB} 
+  & 2 потока & 0.467 & 0.075 & 1.37 \\
+  & 4 потока & 0.298 & 0.070 & 1.47 \\
+\hline
+\multirow{3}{*}{STL} 
+  & 2 потока & 0.959 & 0.080 & 1.29 \\
+  & 4 потока & 0.535 & 0.075 & 1.37 \\
+\hline
+\multirow{3}{*}{MPI + TBB} 
+  & 2 потока & 0.481 & 0.065 & 1.58 \\
+  & 4 потока & 0.363 & 0.061 & 1.69 \\
+\hline
+\end{tabular}
+\label{tab:fox_perf}
+\end{table}
+
+\subsection*{Анализ}
+
+\hspace*{1.25em}Эксперименты показали, что все параллельные реализации обеспечивают ускорение не выше 1.7 по сравнению с последовательной версией в режиме \texttt{TaskRun}. Наибольшее ускорение (1.69) достигнуто для конфигурации MPI + TBB с 4 потоками, что свидетельствует о её эффективности при распределённых вычислениях. Версии OpenMP и TBB демонстрируют ускорение в диапазоне 1.37–1.58, что отражает умеренное улучшение благодаря параллелизации на многоядерных системах. Реализация STL показывает наименьший выигрыш (1.29–1.37), вероятно, из-за накладных расходов на управление потоками. Значения \texttt{PipelineRun} подтверждают общую тенденцию, но их влияние на производительность менее выражено, чем у \texttt{TaskRun}.
+
+\section{Заключение}
+
+\hspace*{1.25em}В работе реализован алгоритм Фокса для умножения матриц в последовательной и параллельных версиях (STL, TBB, OpenMP, MPI + TBB). Проведены тестирование и анализ производительности. Гибридная реализация MPI + TBB показала наивысшее ускорение, что делает её предпочтительной. TBB и OpenMP эффективны для локальных систем. В то время, как STL показала наименьшее ускорение.
+
+\section{Список литературы}
+\begin{enumerate}
+ \item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks}. — Нижний Новгород, 2007.
+    \item Reinders J. \textit{Intel Threading Building Blocks}. — O’Reilly Media, 2007.
+    \item Gropp W., Lusk E. \textit{Using MPI}. — MIT Press, 2014.
+    \item OpenMP Architecture Review Board. \textit{OpenMP API Version 5.1}. — 2020.
+
+\end{enumerate}
+
+\appendix
+\section*{Приложение}
+\addcontentsline{toc}{section}{Приложение}
+
+\subsection*{OpenMP: Параллелизация в RunImpl}
+
+Фрагмент показывает распараллеливание внутреннего цикла по блокам с помощью директивы \texttt{\#pragma omp parallel for}, где потоки обрабатывают независимые блоки матриц.
+
+\begin{lstlisting}[language=C++]
+#pragma omp parallel for default(none) shared(a_ref, b_ref, output_ref, n_ref, block_size_ref, stage)
+for (int i = 0; i < n_ref; i += block_size_ref) {
+  for (int j = 0; j < n_ref; j += block_size_ref) {
+    for (int bi = i; bi < i + block_size_ref && bi < n_ref; ++bi) {
+      for (int bj = j; bj < j + block_size_ref && bj < n_ref; ++bj) {
+        int start_k = stage * block_size_ref;
+        for (int bk = start_k; bk < std::min((stage + 1) * block_size_ref, n_ref); ++bk) {
+          output_ref[(bi * n_ref) + bj] += a_ref[(bi * n_ref) + bk] * b_ref[(bk * n_ref) + bj];
+        }
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+\subsection*{TBB: Параллелизация в RunImpl}
+
+Фрагмент демонстрирует использование \texttt{tbb::parallel\_for} для распределения задач по блокам, где каждый индекс соответствует блоку, обрабатываемому в отдельной задаче.
+
+\begin{lstlisting}[language=C++]
+tbb::parallel_for(0, num_blocks * num_blocks, [&](int index) {
+  int i = index / num_blocks;
+  int j = index % num_blocks;
+  for (int step = 0; step < num_blocks; ++step) {
+    int k = (i + step) % num_blocks;
+    FoxBlockMul(A_, B_, output_, n_, block_size_, step, i * block_size_, j * block_size_, k * block_size_);
+  }
+});
+\end{lstlisting}
+
+\subsection*{STL: Параллелизация в RunImpl}
+
+Фрагмент показывает создание потоков \texttt{std::thread} для обработки блоков, где каждый поток выполняет подмножество задач, синхронизируемых через \texttt{join()}.
+
+\begin{lstlisting}[language=C++]
+std::vector<std::thread> threads;
+for (int t = 0; t < num_threads; ++t) {
+  threads.emplace_back([&, t, stage]() {
+    for (int task_id = t; task_id < total_tasks; task_id += num_threads) {
+      int i = (task_id / num_block_cols) * block_size_;
+      int j = (task_id % num_block_cols) * block_size_;
+      if (i < n_ && j < n_) {
+        FoxBlockMul(A_, B_, output_, n_, block_size_, stage, i, j);
+      }
+    }
+  });
+}
+for (auto& thread : threads) {
+  thread.join();
+}
+\end{lstlisting}
+
+\subsection*{MPI + TBB: Параллелизация в MultBlocks}
+
+Фрагмент показывает использование \texttt{tbb::parallel\_for} внутри функции \texttt{MultBlocks}, вызываемой в рамках MPI-процессов, для параллельного умножения блоков.
+
+\begin{lstlisting}[language=C++]
+tbb::parallel_for(
+    tbb::blocked_range<int>(0, block_size),
+    [&](const tbb::blocked_range<int>& block_range) {
+      for (int row_idx = block_range.begin(); row_idx < block_range.end(); ++row_idx) {
+        const double* row_a = matrix_a + (row_idx * block_size);
+        double* row_c = matrix_c + (row_idx * block_size);
+        for (int inner_idx = 0; inner_idx < block_size; ++inner_idx) {
+          double element_a = row_a[inner_idx];
+          const double* row_b = matrix_b + (inner_idx * block_size);
+          for (int col_idx = 0; col_idx < block_size; ++col_idx) {
+            row_c[col_idx] += element_a * row_b[col_idx];
+          }
+        }
+      }
+    },
+    tbb::auto_partitioner());
+\end{lstlisting}
+
+\end{document}
