@@ -1,0 +1,1187 @@
+\documentclass[12pt,a4paper]{extarticle}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{framed}
+\usepackage{listings}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
+
+\geometry{
+	a4paper,
+	left=30mm,
+	right=15mm,
+	top=20mm,
+	bottom=20mm
+}
+
+\titleformat{\section}[block]
+{\normalfont\fontsize{14}{16}\bfseries\centering}
+{\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries\filcenter}
+{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries\filcenter}
+{\thesubsubsection.}{0.5em}{}
+
+\sloppy
+
+\onehalfspacing
+
+\setlength{\parindent}{1.25cm}
+
+\newcommand{\appendixsection}[1]{%
+	\clearpage
+	\section*{\centering Приложение #1}
+	\addcontentsline{toc}{section}{Приложение #1}
+}
+
+\begin{document}
+
+	\begin{titlepage}
+		\begin{center}
+
+			\onehalfspacing
+
+			\begin{center}
+				\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\ 			
+				\vspace{0.5cm}
+				Федеральное государственное автономное образовательное учреждение высшего образования \\ 
+				\vspace{0.5cm}
+				\textbf{«Национальный исследовательский Нижегородский государственный университет имени Н.И. Лобачевского»} \\
+				(ННГУ)\\
+				\vspace{0.5cm}
+				\textbf{Институт информационных технологий, математики и механики}
+			\end{center}
+			\vspace{0.5cm}
+			\begin{center}
+			Направление подготовки: Фундаментальная информатика и информационные технологии
+
+
+			Профиль подготовки: «Инженерия программного обеспечения»
+			\end{center}
+			\vspace{2.5cm}
+			\begin{center}
+				\textbf{Отчёт по лабораторной работе}
+
+				на тему: 
+
+				\textbf{"Поразрядная сортировка для целых чисел с четно-нечетным слиянием Бэтчера"}
+			\end{center}
+
+			\vspace{2.5cm}
+
+			\begin{flushright}
+				\textbf{Выполнил:} \\
+				студент группы 3822Б1ФИ2 \\
+				Ополин Д.А. \\
+
+				\vspace{1cm}
+
+			\noindent\textbf{Преподаватель:} \\
+			к.т.н., доцент кафедры ВВСП \\
+			{Сысоев А.В.}
+			\end{flushright}
+
+			\vspace{2em}
+
+			\vfill
+
+			\begin{center}
+				Нижний Новгород \\
+				2025 г.
+			\end{center}
+
+		\end{center}
+	\end{titlepage}
+
+	\newpage
+
+
+	\section*{Введение}
+	Сортировка данных — базовая процедура для обработки и анализа информации. В данной работе представлен подход к сортировке целых чисел, сочетающий поразрядную сортировку с четно-нечетным слиянием Бэтчера. В работе представлен разбор как последовательного исполнения алгоритма, так и его параллельных модификаций, реализованных посредством Intel TBB, OpenMP, STL и сочетания MPI и TBB.
+
+	\section*{Цели и задачи}	
+	Цель работы:
+	Проведение эмпирического исследования вычислительной эффективности комбинированного алгоритма сортировки целых чисел, основанного на интеграции поразрядной сортировки и чётно-нечётного слияния Бэтчера. Работа включает разработку, тестирование и сравнительный анализ различных вычислительных стратегий с оценкой достижимого ускорения при параллельном исполнении.
+
+	Задачи исследования:
+
+	\begin{enumerate}
+		\item Разработка последовательной версии алгоритма.
+		\item Разработка параллельной реализации с использованием OpenMP.
+		\item Разработка параллельной реализации с использованием TBB.
+		\item Разработка параллельной реализации с использованием STL Threads.
+		\item Разработка параллельной реализации с использованием комбинации технологий MPI и TBB.
+		\item Проведение вычислительных экспериментов.
+		\item Сравнительный анализ эффективности реализаций.
+	\end{enumerate}
+
+	\section{Поразрядная сортировка}
+
+	Метод поразрядной сортировки относится к классу устойчивых сортировок. В основе лежит последовательная обработка отдельных разрядов чисел, начиная с младшего (LSD — Least Significant Digit).
+  
+	\textbf{Преимущества:}
+	\begin{itemize}
+    		\item \textbf{Временная сложность}: Выполнение за $O(d \cdot n)$ операций, где $d$ - количество разрядов, $n$ - размер массива. Независимость от исходной упорядоченности данных.
+    
+    		\item \textbf{Параллелизуемость}: Возможность эффективного распараллеливания на этапах распределения по корзинам и сборки результатов.
+	\end{itemize}
+
+	\textbf{Недостатки:}
+
+	\begin{itemize}
+    		\item \textbf{Память}: Требует $O(n + b)$ дополнительной памяти, где $b$ - количество разрядов.
+    
+    		\item \textbf{Обработка отрицательных чисел}: Требует дополнительных операций для обработки.
+    
+	\end{itemize}
+
+	\section{Слияние Бэтчера}
+	Четно-нечетное слияние Бэтчера — это параллельный алгоритм слияния двух отсортированных массивов в один. Алгоритм использует сортирующую сеть, состоящую из log2(n)+1 этапов. Каждый этап включает независимые операции сравнения-обмена между элементами массива.
+
+	\section{Описание реализаций}
+
+	\subsection{Последовательная версия}
+\begin{enumerate}
+    \item \textbf{Разделение входного массива}:
+    \begin{itemize}
+        \item Формирование двух подмассивов:
+        \begin{itemize}
+            \item $positives = \{ x \mid x \geq 0 \}$ — содержит неотрицательные элементы входного массива.
+            \item $negatives = \{ -x \mid x < 0 \}$ — содержит модули отрицательных элементов входного массива.
+        \end{itemize}
+    \end{itemize}
+    
+    \item \textbf{Определение параметров}:
+    \begin{itemize}
+        \item Вычисление количества разрядов $d$ для наибольшего по модулю элемента: $d = \lfloor \log_{10}(\max |x|) \rfloor + 1$. Это определяет количество итераций поразрядной сортировки.
+    \end{itemize}
+    
+    \item \textbf{Независимая сортировка подмассивов}:
+    \begin{itemize}
+        \item Применение LSD (Least Significant Digit) поразрядной сортировки с основанием 10 для подмассивов $positives$ и $negatives$.
+        \item Итеративная обработка разрядов: от $10^0$ до $10^{d-1}$, начиная с младшего разряда.
+    \end{itemize}
+    
+    \item \textbf{Финальное объединение}:
+    \begin{itemize}
+        \item Инверсия порядка $negatives = \mathrm{reverse}(negarives)$, так как отрицательные числа должны быть в убывающем порядке.
+        \item Восстановление знака у $negatives$
+        \item Объединение массива отрицательных и положительных чисел.
+    \end{itemize}
+\end{enumerate}
+
+\textbf{Обоснование отсутствия слияния Бэтчера}
+
+В последовательной версии слияние Бэтчера не используется, так как подмассивы $positives$ и $negatives$ сортируются независимо и объединяются в правильном порядке, что гарантирует полную отсортированность массива без дополнительных операций слияния.
+
+	
+	\subsection{Реализация с использованием OpenMP}
+\begin{enumerate}
+    
+    \item \textbf{Инициализация и Разделение Блоков (OpenMP)}:
+    \begin{itemize}
+        \item Определение количества потоков: \texttt{num\_threads = omp\_get\_max\_threads()}.
+        \item Расчет размера блока: $\mathrm{block\_size} = \lceil \mathrm{size\_} / \mathrm{num\_threads} \rceil$.
+        \item Формирование диапазонов: Создание векторов \texttt{starts} и \texttt{ends} для каждого блока, учитывая границы массива.
+    \end{itemize}
+    
+    \item \textbf{Параллельная Сортировка Блоков (Radix Sort)}:
+    \begin{itemize}
+        \item Применение \texttt{\#pragma omp parallel for}: Распределение выполнения \texttt{RadixSort} для каждого определенного блока.
+        \item Локальная обработка в \texttt{RadixSort}:
+        \begin{itemize}
+            \item Разделение на положительные и отрицательные числа.
+            \item Определение максимального абсолютного значения для вычисления количества разрядов.
+            \item Итеративная сортировка по разрядам (\texttt{SortByDigit}) отдельно для положительных и отрицательных чисел.
+            \item Обратное преобразование отрицательных чисел и слияние отсортированных положительных и отрицательных частей.
+        \end{itemize}
+    \end{itemize}
+    
+    \item \textbf{Четно-нечетное слияние Бэтчера}:
+    \begin{itemize}
+        \item Итеративный процесс: Продолжается, пока остается более одного блока для слияния.
+        \item Определение пар слияния: $\mathrm{merge\_pairs} = \lfloor \mathrm{starts.size()} / 2 \rfloor$.
+        \item Применение \texttt{\#pragma omp parallel for}: Параллельное выполнение \texttt{BatcherOddEvenMerge} для каждой пары соседних блоков.
+        \item Обновление диапазонов: Формирование новых векторов \texttt{new\_starts} и \texttt{new\_ends} для объединенных блоков.
+        \item Обработка нечетного количества блоков: Если количество блоков нечетное, последний блок переносится в следующий этап без слияния.
+    \end{itemize}
+    
+    \item \textbf{Алгоритм Слияния Бэтчера}:
+    \begin{itemize}
+        \item Определение размера подмассива: \texttt{n = end - start}.
+        \item Вычисление начального шага \texttt{p}: Наибольшая степень двойки, не превышающая \texttt{n}.
+        \item Итерационный процесс: Пока \texttt{p} больше нуля.
+        \begin{itemize}
+            \item \textbf{Параллельное сравнение и обмен}: Использование \texttt{\#pragma omp parallel for} для параллельного сравнения элементов \texttt{array[i]} и \texttt{array[i + p]} и их обмена, если они не по порядку.
+            \item Уменьшение шага: \texttt{p /= 2}.
+        \end{itemize}
+        \item Завершение: Блок считается отсортированным, когда шаг \texttt{p} становится нулевым.
+    \end{itemize}
+    
+\end{enumerate}
+
+\section*{Инструменты OpenMP в реализации}
+\begin{itemize}
+    \item \texttt{omp\_get\_max\_threads()}:
+        Возвращает максимально допустимое количество потоков, которое может быть использовано в параллельном регионе, что позволяет динамически адаптироваться к доступным ресурсам.
+        
+    \item \texttt{\#pragma omp parallel for}:
+        Директива, которая создает параллельную область и распределяет итерации следующего за ней цикла \texttt{for} между доступными потоками. Используется для:
+        \begin{itemize}
+            \item Параллельной сортировки отдельных блоков с помощью Radix Sort.
+            \item Параллельного слияния пар блоков в иерархическом слиянии Бэтчера.
+            \item Параллельных сравнений и обменов элементов в алгоритме слияния Бэтчера.
+        \end{itemize}
+\end{itemize}
+
+	\subsection{Реализация с использованием TBB}
+
+\begin{enumerate}
+    
+    \item \textbf{Преобразование данных}:
+    \begin{itemize}
+        \item Инициализация \texttt{keys}: Создание вектора \texttt{keys} типа \texttt{uint32\_t} того же размера, что и входной массив.
+        \item Параллельное преобразование: Использование \texttt{tbb::parallel\_for} по всему диапазону массива (\texttt{tbb::blocked\_range<size\_t>(0, size\_)}) для преобразования знаковых чисел (\texttt{int}) в беззнаковые (\texttt{uint32\_t}) с помощью функции \texttt{ConvertIntToUint}.
+    \end{itemize}
+    
+    \item \textbf{Параллельная поразрядная сортировка (Radix Sort)}:
+    \begin{itemize}
+        \item Применение \texttt{RadixSort(keys)}: Вызов функции сортировки для преобразованных беззнаковых чисел.
+        \item Обработка 4 байтов: Цикл по стадиям (\texttt{stage = 0} до \texttt{3}), каждая стадия обрабатывает один байт (8 бит) числа.
+        \begin{enumerate}
+            \item \textbf{Параллельный подсчет частот байтов}:
+                Использование \texttt{tbb::enumerable\_thread\_specific<std::vector<size\_t>> local\_counts} для создания потоково-локальных счетчиков для каждого байта (0-255).
+                \texttt{tbb::parallel\_for} используется для итерации по элементам массива. Каждый поток инкрементирует счетчик соответствующего байта в своем локальном хранилище.
+            \item \textbf{Агрегация результатов}:
+                Суммирование всех потоково-локальных счетчиков (\texttt{local\_counts}) в один общий вектор \texttt{pref} для получения глобальных частот байтов.
+            \item \textbf{Вычисление префиксных сумм}:
+                Последовательное суммирование элементов вектора \texttt{pref} для определения конечных позиций каждого байта в отсортированном массиве.
+            \item \textbf{Распределение элементов}:
+                Обратный проход по массиву (\texttt{uns\_vec}). Для каждого элемента определяется его байт на текущей стадии, и он помещается в свою новую позицию в результирующем массиве \texttt{res} на основе вычисленных префиксных сумм.
+        \end{enumerate}
+        \item Обмен массивами: Обмен содержимым \texttt{uns\_vec} и \texttt{res} для перехода к следующей стадии.
+    \end{itemize}
+    
+    \item \textbf{Обратное преобразование}:
+    \begin{itemize}
+        \item Параллельное восстановление: Использование \texttt{tbb::parallel\_for} по всему диапазону массива (\texttt{tbb::blocked\_range<size\_t>(0, size\_)}) для преобразования беззнаковых чисел (\texttt{uint32\_t}) обратно в знаковые (\texttt{int}) с помощью функции \texttt{ConvertUintToInt}, записывая результат напрямую в \texttt{output\_}.
+    \end{itemize}
+    
+    \item \textbf{Рекурсивное слияние Бэтчера}:
+    \begin{itemize}
+        \item Базовый случай: Если размер диапазона \texttt{high - low} меньше или равен 1, функция завершается.
+        \item Разделение: Диапазон \texttt{[low, high)} делится на две приблизительно равные части, определяя \texttt{mid}.
+        \item Рекурсивное параллельное слияние:
+            Использование \texttt{tbb::parallel\_invoke} для параллельного рекурсивного вызова \texttt{BatcherOddEvenMerge} для обеих половин: \texttt{[low, mid)} и \texttt{[mid, high)}.
+        \item Параллельное сравнение-обмен:
+            После рекурсивного слияния половин, \texttt{tbb::parallel\_for} используется для параллельного сравнения и обмена элементов между первой половиной (\texttt{vec[i]}) и соответствующими элементами второй половины (\texttt{vec[i + mid - low]}), чтобы гарантировать полное упорядочивание.
+    \end{itemize}
+   
+\end{enumerate}
+
+\section*{Инструменты TBB в реализации}
+\begin{itemize}
+    \item \texttt{tbb::parallel\_for}:
+        Основной шаблон параллельного алгоритма для итерации по диапазону. Автоматически разбивает диапазон на меньшие части и распределяет их между потоками. Используется для:
+        \begin{itemize}
+            \item Параллельного преобразования чисел (\texttt{int} $\leftrightarrow$ \texttt{uint}).
+            \item Параллельного подсчета частот байтов в Radix Sort.
+            \item Параллельного сравнения и обмена элементов в алгоритме слияния Бэтчера.
+        \end{itemize}
+        
+    \item \texttt{tbb::blocked\_range}:
+        Класс-объект, представляющий итерационный диапазон данных. Используется совместно с \texttt{tbb::parallel\_for} для определения частей данных, которые должны быть обработаны параллельно.
+        
+    \item \texttt{tbb::enumerable\_thread\_specific}:
+        Тип данных, который предоставляет потоково-локальные хранилища. Это позволяет каждому потоку иметь свою собственную копию данных (например, счетчиков байтов в Radix Sort), что минимизирует конфликты доступа и накладные расходы на синхронизацию. Результаты из этих локальных хранилищ затем агрегируются.
+        
+    \item \texttt{tbb::parallel\_invoke}:
+        Шаблон параллельного алгоритма, который параллельно выполняет несколько предоставленных задач (функций или лямбда-выражений). Используется в рекурсивном алгоритме слияния Бэтчера для одновременного слияния двух подмассивов.
+\end{itemize}
+	\subsection{Реализация с использованием STL Threads}
+\begin{enumerate}
+
+    \item \textbf{Параллельное преобразование данных}:
+    \begin{itemize}
+        \item Определение количества потоков: \texttt{num\_threads = ppc::util::GetPPCNumThreads()}.
+        \item Обработка граничных случаев: Если размер массива \texttt{size\_} $\le 1$, массив копируется напрямую в \texttt{output\_} и функция завершается.
+        \item Параллельное преобразование: Использование вспомогательной функции \texttt{ParallelProcessRange} для параллельного преобразования каждого элемента из \texttt{int} в \texttt{uint32\_t} с помощью лямбда-функции и функции \texttt{IntToUnsigned}. Результаты сохраняются в \texttt{unsigned\_data\_}.
+    \end{itemize}
+    
+    \item \textbf{Параллельная сортировка блоков (Radix Sort)}:
+    \begin{itemize}
+        \item Расчет размера блока: $\mathrm{block\_size} = \lceil \mathrm{size\_} / \mathrm{num\_threads} \rceil$.
+        \item Определение фактического числа блоков: \texttt{actual\_num\_blocks}.
+        \item Создание задач сортировки: Для каждого блока данных создается задача (\texttt{std::function<void()>}), которая вызывает \texttt{RadixSortLSD} для соответствующего диапазона в \texttt{unsigned\_data\_}.
+        \item Динамическое распределение и выполнение задач: Если задачи существуют, они выполняются параллельно с использованием \texttt{ParallelRunTasks}.
+
+        \item \textbf{RadixSortLSD}: Локальная сортировка наименее значащим разрядом.
+        \begin{itemize}
+            \item Итерация по байтам: Для каждого байта в \texttt{uint32\_t}.
+            \item Подсчет частот: Для каждого элемента подсчитывается частота появления каждого значения байта.
+            \item Вычисление префиксных сумм: Преобразование частот в кумулятивные суммы для определения конечных позиций.
+            \item Распределение элементов: Элементы перемещаются в буфер \texttt{buffer} в их отсортированные позиции.
+            \item Копирование обратно: Содержимое буфера копируется обратно в исходный диапазон.
+        \end{itemize}
+    \end{itemize}
+    
+    \item \textbf{Четно-нечетное слияние Бэтчера}:
+    \begin{itemize}
+        \item Вызов \texttt{IterativeOddEvenBlockMerge}: Начальный размер блока \texttt{initial\_block\_size} равен размеру отсортированного блока, \texttt{num\_initial\_blocks} - количество блоков.
+        \item Итеративный процесс: Продолжается, пока \texttt{current\_merge\_block\_size} меньше общего размера массива \texttt{n}.
+        \begin{enumerate}
+            \item Создание задач слияния: Для каждой пары соседних блоков определяется диапазон слияния.
+            \item Параллельное слияние: Если диапазон слияния валиден, создается задача, вызывающая \texttt{std::inplace\_merge} для данной пары. Эти задачи добавляются в \texttt{merge\_tasks}.
+            \item Выполнение задач слияния: Если \texttt{merge\_tasks} не пуст, задачи выполняются параллельно через \texttt{ParallelRunTasks}.
+            \item Удвоение размера блока: \texttt{current\_merge\_block\_size *= 2} для следующей итерации.
+        \end{enumerate}
+    \end{itemize}
+    
+    \item \textbf{Обратное преобразование}:
+    \begin{itemize}
+        \item Параллельное восстановление: Использование \texttt{ParallelProcessRange} для параллельного преобразования \texttt{uint32\_t} обратно в \texttt{int} с помощью функции \texttt{UnsignedToInt}. Результаты сохраняются в \texttt{output\_}.
+    \end{itemize}
+\end{enumerate}
+
+\section*{Инструменты STL в реализации}
+\begin{itemize}
+    
+    \item \texttt{std::thread}:
+        Основной механизм для создания и управления отдельными потоками выполнения. Используется внутри вспомогательных функций \texttt{ParallelProcessRange} и \texttt{ParallelRunTasks} для организации параллельной работы.
+        
+    \item \texttt{std::atomic}:
+        Атомарные типы данных, обеспечивающие безопасный доступ к общим переменным из нескольких потоков без блокировок. В частности, \texttt{std::atomic<size\_t> task\_idx(0)} используется в \texttt{ParallelRunTasks} для динамического распределения задач между потоками.
+        
+    \item \texttt{std::function}:
+        Универсальная обертка для любых вызываемых объектов (функций, лямбда-выражений, указателей на функции). Используется для создания и хранения задач, которые будут выполняться параллельно (\texttt{sort\_tasks}, \texttt{merge\_tasks}).
+        
+    \item \texttt{std::inplace\_merge}:
+        Алгоритм стандартной библиотеки, который сливает два последовательных отсортированных диапазона в один отсортированный диапазон на месте. Применяется в \texttt{IterativeOddEvenBlockMerge} для слияния отсортированных блоков.
+        
+    \item \texttt{ppc::util::GetPPCNumThreads()}:
+        Внешняя утилитарная функция для получения количества потоков, доступных в системе или сконфигурированных для параллельных вычислений. Используется для определения числа потоков, которые будут созданы для выполнения задач.
+\end{itemize}
+
+	\subsection{Реализация с использованием комбинации MPI и TBB}
+
+\begin{enumerate}
+
+    \item \textbf{Распределение данных по процессам}:
+    \begin{itemize}
+        \item Определение размеров блоков данных \texttt{counts} и смещений \texttt{displs} для каждого процесса.
+        \item Использование \texttt{boost::mpi::scatter} для определения размера локального блока \texttt{local\_size} для каждого процесса.
+        \item Использование \texttt{boost::mpi::scatterv} для распределения входных данных \texttt{input\_} (на мастере) или приема данных (на остальных процессах) в локальный вектор \texttt{local\_data}.
+    \end{itemize}
+    
+    \item \textbf{Параллельное преобразование данных}:
+    \begin{itemize}
+        \item Преобразование \texttt{int} $\rightarrow$ \texttt{uint} для локальных данных с использованием \texttt{tbb::parallel\_for} и функции \texttt{ConvertIntToUint}.
+    \end{itemize}
+    
+    \item \textbf{Локальная параллельная сортировка Radix Sort}:
+    \begin{itemize}
+        \item Использование функции \texttt{RadixSort} для сортировки локальных данных (\texttt{std::vector<uint32\_t>}).
+        \item \textbf{Поэтапная сортировка}: Проходит 4 этапа (по 8 бит).
+        \item \textbf{Подсчет байтов}: Использование \texttt{tbb::enumerable\_thread\_specific} для локальных подсчетов в потоках.
+        \item \textbf{Вычисление префиксных сумм}: Агрегация локальных подсчетов для получения глобальных префиксных сумм.
+        \item \textbf{Размещение элементов}: Размещение элементов в отсортированный массив на основе префиксных сумм.
+    \end{itemize}
+    
+    \item \textbf{Обратное преобразование}:
+    \begin{itemize}
+        \item Параллельное преобразование \texttt{uint} $\rightarrow$ \texttt{int} для локальных данных с использованием \texttt{tbb::parallel\_for} и функции \texttt{ConvertUintToInt}.
+    \end{itemize}
+    
+    \item \textbf{Четно-нечетное слияние Бэтчера}:
+    \begin{itemize}
+        \item Вызов \texttt{BatcherOddEvenMerge} для локально отсортированных данных.
+        \item \textbf{Рекурсивное деление}: Данные рекурсивно делятся на две половины.
+        \item \textbf{Параллельный вызов}: Использование \texttt{tbb::parallel\_invoke} для параллельного слияния половин.
+        \item \textbf{Сравнение и обмен}: Для каждой пары соседних элементов в пределах общего размера сравниваются и меняются местами, если они расположены неправильно, используя \texttt{tbb::parallel\_for}.
+    \end{itemize}
+    
+    \item \textbf{Сбор данных и окончательное слияние}:
+    \begin{itemize}
+        \item \textbf{Сбор данных}: Использование \texttt{boost::mpi::gatherv} для сбора всех локально отсортированных данных на мастер-процессе (ранг 0).
+        \item \textbf{Окончательное слияние (на мастере)}: После сбора всех блоков, мастер-процесс выполняет окончательное слияние собранных данных с использованием \texttt{std::inplace\_merge}.
+    \end{itemize}
+    
+\end{enumerate}
+
+\section*{Инструменты TBB и MPI в реализации}
+\begin{itemize}
+    \item \textbf{TBB}:
+    \begin{itemize}
+        \item \texttt{tbb::parallel\_for}: Распараллеливание циклов по диапазонам данных. Используется для преобразования типов, а также для подсчета байтов в Radix Sort и сравнения элементов в слиянии Бэтчера.
+        \item \texttt{tbb::parallel\_invoke}: Параллельное выполнение нескольких независимых задач. Используется для рекурсивного разделения и слияния в алгоритме Бэтчера.
+        \item \texttt{tbb::enumerable\_thread\_specific}: Потоко-локальные хранилища данных. Применяется для эффективного подсчета элементов на каждом потоке в Radix Sort, избегая накладных расходов на синхронизацию.
+    \end{itemize}
+    
+    \item \textbf{MPI}:
+    \begin{itemize}
+        \item \texttt{boost::mpi::broadcast}: Отправка одного и того же значения (например, общего размера данных) от одного процесса (корневого, ранг 0) всем остальным процессам в коммуникаторе.
+        \item \texttt{boost::mpi::scatter}: Распределение данных от одного процесса (корневого) поровну или по заданным размерам между всеми процессами в коммуникаторе. Используется для определения размера локального блока данных для каждого процесса.
+        \item \texttt{boost::mpi::scatterv}: Более гибкий вариант \texttt{scatter}, позволяющий корневому процессу отправлять части данных разного размера и со смещениями другим процессам. Используется для распределения исходного массива по процессам.
+        \item \texttt{boost::mpi::gatherv}: Сбор данных различного размера от всех процессов к одному процессу (корневому). После локальной сортировки на каждом процессе, эти отсортированные части собираются на ранге 0 для окончательного слияния.
+    \end{itemize}
+\end{itemize}
+
+	\section{Результаты эксперимента}
+
+Для изучения производительности различных подходов к сортировке был проведён эксперимент с использованием набора данных, включающего 1 000 000 случайных целых чисел. Сравнение проводилось между последовательной реализацией алгоритма и его параллельными версиями, созданными с применением OpenMP, STL, TBB и комбинированного подхода MPI+TBB.
+
+Тестирование осуществлялось на устройстве с процессором AMD Ryzen 3 3200U, обладающим 2 ядрами и 4 потоками. Последовательная реализация выполнялась в одном потоке, тогда как параллельные варианты (OpenMP, STL, TBB) использовали 4 потока. В случае MPI+TBB применялось 2 процесса, каждый из которых задействовал 4 потока.
+
+Данные о времени выполнения представлены в таблице ниже, где также рассчитано ускорение для параллельных реализаций.
+
+\begin{table}[h]
+\caption{Время выполнения и ускорение различных реализаций алгоритма (в секундах)}
+\begin{tabular}{lccccc}
+\toprule
+Реализация & Конфигурация & pipeline & task &Ускорение(pipeline)&Ускорение(task)\\
+\midrule
+Последовательная & 1 & 0.988 & 0.949 & - & -\\
+OpenMP & 4 & 0.788 & 0.659 & 1.25 & 1.44\\
+STL & 4  & 0.231 & 0.175 & 4.28 & 5.42\\
+TBB & 4  & 3.701 & 3.634 & 0.27 & 0.26\\
+MPI+TBB & 2/4 & 3.592 & 3.508 & 0.28 & 0.27\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Анализ результатов}
+
+Оценка результатов показывает, что реализация на основе STL с использованием \texttt{std::thread} оказалась наиболее эффективной, обеспечив ускорение 4.28 и 5.42 для тестов \texttt{pipeline} и \texttt{task\_run} соответственно. Это заметное улучшение по сравнению с последовательной версией (0.988 с и 0.949 с) подчёркивает достоинства данного подхода к параллелизации. OpenMP также показал положительный эффект с ускорением 1.25 и 1.44, что подтверждает целесообразность распараллеливания.
+
+Однако реализации TBB и MPI+TBB уступили по скорости последовательной версии, что выразилось в значениях ускорения ниже 1 (0.27 и 0.26 для TBB, 0.28 и 0.27 для MPI+TBB). Это говорит о том, что их реализация не является эффективной.
+
+\section*{Вывод}
+\addcontentsline{toc}{section}{Вывод}
+
+В результате, были разработаны различные версии алгоритма поразрядной сортировки с четно-нечетным слиянием Бэтчера для целых чисел в различных версиях. Итоги эксперимента свидетельствуют о том, что правильное применение параллельных технологий, таких как STL и OpenMP, способно значительно повысить скорость сортировки. Тем не менее, некорректно реализованные версии, как в случае с TBB и MPI+TBB, могут привести к замедлению работы. В дальнейшем стоит сосредоточиться на улучшении этих реализаций или поиске других способов повышения производительности.
+
+
+
+\lstset{
+	language=C++,
+	basicstyle=\ttfamily\small,
+	keywordstyle=\color{blue},
+	tabsize=2,
+	breaklines=true
+}
+
+
+\appendixsection{1}
+\subsection*{Последовательная версия}
+
+\begin{lstlisting}
+bool opolin_d_radix_betcher_sort_seq::RadixBetcherSortTaskSequential::PreProcessingImpl() {
+  // Init value for input and output
+  auto *in_ptr = reinterpret_cast<int *>(task_data->inputs[0]);
+  input_ = std::vector<int>(in_ptr, in_ptr + size_);
+  unsigned int output_size = task_data->outputs_count[0];
+  output_ = std::vector<int>(output_size, 0);
+  return true;
+}
+
+bool opolin_d_radix_betcher_sort_seq::RadixBetcherSortTaskSequential::ValidationImpl() {
+  // Check equality of counts elements
+  size_ = static_cast<int>(task_data->inputs_count[0]);
+  if (size_ <= 0 || task_data->inputs.empty()) {
+    return false;
+  }
+  return task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+bool opolin_d_radix_betcher_sort_seq::RadixBetcherSortTaskSequential::RunImpl() {
+  std::vector<int> positives;
+  std::vector<int> negatives;
+  for (int i = 0; i < size_; i++) {
+    if (input_[i] >= 0) {
+      positives.push_back(input_[i]);
+    } else {
+      negatives.push_back(-input_[i]);
+    }
+  }
+  int max_abs = 0;
+  for (int i = 0; i < size_; i++) {
+    max_abs = std::max(max_abs, std::abs(input_[i]));
+  }
+  int digit_count = 0;
+  if (max_abs == 0) {
+    digit_count = 1;
+  } else {
+    while (max_abs > 0) {
+      max_abs /= 10;
+      digit_count++;
+    }
+  }
+  for (int place = 1; digit_count > 0; place *= 10, digit_count--) {
+    if (!positives.empty()) {
+      SortByDigit(positives, place);
+    }
+    if (!negatives.empty()) {
+      SortByDigit(negatives, place);
+    }
+  }
+
+  if (!negatives.empty()) {
+    std::ranges::reverse(negatives);
+  }
+
+  for (size_t i = 0; i < negatives.size(); i++) {
+    output_[i] = -negatives[i];
+  }
+  for (size_t i = 0; i < positives.size(); i++) {
+    output_[negatives.size() + i] = positives[i];
+  }
+  return true;
+}
+
+bool opolin_d_radix_betcher_sort_seq::RadixBetcherSortTaskSequential::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<int *>(task_data->outputs[0])[i] = output_[i];
+  }
+  return true;
+}
+
+void opolin_d_radix_betcher_sort_seq::SortByDigit(std::vector<int> &array, int digit_place) {
+  const int base = 10;
+  std::vector<int> result(array.size());
+  std::vector<int> buckets(base, 0);
+
+  for (int value : array) {
+    int digit = (value / digit_place) % base;
+    buckets[digit]++;
+  }
+  for (int i = 1; i < base; i++) {
+    buckets[i] += buckets[i - 1];
+  }
+  for (int i = static_cast<int>(array.size() - 1); i >= 0; i--) {
+    int digit = (array[i] / digit_place) % base;
+    result[--buckets[digit]] = array[i];
+  }
+  array = result;
+}
+\end{lstlisting}
+
+\appendixsection{2}
+\subsection*{OpenMP версия}
+
+\begin{lstlisting}
+bool opolin_d_radix_batcher_sort_omp::RadixBatcherSortTaskOpenMP::PreProcessingImpl() {
+  auto *in_ptr = reinterpret_cast<int *>(task_data->inputs[0]);
+  input_ = std::vector<int>(in_ptr, in_ptr + size_);
+  unsigned int output_size = task_data->outputs_count[0];
+  output_ = std::vector<int>(output_size, 0);
+  return true;
+}
+
+bool opolin_d_radix_batcher_sort_omp::RadixBatcherSortTaskOpenMP::ValidationImpl() {
+  // Check equality of counts elements
+  size_ = static_cast<int>(task_data->inputs_count[0]);
+  if (size_ <= 0 || task_data->inputs.empty() || task_data->outputs.empty()) {
+    return false;
+  }
+  if (task_data->inputs[0] == nullptr || task_data->outputs[0] == nullptr) {
+    return false;
+  }
+  return task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+bool opolin_d_radix_batcher_sort_omp::RadixBatcherSortTaskOpenMP::RunImpl() {
+  int num_threads = omp_get_max_threads();
+  int block_size = (size_ + num_threads - 1) / num_threads;
+
+  std::vector<int> starts;
+  std::vector<int> ends;
+  for (int i = 0; i < num_threads; i++) {
+    int start = i * block_size;
+    int end = std::min(start + block_size, size_);
+    if (start < end) {
+      starts.push_back(start);
+      ends.push_back(end);
+    }
+  }
+#pragma omp parallel for
+  for (int i = 0; i < static_cast<int>(starts.size()); i++) {
+    RadixSort(input_, starts[i], ends[i]);
+  }
+  while (starts.size() > 1) {
+    int merge_pairs = static_cast<int>(starts.size()) / 2;
+    std::vector<int> new_starts(merge_pairs);
+    std::vector<int> new_ends(merge_pairs);
+#pragma omp parallel for
+    for (int i = 0; i < merge_pairs; i++) {
+      int idx = i * 2;
+      int start = starts[idx];
+      int mid = ends[idx];
+      int end = ends[idx + 1];
+      BatcherOddEvenMerge(input_, start, mid, end);
+      new_starts[i] = start;
+      new_ends[i] = end;
+    }
+    if (starts.size() % 2 == 1) {
+      new_starts.push_back(starts.back());
+      new_ends.push_back(ends.back());
+    }
+    starts = std::move(new_starts);
+    ends = std::move(new_ends);
+  }
+  output_ = input_;
+  return true;
+}
+
+bool opolin_d_radix_batcher_sort_omp::RadixBatcherSortTaskOpenMP::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<int *>(task_data->outputs[0])[i] = output_[i];
+  }
+  return true;
+}
+
+void opolin_d_radix_batcher_sort_omp::RadixSort(std::vector<int> &input, int start, int end) {
+  std::vector<int> local_input(input.begin() + start, input.begin() + end);
+  std::vector<int> positives;
+  std::vector<int> negatives;
+  for (size_t j = 0; j < local_input.size(); j++) {
+    if (local_input[j] >= 0) {
+      positives.push_back(local_input[j]);
+    } else {
+      negatives.push_back(-local_input[j]);
+    }
+  }
+  int max_abs = 0;
+  for (size_t j = 0; j < local_input.size(); j++) {
+    max_abs = std::max(max_abs, std::abs(local_input[j]));
+  }
+  int digit_count = (max_abs == 0) ? 1 : static_cast<int>(std::log10(max_abs)) + 1;
+  for (int place = 1; digit_count > 0; place *= 10, digit_count--) {
+    if (!positives.empty()) {
+      SortByDigit(positives, place);
+    }
+    if (!negatives.empty()) {
+      SortByDigit(negatives, place);
+    }
+  }
+  if (!negatives.empty()) {
+    std::ranges::reverse(negatives);
+    for (size_t j = 0; j < negatives.size(); j++) {
+      negatives[j] = -negatives[j];
+    }
+  }
+  std::vector<int> sorted_local;
+  sorted_local.insert(sorted_local.end(), negatives.begin(), negatives.end());
+  sorted_local.insert(sorted_local.end(), positives.begin(), positives.end());
+  std::ranges::copy(sorted_local, input.begin() + start);
+}
+
+void opolin_d_radix_batcher_sort_omp::SortByDigit(std::vector<int> &array, int digit_place) {
+  const int base = 10;
+  std::vector<int> result(array.size());
+  std::vector<int> buckets(base, 0);
+  for (size_t i = 0; i < array.size(); i++) {
+    int digit = (array[i] / digit_place) % base;
+    buckets[digit]++;
+  }
+  for (int i = 1; i < base; i++) {
+    buckets[i] += buckets[i - 1];
+  }
+  for (int i = static_cast<int>(array.size() - 1); i >= 0; i--) {
+    int digit = (array[i] / digit_place) % base;
+    result[--buckets[digit]] = array[i];
+  }
+  array = result;
+}
+
+void opolin_d_radix_batcher_sort_omp::BatcherOddEvenMerge(std::vector<int> &array, int start, int mid, int end) {
+  int n = end - start;
+  if (n <= 1) {
+    return;
+  }
+  int p = 0;
+  if (n <= 1) {
+    p = 0;
+  } else {
+    int exp = static_cast<int>(std::floor(std::log2(n)));
+    p = 1 << exp;
+  }
+  while (p > 0) {
+#pragma omp parallel for
+    for (int i = start; i < end - p; i++) {
+      if (array[i] > array[i + p]) {
+        std::swap(array[i], array[i + p]);
+      }
+    }
+    p /= 2;
+  }
+}
+\end{lstlisting}
+
+\appendixsection{3}
+\subsection*{TBB версия}
+
+
+\begin{lstlisting}
+bool opolin_d_radix_batcher_sort_tbb::RadixBatcherSortTaskTbb::PreProcessingImpl() {
+  auto* in_ptr = reinterpret_cast<int*>(task_data->inputs[0]);
+  input_ = std::vector<int>(in_ptr, in_ptr + size_);
+  unsigned int output_size = task_data->outputs_count[0];
+  output_ = std::vector<int>(output_size, 0);
+  return true;
+}
+
+bool opolin_d_radix_batcher_sort_tbb::RadixBatcherSortTaskTbb::ValidationImpl() {
+  // Check equality of counts elements
+  size_ = static_cast<int>(task_data->inputs_count[0]);
+  if (size_ <= 0 || task_data->inputs.empty() || task_data->outputs.empty()) {
+    return false;
+  }
+  if (task_data->inputs[0] == nullptr || task_data->outputs[0] == nullptr) {
+    return false;
+  }
+  return task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+bool opolin_d_radix_batcher_sort_tbb::RadixBatcherSortTaskTbb::RunImpl() {
+  std::vector<uint32_t> keys(size_);
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, size_), [&](const tbb::blocked_range<size_t>& r) {
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      keys[i] = ConvertIntToUint(input_[i]);
+    }
+  });
+  RadixSort(keys);
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, size_), [&](const tbb::blocked_range<size_t>& r) {
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      output_[i] = ConvertUintToInt(keys[i]);
+    }
+  });
+  BatcherOddEvenMerge(output_, 0, static_cast<int>(size_));
+  return true;
+}
+
+bool opolin_d_radix_batcher_sort_tbb::RadixBatcherSortTaskTbb::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<int*>(task_data->outputs[0])[i] = output_[i];
+  }
+  return true;
+}
+
+uint32_t opolin_d_radix_batcher_sort_tbb::ConvertIntToUint(int num) { return static_cast<uint32_t>(num) ^ 0x80000000U; }
+
+int opolin_d_radix_batcher_sort_tbb::ConvertUintToInt(uint32_t unum) { return static_cast<int>(unum ^ 0x80000000U); }
+
+void opolin_d_radix_batcher_sort_tbb::RadixSort(std::vector<uint32_t>& uns_vec) {
+  size_t sz = uns_vec.size();
+  if (sz <= 1) {
+    return;
+  }
+  const int rad = 256;
+  std::vector<uint32_t> res(sz);
+  for (int stage = 0; stage < 4; stage++) {
+    tbb::enumerable_thread_specific<std::vector<size_t>> local_counts([] { return std::vector<size_t>(rad, 0); });
+    int shift = stage * 8;
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, sz), [&](const tbb::blocked_range<size_t>& r) {
+      auto& lc = local_counts.local();
+      for (size_t i = r.begin(); i < r.end(); ++i) {
+        const uint8_t byte = (uns_vec[i] >> shift) & 255;
+        lc[byte]++;
+      }
+    });
+    std::vector<size_t> pref(rad, 0);
+    for (auto& lc : local_counts) {
+      for (int j = 0; j < rad; ++j) {
+        pref[j] += lc[j];
+      }
+    }
+    for (int j = 1; j < rad; ++j) {
+      pref[j] += pref[j - 1];
+    }
+    for (int i = static_cast<int>(sz) - 1; i >= 0; --i) {
+      const uint8_t byte = (uns_vec[i] >> shift) & 255;
+      res[--pref[byte]] = uns_vec[i];
+    }
+    uns_vec.swap(res);
+  }
+}
+
+void opolin_d_radix_batcher_sort_tbb::BatcherOddEvenMerge(std::vector<int>& vec, int low, int high) {
+  if (high - low <= 1) {
+    return;
+  }
+  int mid = (low + high) / 2;
+  tbb::parallel_invoke([&] { BatcherOddEvenMerge(vec, low, mid); }, 
+  [&] { BatcherOddEvenMerge(vec, mid, high); });
+  tbb::parallel_for(tbb::blocked_range<int>(low, mid), [&](const tbb::blocked_range<int>& r) {
+    for (int i = r.begin(); i < r.end(); ++i) {
+      if (vec[i] > vec[i + mid - low]) {
+        std::swap(vec[i], vec[i + mid - low]);
+      }
+    }
+  });
+}
+\end{lstlisting}
+
+\appendixsection{4}
+\subsection*{STL версия}
+
+\begin{lstlisting}
+bool opolin_d_radix_batcher_sort_stl::RadixBatcherSortTaskStl::PreProcessingImpl() {
+  auto* in_ptr = reinterpret_cast<int*>(task_data->inputs[0]);
+  input_ = std::vector<int>(in_ptr, in_ptr + size_);
+  unsigned int output_size = task_data->outputs_count[0];
+  output_ = std::vector<int>(output_size);
+  unsigned_data_.resize(size_);
+  return true;
+}
+
+bool opolin_d_radix_batcher_sort_stl::RadixBatcherSortTaskStl::ValidationImpl() {
+  // Check equality of counts elements
+  size_ = static_cast<int>(task_data->inputs_count[0]);
+  if (size_ <= 0 || task_data->inputs.empty() || task_data->outputs.empty()) {
+    return false;
+  }
+  if (task_data->inputs[0] == nullptr || task_data->outputs[0] == nullptr) {
+    return false;
+  }
+  return task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+bool opolin_d_radix_batcher_sort_stl::RadixBatcherSortTaskStl::RunImpl() {
+  int num_threads = ppc::util::GetPPCNumThreads();
+  if (size_ <= 1) {
+    output_ = input_;
+    return true;
+  }
+  auto unum_threads = static_cast<size_t>(num_threads);
+  ParallelProcessRange(static_cast<size_t>(size_), static_cast<unsigned int>(unum_threads),
+    [this](size_t start, size_t end) {
+      for (size_t i = start; i < end; ++i) {
+        unsigned_data_[i] = IntToUnsigned(input_[i]);
+       }
+     });
+
+  size_t block_size = (static_cast<size_t>(size_) + unum_threads - 1) / unum_threads;
+  size_t actual_num_blocks = (static_cast<size_t>(size_) + block_size - 1) / block_size;
+  std::vector<std::function<void()>> sort_tasks;
+  sort_tasks.reserve(actual_num_blocks);
+  for (unsigned int i = 0; i < actual_num_blocks; ++i) {
+    size_t start = i * block_size;
+    size_t end = std::min(start + block_size, static_cast<size_t>(size_));
+    if (start < end) {
+      sort_tasks.emplace_back([this, start, end]() {
+        RadixSortLSD(unsigned_data_.begin() + static_cast<ptrdiff_t>(start),
+                     unsigned_data_.begin() + static_cast<ptrdiff_t>(end));
+      });
+    }
+  }
+  if (!sort_tasks.empty()) {
+    ParallelRunTasks(sort_tasks);
+  }
+  IterativeOddEvenBlockMerge(unsigned_data_.begin(), unsigned_data_.end(),
+    actual_num_blocks, block_size, static_cast<unsigned int>(unum_threads));
+  ParallelProcessRange(static_cast<size_t>(size_), static_cast<unsigned int>(unum_threads),
+    [this](size_t start, size_t end) {
+      for (size_t i = start; i < end; ++i) {
+        output_[i] = UnsignedToInt(unsigned_data_[i]);
+       }
+     });
+  return true;
+}
+
+bool opolin_d_radix_batcher_sort_stl::RadixBatcherSortTaskStl::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<int*>(task_data->outputs[0])[i] = output_[i];
+  }
+  return true;
+}
+
+uint32_t opolin_d_radix_batcher_sort_stl::IntToUnsigned(int value) { return static_cast<uint32_t>(value) ^ (1U << 31); }
+
+int opolin_d_radix_batcher_sort_stl::UnsignedToInt(uint32_t value) { return static_cast<int>(value ^ (1U << 31)); }
+
+void opolin_d_radix_batcher_sort_stl::ParallelProcessRange(size_t total_size, unsigned int num_threads,
+  const std::function<void(size_t start, size_t end)>& func) {
+  if (total_size == 0) {
+    return;
+  }
+  unsigned int actual_threads = std::min(num_threads, static_cast<unsigned int>(total_size));
+  std::vector<std::thread> threads;
+  threads.reserve(actual_threads);
+  size_t block_size = (total_size + actual_threads - 1) / actual_threads;
+
+  for (unsigned int i = 0; i < actual_threads; ++i) {
+    size_t start = i * block_size;
+    size_t end = std::min(start + block_size, total_size);
+    if (start < end) {
+      threads.emplace_back(func, start, end);
+    }
+  }
+  for (auto& t : threads) {
+    if (t.joinable()) {
+      t.join();
+    }
+  }
+}
+
+void opolin_d_radix_batcher_sort_stl::ParallelRunTasks(const std::vector<std::function<void()>>& tasks) {
+  if (tasks.empty()) {
+    return;
+  }
+  unsigned int num_threads = ppc::util::GetPPCNumThreads();
+  unsigned int actual_threads = std::min(num_threads, static_cast<unsigned int>(tasks.size()));
+  std::vector<std::thread> threads;
+  threads.reserve(actual_threads);
+  std::atomic<size_t> task_idx(0);
+
+  for (unsigned int i = 0; i < actual_threads; ++i) {
+    threads.emplace_back([&]() {
+      size_t current_task = 0;
+      while ((current_task = task_idx.fetch_add(1, std::memory_order_relaxed)) < tasks.size()) {
+        tasks[current_task]();
+      }
+    });
+  }
+  for (auto& t : threads) {
+    if (t.joinable()) {
+      t.join();
+    }
+  }
+}
+
+void opolin_d_radix_batcher_sort_stl::RadixSortLSD(std::vector<uint32_t>::iterator begin,
+  std::vector<uint32_t>::iterator end) {
+  size_t n = std::distance(begin, end);
+  if (n <= 1) {
+    return;
+  }
+  const int radix = 256;
+  const int num_passes = sizeof(uint32_t);
+
+  std::vector<uint32_t> buffer(n);
+  std::vector<size_t> count(radix);
+
+  for (int pass = 0; pass < num_passes; ++pass) {
+    int shift = pass * 8;
+    std::ranges::fill(count, 0);
+    for (auto it = begin; it != end; ++it) {
+      count[(*it >> shift) & (radix - 1)]++;
+    }
+    size_t cumulative_sum = 0;
+    for (size_t i = 0; i < radix; ++i) {
+      size_t current_count = count[i];
+      count[i] = cumulative_sum;
+      cumulative_sum += current_count;
+    }
+    for (auto it = begin; it != end; ++it) {
+      buffer[count[(*it >> shift) & (radix - 1)]++] = *it;
+    }
+    std::copy(buffer.begin(), buffer.begin() + static_cast<ptrdiff_t>(n), begin);
+  }
+}
+
+void opolin_d_radix_batcher_sort_stl::IterativeOddEvenBlockMerge(std::vector<uint32_t>::iterator data_begin,
+std::vector<uint32_t>::iterator data_end, size_t num_initial_blocks, size_t initial_block_size,
+unsigned int num_threads) {
+  size_t n = std::distance(data_begin, data_end);
+  if (num_initial_blocks <= 1 || n <= 1) {
+    return;
+  }
+  size_t current_merge_block_size = initial_block_size;
+  while (current_merge_block_size < n) {
+    std::vector<std::function<void()>> merge_tasks;
+
+    for (size_t i = 0; i < n; i += 2 * current_merge_block_size) {
+      auto merge_begin = data_begin + static_cast<ptrdiff_t>(i);
+      auto merge_mid = data_begin + static_cast<ptrdiff_t>(std::min(i + current_merge_block_size, n));
+      auto merge_end = data_begin + static_cast<ptrdiff_t>(std::min(i + (2 * current_merge_block_size), n));
+      if (merge_mid < merge_end) {
+        merge_tasks.emplace_back(
+            [merge_begin, merge_mid, merge_end]() { std::inplace_merge(merge_begin, merge_mid, merge_end); });
+      }
+    }
+    if (!merge_tasks.empty()) {
+      ParallelRunTasks(merge_tasks);
+    }
+    current_merge_block_size *= 2;
+  }
+}
+\end{lstlisting}
+\appendixsection{5}
+\subsection*{MPI+TBB версия}
+
+\begin{lstlisting}
+bool opolin_d_radix_batcher_sort_all::RadixBatcherSortTaskAll::PreProcessingImpl() {
+  if (world_.rank() == 0) {
+    auto* in_ptr = reinterpret_cast<int*>(task_data->inputs[0]);
+    input_ = std::vector<int>(in_ptr, in_ptr + size_);
+    unsigned int output_size = task_data->outputs_count[0];
+    output_ = std::vector<int>(output_size, 0);
+  }
+  boost::mpi::broadcast(world_, size_, 0);
+  return true;
+}
+
+bool opolin_d_radix_batcher_sort_all::RadixBatcherSortTaskAll::ValidationImpl() {
+  if (world_.rank() == 0) {
+    size_ = static_cast<int>(task_data->inputs_count[0]);
+    if (size_ <= 0 || task_data->inputs.empty() || task_data->outputs.empty()) {
+      return false;
+    }
+    if (task_data->inputs[0] == nullptr || task_data->outputs[0] == nullptr) {
+      return false;
+    }
+    return task_data->inputs_count[0] == task_data->outputs_count[0];
+  }
+  return true;
+}
+
+bool opolin_d_radix_batcher_sort_all::RadixBatcherSortTaskAll::RunImpl() {
+  int rank = world_.rank();
+  int world_size = world_.size();
+  std::vector<int> local_data;
+  std::vector<int> counts(world_size);
+  std::vector<int> displs(world_size);
+  int local_size = 0;
+  if (rank == 0) {
+    int chunk = size_ / world_size;
+    int remainder = size_ % world_size;
+    int offset = 0;
+    for (int i = 0; i < world_size; ++i) {
+      counts[i] = chunk + (i < remainder ? 1 : 0);
+      displs[i] = offset;
+      offset += counts[i];
+    }
+  }
+  boost::mpi::scatter(world_, counts, local_size, 0);
+  local_data.resize(local_size);
+  if (rank == 0) {
+    boost::mpi::scatterv(world_, input_, counts, displs, local_data.data(), local_size, 0);
+  } else {
+    boost::mpi::scatterv(world_, local_data.data(), local_size, 0);
+  }
+  std::vector<uint32_t> keys(local_size);
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, local_size), [&](auto& r) {
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      keys[i] = ConvertIntToUint(local_data[i]);
+    }
+  });
+
+  RadixSort(keys);
+
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, local_size), [&](auto& r) {
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      local_data[i] = ConvertUintToInt(keys[i]);
+    }
+  });
+
+  if (local_size > 0) {
+    BatcherOddEvenMerge(local_data, 0, local_size);
+  }
+  std::vector<int> gathered_data;
+  if (rank == 0) {
+    gathered_data.resize(size_);
+  }
+  if (rank == 0) {
+    boost::mpi::gatherv(world_, local_data.data(), local_size, gathered_data.data(), counts, displs, 0);
+  } else {
+    boost::mpi::gatherv(world_, local_data.data(), local_size, 0);
+  }
+  if (rank == 0) {
+    output_ = std::move(gathered_data);
+    int offset = counts[0];
+    for (int i = 1; i < world_size; ++i) {
+      int next = offset + counts[i];
+      std::inplace_merge(output_.begin(), output_.begin() + offset, output_.begin() + next);
+      offset = next;
+    }
+  }
+  return true;
+}
+
+bool opolin_d_radix_batcher_sort_all::RadixBatcherSortTaskAll::PostProcessingImpl() {
+  if (world_.rank() == 0) {
+    for (size_t i = 0; i < output_.size(); ++i) {
+      reinterpret_cast<int*>(task_data->outputs[0])[i] = output_[i];
+    }
+  }
+  return true;
+}
+
+uint32_t opolin_d_radix_batcher_sort_all::ConvertIntToUint(int num) { return static_cast<uint32_t>(num) ^ 0x80000000U; }
+
+int opolin_d_radix_batcher_sort_all::ConvertUintToInt(uint32_t unum) { return static_cast<int>(unum ^ 0x80000000U); }
+
+void opolin_d_radix_batcher_sort_all::RadixSort(std::vector<uint32_t>& uns_vec) {
+  size_t sz = uns_vec.size();
+  if (sz <= 1) {
+    return;
+  }
+  const int rad = 256;
+  std::vector<uint32_t> res(sz);
+  for (int stage = 0; stage < 4; stage++) {
+    tbb::enumerable_thread_specific<std::vector<size_t>> local_counts([&] { return std::vector<size_t>(rad, 0); });
+    int shift = stage * 8;
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, sz), [&](const tbb::blocked_range<size_t>& r) {
+      auto& lc = local_counts.local();
+      for (size_t i = r.begin(); i < r.end(); ++i) {
+        const uint8_t byte = (uns_vec[i] >> shift) & (rad - 1);
+        lc[byte]++;
+      }
+    });
+    std::vector<size_t> pref(rad, 0);
+    for (auto& lc_instance : local_counts) {
+      for (int j = 0; j < rad; ++j) {
+        pref[j] += lc_instance[j];
+      }
+    }
+    for (int j = 1; j < rad; ++j) {
+      pref[j] += pref[j - 1];
+    }
+    for (int i = static_cast<int>(sz) - 1; i >= 0; --i) {
+      const uint8_t byte = (uns_vec[i] >> shift) & (rad - 1);
+      res[--pref[byte]] = uns_vec[i];
+    }
+    uns_vec.swap(res);
+  }
+}
+
+void opolin_d_radix_batcher_sort_all::BatcherOddEvenMerge(std::vector<int>& vec, int low, int high) {
+  if (high - low <= 1) {
+    return;
+  }
+  int mid = (low + high) / 2;
+  tbb::parallel_invoke([&] { BatcherOddEvenMerge(vec, low, mid); }, 
+                                  [&] { BatcherOddEvenMerge(vec, mid, high); });
+
+  int first_half_len = mid - low;
+  int second_half_len = high - mid;
+  int common_len = std::min(first_half_len, second_half_len);
+
+  if (common_len > 0) {
+    tbb::parallel_for(tbb::blocked_range<int>(0, common_len), [&](const auto& r) {
+      for (int i_offset = r.begin(); i_offset < r.end(); ++i_offset) {
+        if (vec[low + i_offset] > vec[mid + i_offset]) {
+          std::swap(vec[low + i_offset], vec[mid + i_offset]);
+        }
+      }
+    });
+  }
+}
+\end{lstlisting}
+
+
+\end{document}
