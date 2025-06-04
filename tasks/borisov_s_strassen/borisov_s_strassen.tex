@@ -1,0 +1,1438 @@
+\documentclass[12pt]{article}
+
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+
+\usepackage{amsmath,amssymb}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{hyperref}
+\geometry{left=2cm,right=2cm,top=2cm,bottom=2cm}
+
+\lstset{
+  basicstyle=\small\ttfamily,
+  breaklines=true,
+  tabsize=2,
+  language=C++,
+  numbers=left,
+  numberstyle=\tiny
+}
+
+\begin{document}
+
+\begin{titlepage}
+    \begin{center}
+        \large 
+        \textbf{ННГУ им. Лобачевского / ИИТММ / ПМИ}\\[0.5cm]
+
+        \vspace{4cm}
+        \textbf{\Large Отчёт по выполнению задания}\\
+        \textbf{\large «Параллельное умножение плотных матриц double с использованием алгоритма Штрассена»}\\[3cm]
+
+        \vspace{3cm}
+        \textbf{Выполнил:}\\
+        студент группы 3822Б1ПМоп3 \\
+        \textit{Борисов Сергей Михайлович}\\[1cm]
+
+        \textbf{Преподаватель:}\\
+        \textit{Сысоев Александр Владимирович, доцент}\\[2cm]
+
+        \vfill
+        \textbf{Нижний Новгород, 2025 г.}
+    \end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+Умножение матриц является ключевой операцией во многих задачах вычислительной математики. Алгоритм Штрассена позволяет уменьшить количество умножений с 8 до 7 при рекурсивном разложении матриц, тем самым снижая асимптотическую сложность с $O(n^3)$ до $O(n^{\log_2 7}) \approx O(n^{2.81})$.
+
+\section{Цель и задачи}
+\subsection*{Цель работы}
+Реализовать и сравнить несколько версий параллельного алгоритма Штрассена: SEQ, OpenMP, TBB, STL Threads, MPI+STL.
+
+\subsection*{Задачи}
+\begin{itemize}
+  \item Реализовать последовательный вариант алгоритма
+  \item Реализовать четыре параллельных варианта
+  \item Сравнить производительность и масштабируемость
+  \item Сделать выводы о наиболее эффективном подходе
+\end{itemize}
+
+\section{Математическая формулировка алгоритма Штрассена}
+Для двух матриц $A, B \in \mathbb{R}^{n \times n}$:
+\[
+A = \begin{bmatrix} A_{11} & A_{12} \\ A_{21} & A_{22} \end{bmatrix}, \quad
+B = \begin{bmatrix} B_{11} & B_{12} \\ B_{21} & B_{22} \end{bmatrix}
+\]
+
+Вычисляются:
+\begin{align*}
+M_1 &= (A_{11} + A_{22})(B_{11} + B_{22}) \\
+M_2 &= (A_{21} + A_{22})B_{11} \\
+M_3 &= A_{11}(B_{12} - B_{22}) \\
+M_4 &= A_{22}(B_{21} - B_{11}) \\
+M_5 &= (A_{11} + A_{12})B_{22} \\
+M_6 &= (A_{21} - A_{11})(B_{11} + B_{12}) \\
+M_7 &= (A_{12} - A_{22})(B_{21} + B_{22})
+\end{align*}
+
+Затем результат собирается как:
+\begin{align*}
+C_{11} &= M_1 + M_4 - M_5 + M_7 \\
+C_{12} &= M_3 + M_5 \\
+C_{21} &= M_2 + M_4 \\
+C_{22} &= M_1 - M_2 + M_3 + M_6
+\end{align*}
+
+\section{Общие функции и структура реализации}
+Во всех версиях алгоритма реализован единый интерфейс, включающий в себя следующие методы и вспомогательные функции.
+
+\subsection*{PreProcessingImpl()}
+Подготавливает входные данные. Извлекаются размеры матриц, сами данные приводятся к формату, удобному для обработки. Производится дополнение матриц до размеров, кратных степени двойки, с инициализацией новых ячеек нулями.
+
+\subsection*{ValidationImpl()}
+Проверяет корректность входных данных. Основной критерий — соответствие размеров: число столбцов матрицы A должно совпадать с числом строк матрицы B.
+
+\subsection*{RunImpl()}
+Основная логика запуска алгоритма. Включает вызов рекурсивной функции \texttt{StrassenRecursive}, сборку результата, обрезку дополненных нулей и упаковку результата в выходной вектор.
+
+\subsection*{PostProcessingImpl()}
+Формирует выходной массив в формате, ожидаемом системой. Переписывает результат из внутреннего вектора в буфер \texttt{task\_data->outputs[0]}.
+
+\subsection*{AddMatr(), SubMatr()}
+Поэлементное сложение и вычитание квадратных матриц одинакового размера:
+
+\subsection*{SubMatrix(), SetSubMatrix()}
+\begin{itemize}
+  \item \texttt{SubMatrix()} — извлекает подматрицу размера $k \times k$ из заданной позиции \texttt{(row, col)}
+  \item \texttt{SetSubMatrix()} — вставляет подматрицу обратно в результирующую матрицу
+\end{itemize}
+
+\subsection*{StrassenRecursive()}
+Рекурсивная реализация основного алгоритма Штрассена:
+\begin{itemize}
+  \item На входе — две квадратные матрицы размера $n \times n$
+  \item При $n \leq threshold$ (например, 16 или 64) — вызывается обычное умножение
+  \item Иначе — рекурсивный вызов 7 промежуточных произведений $M_1 \dots M_7$
+  \item Собираются блоки $C_{11} \dots C_{22}$ и возвращаются
+\end{itemize}
+
+\section{Описание реализаций}
+
+\subsection{Последовательная реализация (SEQ)}
+\subsubsection*{Особенности}
+\begin{itemize}
+  \item Используется простая рекурсивная реализация
+  \item Для $n \leq 16$ применяется наивное перемножение
+\end{itemize}
+
+\subsection{OpenMP реализация}
+\subsubsection*{Этапы работы алгоритма}
+\begin{itemize}
+  \item В функциях \texttt{AddMatr}, \texttt{SubMatr}, \texttt{MultiplyNaive} применена директива \texttt{\#pragma omp parallel for}, которая распараллеливает итерации цикла между потоками
+  \item Вызовы \texttt{StrassenRecursive} для семи $M_i$ обёрнуты в \texttt{\#pragma omp parallel sections} и \texttt{\#pragma omp section}, чтобы выполнять их параллельно
+\end{itemize}
+
+\subsubsection*{Как работает omp parallel for}
+Директива \texttt{omp parallel for} создаёт команду потоков, каждый из которых получает диапазон итераций цикла. Планировщик может использовать стратегии: static, dynamic, guided. Это позволяет ускорить циклы, например:
+\begin{lstlisting}
+#pragma omp parallel for
+for (int i = 0; i < n; ++i) {
+    c[i] = a[i] + b[i];
+}
+\end{lstlisting}
+
+\subsubsection*{Особенности}
+\begin{itemize}
+  \item Простая реализация многопоточности
+  \item Автоматическое управление распределением итераций
+\end{itemize}
+
+\subsection{MPI + STL реализация}
+\subsubsection*{Структура параллелизма}
+В реализации используются два уровня параллелизма:
+\begin{itemize}
+  \item \textbf{Первый уровень (MPI)} — каждая из 7 матриц $M_i$ вычисляется в отдельном MPI-процессе (если доступно 7 и более процессов). На этапе сборки процессы шлют результаты на процесс 0, который собирает итоговую матрицу $C$.
+  \item \textbf{Второй уровень (STL threads)} — внутри каждого процесса используется \texttt{std::thread} на глубине рекурсии $< 2$ для параллельного расчёта $M_i$.
+\end{itemize}
+
+\subsubsection*{Особенности}
+\begin{itemize}
+  \item MPI-уровень распараллеливает по подзадачам
+  \item std::thread реализует параллелизм на уровне рекурсии
+\end{itemize}
+
+\subsubsection*{Преимущества}
+\begin{itemize}
+  \item Возможность масштабирования на кластер
+  \item Поддержка многоядерности внутри каждого узла
+\end{itemize}
+
+\subsection{TBB реализация}
+\subsubsection*{Этапы работы алгоритма}
+\begin{itemize}
+  \item Использование \texttt{tbb::parallel\_for} для параллельных циклов сложения, вычитания, копирования
+  \item Использование \texttt{tbb::parallel\_invoke} для вызовов всех семи рекурсий $M_1 \dots M_7$
+\end{itemize}
+
+\subsubsection*{Особенности}
+\begin{itemize}
+  \item Автоматическое управление потоками через TBB runtime
+  \item Контроль за зернистостью задач (grainsize)
+\end{itemize}
+
+\subsubsection*{Преимущества}
+\begin{itemize}
+  \item Хорошая масштабируемость
+  \item Эффективность для больших матриц
+\end{itemize}
+
+\subsection{STL threads реализация}
+\subsubsection*{Этапы работы алгоритма}
+\begin{itemize}
+  \item На первых двух уровнях рекурсии создаются 7 потоков
+  \item Далее рекурсивные вызовы выполняются последовательно
+\end{itemize}
+
+\subsubsection*{Особенности}
+\begin{itemize}
+  \item Потоки создаются вручную через \texttt{std::thread}
+  \item Используются \texttt{join()} для синхронизации
+\end{itemize}
+
+\subsubsection*{Преимущества}
+\begin{itemize}
+  \item Полный контроль над параллелизмом
+  \item Отсутствие зависимостей от внешних библиотек
+\end{itemize}
+
+\section{Результаты экспериментов}
+\subsection*{Конфигурация системы}
+\begin{itemize}
+  \item CPU: Intel Core i5
+  \item RAM: 32 GB
+  \item ОС: Windows 11
+  \item Потоки: 4
+\end{itemize}
+
+\subsection*{Тестовые размеры матриц}
+\begin{itemize}
+  \item Проверочные: $3 \times 3$, $128 \times 128$
+  \item Основной тест: $1024 \times 512$
+\end{itemize}
+
+\subsection*{Производительность}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Реализация} & \textbf{Pipeline (ms)} & \textbf{Task (ms)} \\
+\hline
+SEQ       & 3853 & 4232 \\
+OMP       & 2471 & 2486 \\
+TBB       & 2533 & 2532 \\
+STL       & 2370 & 2351 \\
+MPI+STL   & 1534 & \textbf{889} \\
+\hline
+\end{tabular}
+
+\subsection*{Ускорение}
+\[
+S_{\text{OMP}} = \frac{3853}{2471} \approx 1.56, \quad
+S_{\text{TBB}} = \frac{3853}{2533} \approx 1.52, \quad
+S_{\text{MPI+STL}} = \frac{3853}{1534} \approx 2.51
+\]
+
+\section{Выводы}
+\begin{itemize}
+  \item MPI+STL показала наилучшее ускорение благодаря двухуровневой параллелизации
+  \item STL Threads требует больше кода, но даёт контроль
+  \item TBB и OpenMP обеспечивают простоту и масштабируемость
+\end{itemize}
+
+\section*{Список литературы}
+\begin{enumerate}
+  \item OpenMP Architecture Review Board. OpenMP API Specification for Parallel Programming. \url{https://www.openmp.org/}
+  \item Intel. Threading Building Blocks. \url{https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html}
+  \item Boost C++ Libraries. Boost.MPI. \url{https://www.boost.org/doc/libs/release/doc/html/mpi.html}
+  \item В.П. Гергель. «Теория и практика параллельных вычислений». М.: Интернет-Университет, 2007.
+  \item Материалы лекций и лабораторных работ кафедры ВВСП, ННГУ им. Лобачевского
+\end{enumerate}
+
+\newpage
+\appendix
+\section*{Приложение: Исходные коды реализаций}
+\subsection*{SEQ}
+\begin{lstlisting}
+#include "seq/borisov_s_strassen/include/ops_seq.hpp"
+
+#include <algorithm>
+#include <cstddef>
+#include <vector>
+
+namespace borisov_s_strassen_seq {
+
+namespace {
+
+std::vector<double> MultiplyNaive(const std::vector<double> &a, const std::vector<double> &b, int n) {
+  std::vector<double> c(n * n, 0.0);
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < n; ++j) {
+      double sum = 0.0;
+      for (int k = 0; k < n; ++k) {
+        sum += a[(i * n) + k] * b[(k * n) + j];
+      }
+      c[(i * n) + j] = sum;
+    }
+  }
+  return c;
+}
+
+std::vector<double> AddMatr(const std::vector<double> &a, const std::vector<double> &b, int n) {
+  std::vector<double> c(n * n);
+  for (int i = 0; i < n * n; ++i) {
+    c[i] = a[i] + b[i];
+  }
+  return c;
+}
+
+std::vector<double> SubMatr(const std::vector<double> &a, const std::vector<double> &b, int n) {
+  std::vector<double> c(n * n);
+  for (int i = 0; i < n * n; ++i) {
+    c[i] = a[i] - b[i];
+  }
+  return c;
+}
+
+std::vector<double> SubMatrix(const std::vector<double> &m, int n, int row, int col, int size) {
+  std::vector<double> sub(size * size);
+  for (int i = 0; i < size; ++i) {
+    for (int j = 0; j < size; ++j) {
+      sub[(i * size) + j] = m[((row + i) * n) + (col + j)];
+    }
+  }
+  return sub;
+}
+
+void SetSubMatrix(std::vector<double> &m, const std::vector<double> &sub, int n, int row, int col, int size) {
+  for (int i = 0; i < size; ++i) {
+    for (int j = 0; j < size; ++j) {
+      m[((row + i) * n) + (col + j)] = sub[(i * size) + j];
+    }
+  }
+}
+
+std::vector<double> StrassenRecursive(const std::vector<double> &a, const std::vector<double> &b, int n) {
+  if (n <= 16) {
+    return MultiplyNaive(a, b, n);
+  }
+  int k = n / 2;
+  auto a11 = SubMatrix(a, n, 0, 0, k);
+  auto a12 = SubMatrix(a, n, 0, k, k);
+  auto a21 = SubMatrix(a, n, k, 0, k);
+  auto a22 = SubMatrix(a, n, k, k, k);
+
+  auto b11 = SubMatrix(b, n, 0, 0, k);
+  auto b12 = SubMatrix(b, n, 0, k, k);
+  auto b21 = SubMatrix(b, n, k, 0, k);
+  auto b22 = SubMatrix(b, n, k, k, k);
+
+  auto m1 = StrassenRecursive(AddMatr(a11, a22, k), AddMatr(b11, b22, k), k);
+  auto m2 = StrassenRecursive(AddMatr(a21, a22, k), b11, k);
+  auto m3 = StrassenRecursive(a11, SubMatr(b12, b22, k), k);
+  auto m4 = StrassenRecursive(a22, SubMatr(b21, b11, k), k);
+  auto m5 = StrassenRecursive(AddMatr(a11, a12, k), b22, k);
+  auto m6 = StrassenRecursive(SubMatr(a21, a11, k), AddMatr(b11, b12, k), k);
+  auto m7 = StrassenRecursive(SubMatr(a12, a22, k), AddMatr(b21, b22, k), k);
+
+  std::vector<double> c(n * n, 0.0);
+
+  auto c11 = AddMatr(SubMatr(AddMatr(m1, m4, k), m5, k), m7, k);
+  auto c12 = AddMatr(m3, m5, k);
+  auto c21 = AddMatr(m2, m4, k);
+  auto c22 = AddMatr(AddMatr(SubMatr(m1, m2, k), m3, k), m6, k);
+
+  SetSubMatrix(c, c11, n, 0, 0, k);
+  SetSubMatrix(c, c12, n, 0, k, k);
+  SetSubMatrix(c, c21, n, k, 0, k);
+  SetSubMatrix(c, c22, n, k, k, k);
+
+  return c;
+}
+
+int NextPowerOfTwo(int n) {
+  int r = 1;
+  while (r < n) {
+    r <<= 1;
+  }
+  return r;
+}
+
+}  // namespace
+
+bool SequentialStrassenSeq::PreProcessingImpl() {
+  size_t input_count = task_data->inputs_count[0];
+  auto *double_ptr = reinterpret_cast<double *>(task_data->inputs[0]);
+  input_.assign(double_ptr, double_ptr + input_count);
+
+  size_t output_count = task_data->outputs_count[0];
+  output_.resize(output_count, 0.0);
+
+  if (input_.size() < 4) {
+    return false;
+  }
+
+  rowsA_ = static_cast<int>(input_[0]);
+  colsA_ = static_cast<int>(input_[1]);
+  rowsB_ = static_cast<int>(input_[2]);
+  colsB_ = static_cast<int>(input_[3]);
+
+  return true;
+}
+
+bool SequentialStrassenSeq::ValidationImpl() {
+  if (colsA_ != rowsB_) {
+    return false;
+  }
+
+  size_t needed = 4 + (static_cast<size_t>(rowsA_) * colsA_) + (static_cast<size_t>(rowsB_) * colsB_);
+
+  return input_.size() >= needed;
+}
+
+bool SequentialStrassenSeq::RunImpl() {
+  size_t offset = 4;
+  std::vector<double> a(rowsA_ * colsA_);
+  for (int i = 0; i < rowsA_ * colsA_; ++i) {
+    a[i] = input_[offset + i];
+  }
+  offset += static_cast<size_t>(rowsA_ * colsA_);
+
+  std::vector<double> b(rowsB_ * colsB_);
+  for (int i = 0; i < rowsB_ * colsB_; ++i) {
+    b[i] = input_[offset + i];
+  }
+
+  int max_dim = std::max({rowsA_, colsA_, colsB_});
+  int m = NextPowerOfTwo(max_dim);
+
+  std::vector<double> a_exp(m * m, 0.0);
+  std::vector<double> b_exp(m * m, 0.0);
+
+  for (int i = 0; i < rowsA_; ++i) {
+    for (int j = 0; j < colsA_; ++j) {
+      a_exp[(i * m) + j] = a[(i * colsA_) + j];
+    }
+  }
+  for (int i = 0; i < rowsB_; ++i) {
+    for (int j = 0; j < colsB_; ++j) {
+      b_exp[(i * m) + j] = b[(i * colsB_) + j];
+    }
+  }
+
+  auto c_exp = StrassenRecursive(a_exp, b_exp, m);
+
+  std::vector<double> c(rowsA_ * colsB_, 0.0);
+  for (int i = 0; i < rowsA_; ++i) {
+    for (int j = 0; j < colsB_; ++j) {
+      c[(i * colsB_) + j] = c_exp[(i * m) + j];
+    }
+  }
+
+  output_[0] = static_cast<double>(rowsA_);
+  output_[1] = static_cast<double>(colsB_);
+  for (int i = 0; i < rowsA_ * colsB_; ++i) {
+    output_[2 + i] = c[i];
+  }
+
+  return true;
+}
+
+bool SequentialStrassenSeq::PostProcessingImpl() {
+  auto *out_ptr = reinterpret_cast<double *>(task_data->outputs[0]);
+  for (size_t i = 0; i < output_.size(); ++i) {
+    out_ptr[i] = output_[i];
+  }
+  return true;
+}
+
+}  // namespace borisov_s_strassen_seq
+\end{lstlisting}
+
+\subsection*{OpenMP}
+\begin{lstlisting}
+#include "omp/borisov_s_strassen/include/ops_omp.hpp"
+
+#include <algorithm>
+#include <cstddef>
+#include <vector>
+
+namespace borisov_s_strassen_omp {
+
+namespace {
+
+std::vector<double> MultiplyNaive(const std::vector<double> &a, const std::vector<double> &b, int n) {
+  std::vector<double> c(n * n, 0.0);
+#pragma omp parallel for
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < n; ++j) {
+      double sum = 0.0;
+      for (int k = 0; k < n; ++k) {
+        sum += a[(i * n) + k] * b[(k * n) + j];
+      }
+      c[(i * n) + j] = sum;
+    }
+  }
+  return c;
+}
+
+std::vector<double> AddMatr(const std::vector<double> &a, const std::vector<double> &b, int n) {
+  std::vector<double> c(n * n);
+#pragma omp parallel for
+  for (int i = 0; i < n * n; ++i) {
+    c[i] = a[i] + b[i];
+  }
+  return c;
+}
+
+std::vector<double> SubMatr(const std::vector<double> &a, const std::vector<double> &b, int n) {
+  std::vector<double> c(n * n);
+#pragma omp parallel for
+  for (int i = 0; i < n * n; ++i) {
+    c[i] = a[i] - b[i];
+  }
+  return c;
+}
+
+std::vector<double> SubMatrix(const std::vector<double> &m, int n, int row, int col, int size) {
+  std::vector<double> sub(size * size);
+#pragma omp parallel for
+  for (int i = 0; i < size; ++i) {
+    for (int j = 0; j < size; ++j) {
+      sub[(i * size) + j] = m[((row + i) * n) + (col + j)];
+    }
+  }
+  return sub;
+}
+
+void SetSubMatrix(std::vector<double> &m, const std::vector<double> &sub, int n, int row, int col, int size) {
+#pragma omp parallel for
+  for (int i = 0; i < size; ++i) {
+    for (int j = 0; j < size; ++j) {
+      m[((row + i) * n) + (col + j)] = sub[(i * size) + j];
+    }
+  }
+}
+
+std::vector<double> StrassenRecursive(const std::vector<double> &a, const std::vector<double> &b, int n) {
+  if (n <= 16) {
+    return MultiplyNaive(a, b, n);
+  }
+  int k = n / 2;
+  auto a11 = SubMatrix(a, n, 0, 0, k);
+  auto a12 = SubMatrix(a, n, 0, k, k);
+  auto a21 = SubMatrix(a, n, k, 0, k);
+  auto a22 = SubMatrix(a, n, k, k, k);
+
+  auto b11 = SubMatrix(b, n, 0, 0, k);
+  auto b12 = SubMatrix(b, n, 0, k, k);
+  auto b21 = SubMatrix(b, n, k, 0, k);
+  auto b22 = SubMatrix(b, n, k, k, k);
+
+  std::vector<double> m1;
+  std::vector<double> m2;
+  std::vector<double> m3;
+  std::vector<double> m4;
+  std::vector<double> m5;
+  std::vector<double> m6;
+  std::vector<double> m7;
+
+#pragma omp parallel sections
+  {
+#pragma omp section
+    { m1 = StrassenRecursive(AddMatr(a11, a22, k), AddMatr(b11, b22, k), k); }
+#pragma omp section
+    { m2 = StrassenRecursive(AddMatr(a21, a22, k), b11, k); }
+#pragma omp section
+    { m3 = StrassenRecursive(a11, SubMatr(b12, b22, k), k); }
+#pragma omp section
+    { m4 = StrassenRecursive(a22, SubMatr(b21, b11, k), k); }
+#pragma omp section
+    { m5 = StrassenRecursive(AddMatr(a11, a12, k), b22, k); }
+#pragma omp section
+    { m6 = StrassenRecursive(SubMatr(a21, a11, k), AddMatr(b11, b12, k), k); }
+#pragma omp section
+    { m7 = StrassenRecursive(SubMatr(a12, a22, k), AddMatr(b21, b22, k), k); }
+  }
+
+  std::vector<double> c(n * n, 0.0);
+
+  auto c11 = AddMatr(SubMatr(AddMatr(m1, m4, k), m5, k), m7, k);
+  auto c12 = AddMatr(m3, m5, k);
+  auto c21 = AddMatr(m2, m4, k);
+  auto c22 = AddMatr(AddMatr(SubMatr(m1, m2, k), m3, k), m6, k);
+
+  SetSubMatrix(c, c11, n, 0, 0, k);
+  SetSubMatrix(c, c12, n, 0, k, k);
+  SetSubMatrix(c, c21, n, k, 0, k);
+  SetSubMatrix(c, c22, n, k, k, k);
+
+  return c;
+}
+
+int NextPowerOfTwo(int n) {
+  int r = 1;
+  while (r < n) {
+    r <<= 1;
+  }
+  return r;
+}
+
+}  // namespace
+
+bool ParallelStrassenOMP::PreProcessingImpl() {
+  size_t input_count = task_data->inputs_count[0];
+  auto *double_ptr = reinterpret_cast<double *>(task_data->inputs[0]);
+  input_.assign(double_ptr, double_ptr + input_count);
+
+  size_t output_count = task_data->outputs_count[0];
+  output_.resize(output_count, 0.0);
+
+  if (input_.size() < 4) {
+    return false;
+  }
+
+  rowsA_ = static_cast<int>(input_[0]);
+  colsA_ = static_cast<int>(input_[1]);
+  rowsB_ = static_cast<int>(input_[2]);
+  colsB_ = static_cast<int>(input_[3]);
+
+  return true;
+}
+
+bool ParallelStrassenOMP::ValidationImpl() {
+  if (colsA_ != rowsB_) {
+    return false;
+  }
+
+  size_t needed = 4 + (static_cast<size_t>(rowsA_) * colsA_) + (static_cast<size_t>(rowsB_) * colsB_);
+
+  return input_.size() >= needed;
+}
+
+bool ParallelStrassenOMP::RunImpl() {
+  size_t offset = 4;
+  std::vector<double> a(rowsA_ * colsA_);
+  for (int i = 0; i < rowsA_ * colsA_; ++i) {
+    a[i] = input_[offset + i];
+  }
+  offset += static_cast<size_t>(rowsA_ * colsA_);
+
+  std::vector<double> b(rowsB_ * colsB_);
+  for (int i = 0; i < rowsB_ * colsB_; ++i) {
+    b[i] = input_[offset + i];
+  }
+
+  int max_dim = std::max({rowsA_, colsA_, colsB_});
+  int m = NextPowerOfTwo(max_dim);
+
+  std::vector<double> a_exp(m * m, 0.0);
+  std::vector<double> b_exp(m * m, 0.0);
+
+  for (int i = 0; i < rowsA_; ++i) {
+    for (int j = 0; j < colsA_; ++j) {
+      a_exp[(i * m) + j] = a[(i * colsA_) + j];
+    }
+  }
+  for (int i = 0; i < rowsB_; ++i) {
+    for (int j = 0; j < colsB_; ++j) {
+      b_exp[(i * m) + j] = b[(i * colsB_) + j];
+    }
+  }
+
+  auto c_exp = StrassenRecursive(a_exp, b_exp, m);
+
+  std::vector<double> c(rowsA_ * colsB_, 0.0);
+  for (int i = 0; i < rowsA_; ++i) {
+    for (int j = 0; j < colsB_; ++j) {
+      c[(i * colsB_) + j] = c_exp[(i * m) + j];
+    }
+  }
+
+  output_[0] = static_cast<double>(rowsA_);
+  output_[1] = static_cast<double>(colsB_);
+  for (int i = 0; i < rowsA_ * colsB_; ++i) {
+    output_[2 + i] = c[i];
+  }
+
+  return true;
+}
+
+bool ParallelStrassenOMP::PostProcessingImpl() {
+  auto *out_ptr = reinterpret_cast<double *>(task_data->outputs[0]);
+  for (size_t i = 0; i < output_.size(); ++i) {
+    out_ptr[i] = output_[i];
+  }
+  return true;
+}
+
+}  // namespace borisov_s_strassen_omp
+\end{lstlisting}
+
+\subsection*{TBB}
+\begin{lstlisting}
+#include "tbb/borisov_s_strassen/include/ops_tbb.hpp"
+
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/parallel_invoke.h>
+
+#include <algorithm>
+#include <cstddef>
+#include <vector>
+
+namespace borisov_s_strassen_tbb {
+
+namespace {
+
+const int kSeqThreshold = 64;
+
+std::vector<double> MultiplyNaive(const std::vector<double>& a, const std::vector<double>& b, int n) {
+  std::vector<double> c(n * n, 0.0);
+  int grain_size = std::max(1, n / 8);
+  tbb::parallel_for(tbb::blocked_range<int>(0, n, grain_size), [&](const tbb::blocked_range<int>& r) {
+    for (int i = r.begin(); i < r.end(); ++i) {
+      for (int j = 0; j < n; ++j) {
+        double sum = 0.0;
+        for (int k = 0; k < n; ++k) {
+          sum += a[(i * n) + k] * b[(k * n) + j];
+        }
+        c[(i * n) + j] = sum;
+      }
+    }
+  });
+  return c;
+}
+
+std::vector<double> AddMatr(const std::vector<double>& a, const std::vector<double>& b, int n) {
+  std::vector<double> c(n * n, 0.0);
+  int total = n * n;
+  int grain = std::max(1, total / 64);
+  tbb::parallel_for(tbb::blocked_range<int>(0, total, grain), [&](const tbb::blocked_range<int>& r) {
+    for (int i = r.begin(); i < r.end(); ++i) {
+      c[i] = a[i] + b[i];
+    }
+  });
+  return c;
+}
+
+std::vector<double> SubMatr(const std::vector<double>& a, const std::vector<double>& b, int n) {
+  std::vector<double> c(n * n, 0.0);
+  int total = n * n;
+  int grain = std::max(1, total / 64);
+  tbb::parallel_for(tbb::blocked_range<int>(0, total, grain), [&](const tbb::blocked_range<int>& r) {
+    for (int i = r.begin(); i < r.end(); ++i) {
+      c[i] = a[i] - b[i];
+    }
+  });
+  return c;
+}
+
+std::vector<double> SubMatrix(const std::vector<double>& m, int n, int row, int col, int size) {
+  std::vector<double> sub(size * size, 0.0);
+  int grain = std::max(1, size / 4);
+  tbb::parallel_for(tbb::blocked_range<int>(0, size, grain), [&](const tbb::blocked_range<int>& r) {
+    for (int i = r.begin(); i < r.end(); ++i) {
+      for (int j = 0; j < size; ++j) {
+        sub[(i * size) + j] = m[((row + i) * n) + (col + j)];
+      }
+    }
+  });
+  return sub;
+}
+
+void SetSubMatrix(std::vector<double>& m, const std::vector<double>& sub, int n, int row, int col, int size) {
+  int grain = std::max(1, size / 4);
+  tbb::parallel_for(tbb::blocked_range<int>(0, size, grain), [&](const tbb::blocked_range<int>& r) {
+    for (int i = r.begin(); i < r.end(); ++i) {
+      for (int j = 0; j < size; ++j) {
+        m[((row + i) * n) + (col + j)] = sub[(i * size) + j];
+      }
+    }
+  });
+}
+
+std::vector<double> StrassenRecursive(const std::vector<double>& a, const std::vector<double>& b, int n) {
+  if (n <= kSeqThreshold) {
+    return MultiplyNaive(a, b, n);
+  }
+  int k = n / 2;
+  auto a11 = SubMatrix(a, n, 0, 0, k);
+  auto a12 = SubMatrix(a, n, 0, k, k);
+  auto a21 = SubMatrix(a, n, k, 0, k);
+  auto a22 = SubMatrix(a, n, k, k, k);
+
+  auto b11 = SubMatrix(b, n, 0, 0, k);
+  auto b12 = SubMatrix(b, n, 0, k, k);
+  auto b21 = SubMatrix(b, n, k, 0, k);
+  auto b22 = SubMatrix(b, n, k, k, k);
+
+  std::vector<double> m1;
+  std::vector<double> m2;
+  std::vector<double> m3;
+  std::vector<double> m4;
+  std::vector<double> m5;
+  std::vector<double> m6;
+  std::vector<double> m7;
+  tbb::parallel_invoke([&] { m1 = StrassenRecursive(AddMatr(a11, a22, k), AddMatr(b11, b22, k), k); },
+                       [&] { m2 = StrassenRecursive(AddMatr(a21, a22, k), b11, k); },
+                       [&] { m3 = StrassenRecursive(a11, SubMatr(b12, b22, k), k); },
+                       [&] { m4 = StrassenRecursive(a22, SubMatr(b21, b11, k), k); },
+                       [&] { m5 = StrassenRecursive(AddMatr(a11, a12, k), b22, k); },
+                       [&] { m6 = StrassenRecursive(SubMatr(a21, a11, k), AddMatr(b11, b12, k), k); },
+                       [&] { m7 = StrassenRecursive(SubMatr(a12, a22, k), AddMatr(b21, b22, k), k); });
+
+  std::vector<double> c(n * n, 0.0);
+  auto c11 = AddMatr(SubMatr(AddMatr(m1, m4, k), m5, k), m7, k);
+  auto c12 = AddMatr(m3, m5, k);
+  auto c21 = AddMatr(m2, m4, k);
+  auto c22 = AddMatr(AddMatr(SubMatr(m1, m2, k), m3, k), m6, k);
+
+  SetSubMatrix(c, c11, n, 0, 0, k);
+  SetSubMatrix(c, c12, n, 0, k, k);
+  SetSubMatrix(c, c21, n, k, 0, k);
+  SetSubMatrix(c, c22, n, k, k, k);
+
+  return c;
+}
+
+int NextPowerOfTwo(int n) {
+  int r = 1;
+  while (r < n) {
+    r <<= 1;
+  }
+  return r;
+}
+
+}  // namespace
+
+bool ParallelStrassenTBB::PreProcessingImpl() {
+  size_t input_count = task_data->inputs_count[0];
+  auto* double_ptr = reinterpret_cast<double*>(task_data->inputs[0]);
+  input_.assign(double_ptr, double_ptr + input_count);
+
+  size_t output_count = task_data->outputs_count[0];
+  output_.resize(output_count, 0.0);
+
+  if (input_.size() < 4) {
+    return false;
+  }
+
+  rowsA_ = static_cast<int>(input_[0]);
+  colsA_ = static_cast<int>(input_[1]);
+  rowsB_ = static_cast<int>(input_[2]);
+  colsB_ = static_cast<int>(input_[3]);
+
+  return true;
+}
+
+bool ParallelStrassenTBB::ValidationImpl() {
+  if (colsA_ != rowsB_) {
+    return false;
+  }
+  size_t needed = 4 + (static_cast<size_t>(rowsA_) * colsA_) + (static_cast<size_t>(rowsB_) * colsB_);
+  return input_.size() >= needed;
+}
+
+bool ParallelStrassenTBB::RunImpl() {
+  size_t offset = 4;
+  std::vector<double> a(rowsA_ * colsA_);
+  for (int i = 0; i < rowsA_ * colsA_; ++i) {
+    a[i] = input_[offset + i];
+  }
+  offset += static_cast<size_t>(rowsA_ * colsA_);
+
+  std::vector<double> b(rowsB_ * colsB_);
+  for (int i = 0; i < rowsB_ * colsB_; ++i) {
+    b[i] = input_[offset + i];
+  }
+
+  int max_dim = std::max({rowsA_, colsA_, colsB_});
+  int m = NextPowerOfTwo(max_dim);
+
+  std::vector<double> a_exp(m * m, 0.0);
+  std::vector<double> b_exp(m * m, 0.0);
+
+  tbb::parallel_for(tbb::blocked_range<int>(0, rowsA_), [&](const tbb::blocked_range<int>& r) {
+    for (int i = r.begin(); i < r.end(); ++i) {
+      for (int j = 0; j < colsA_; ++j) {
+        a_exp[(i * m) + j] = a[(i * colsA_) + j];
+      }
+    }
+  });
+  tbb::parallel_for(tbb::blocked_range<int>(0, rowsB_), [&](const tbb::blocked_range<int>& r) {
+    for (int i = r.begin(); i < r.end(); ++i) {
+      for (int j = 0; j < colsB_; ++j) {
+        b_exp[(i * m) + j] = b[(i * colsB_) + j];
+      }
+    }
+  });
+
+  auto c_exp = StrassenRecursive(a_exp, b_exp, m);
+
+  std::vector<double> c(rowsA_ * colsB_, 0.0);
+  tbb::parallel_for(tbb::blocked_range<int>(0, rowsA_), [&](const tbb::blocked_range<int>& r) {
+    for (int i = r.begin(); i < r.end(); ++i) {
+      for (int j = 0; j < colsB_; ++j) {
+        c[(i * colsB_) + j] = c_exp[(i * m) + j];
+      }
+    }
+  });
+
+  output_[0] = static_cast<double>(rowsA_);
+  output_[1] = static_cast<double>(colsB_);
+  tbb::parallel_for(tbb::blocked_range<int>(0, rowsA_ * colsB_), [&](const tbb::blocked_range<int>& r) {
+    for (int i = r.begin(); i < r.end(); ++i) {
+      output_[2 + i] = c[i];
+    }
+  });
+
+  return true;
+}
+
+bool ParallelStrassenTBB::PostProcessingImpl() {
+  auto* out_ptr = reinterpret_cast<double*>(task_data->outputs[0]);
+  for (size_t i = 0; i < output_.size(); ++i) {
+    out_ptr[i] = output_[i];
+  }
+  return true;
+}
+
+}  // namespace borisov_s_strassen_tbb
+\end{lstlisting}
+
+\subsection*{STL}
+\begin{lstlisting}
+#include "stl/borisov_s_strassen/include/ops_stl.hpp"
+
+#include <algorithm>
+#include <cstddef>
+#include <thread>
+#include <vector>
+
+namespace borisov_s_strassen_stl {
+
+namespace {
+
+std::vector<double> MultiplyNaive(const std::vector<double> &a, const std::vector<double> &b, int n) {
+  std::vector<double> c(n * n, 0.0);
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < n; ++j) {
+      double sum = 0.0;
+      for (int k = 0; k < n; ++k) {
+        sum += a[(i * n) + k] * b[(k * n) + j];
+      }
+      c[(i * n) + j] = sum;
+    }
+  }
+  return c;
+}
+
+std::vector<double> AddMatr(const std::vector<double> &a, const std::vector<double> &b, int n) {
+  std::vector<double> c(n * n);
+  for (int i = 0; i < n * n; ++i) {
+    c[i] = a[i] + b[i];
+  }
+  return c;
+}
+
+std::vector<double> SubMatr(const std::vector<double> &a, const std::vector<double> &b, int n) {
+  std::vector<double> c(n * n);
+  for (int i = 0; i < n * n; ++i) {
+    c[i] = a[i] - b[i];
+  }
+  return c;
+}
+
+std::vector<double> SubMatrix(const std::vector<double> &m, int n, int row, int col, int size) {
+  std::vector<double> sub(size * size);
+  for (int i = 0; i < size; ++i) {
+    std::copy(m.begin() + (row + i) * n + col, m.begin() + (row + i) * n + col + size, sub.begin() + i * size);
+  }
+  return sub;
+}
+
+void SetSubMatrix(std::vector<double> &m, const std::vector<double> &sub, int n, int row, int col, int size) {
+  for (int i = 0; i < size; ++i) {
+    std::copy(sub.begin() + i * size, sub.begin() + (i + 1) * size, m.begin() + (row + i) * n + col);
+  }
+}
+
+std::vector<double> StrassenRecursive(const std::vector<double> &a, const std::vector<double> &b, int n,
+                                      int depth = 0) {
+  const int parallel_depth = 2;
+
+  if (n <= 64) {
+    return MultiplyNaive(a, b, n);
+  }
+  int k = n / 2;
+  auto a11 = SubMatrix(a, n, 0, 0, k);
+  auto a12 = SubMatrix(a, n, 0, k, k);
+  auto a21 = SubMatrix(a, n, k, 0, k);
+  auto a22 = SubMatrix(a, n, k, k, k);
+
+  auto b11 = SubMatrix(b, n, 0, 0, k);
+  auto b12 = SubMatrix(b, n, 0, k, k);
+  auto b21 = SubMatrix(b, n, k, 0, k);
+  auto b22 = SubMatrix(b, n, k, k, k);
+
+  std::vector<double> m1;
+  std::vector<double> m2;
+  std::vector<double> m3;
+  std::vector<double> m4;
+  std::vector<double> m5;
+  std::vector<double> m6;
+  std::vector<double> m7;
+
+  if (depth < parallel_depth) {
+    std::thread t1([&] { m1 = StrassenRecursive(AddMatr(a11, a22, k), AddMatr(b11, b22, k), k, depth + 1); });
+    std::thread t2([&] { m2 = StrassenRecursive(AddMatr(a21, a22, k), b11, k, depth + 1); });
+    std::thread t3([&] { m3 = StrassenRecursive(a11, SubMatr(b12, b22, k), k, depth + 1); });
+    std::thread t4([&] { m4 = StrassenRecursive(a22, SubMatr(b21, b11, k), k, depth + 1); });
+    std::thread t5([&] { m5 = StrassenRecursive(AddMatr(a11, a12, k), b22, k, depth + 1); });
+    std::thread t6([&] { m6 = StrassenRecursive(SubMatr(a21, a11, k), AddMatr(b11, b12, k), k, depth + 1); });
+    std::thread t7([&] { m7 = StrassenRecursive(SubMatr(a12, a22, k), AddMatr(b21, b22, k), k, depth + 1); });
+
+    t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
+    t5.join();
+    t6.join();
+    t7.join();
+  } else {
+    m1 = StrassenRecursive(AddMatr(a11, a22, k), AddMatr(b11, b22, k), k, depth + 1);
+    m2 = StrassenRecursive(AddMatr(a21, a22, k), b11, k, depth + 1);
+    m3 = StrassenRecursive(a11, SubMatr(b12, b22, k), k, depth + 1);
+    m4 = StrassenRecursive(a22, SubMatr(b21, b11, k), k, depth + 1);
+    m5 = StrassenRecursive(AddMatr(a11, a12, k), b22, k, depth + 1);
+    m6 = StrassenRecursive(SubMatr(a21, a11, k), AddMatr(b11, b12, k), k, depth + 1);
+    m7 = StrassenRecursive(SubMatr(a12, a22, k), AddMatr(b21, b22, k), k, depth + 1);
+  }
+
+  std::vector<double> c(n * n, 0.0);
+
+  auto c11 = AddMatr(SubMatr(AddMatr(m1, m4, k), m5, k), m7, k);
+  auto c12 = AddMatr(m3, m5, k);
+  auto c21 = AddMatr(m2, m4, k);
+  auto c22 = AddMatr(AddMatr(SubMatr(m1, m2, k), m3, k), m6, k);
+
+  SetSubMatrix(c, c11, n, 0, 0, k);
+  SetSubMatrix(c, c12, n, 0, k, k);
+  SetSubMatrix(c, c21, n, k, 0, k);
+  SetSubMatrix(c, c22, n, k, k, k);
+
+  return c;
+}
+
+int NextPowerOfTwo(int n) {
+  int r = 1;
+  while (r < n) {
+    r <<= 1;
+  }
+  return r;
+}
+
+}  // namespace
+
+bool ParallelStrassenStl::PreProcessingImpl() {
+  size_t input_count = task_data->inputs_count[0];
+  auto *double_ptr = reinterpret_cast<double *>(task_data->inputs[0]);
+  input_.assign(double_ptr, double_ptr + input_count);
+
+  size_t output_count = task_data->outputs_count[0];
+  output_.resize(output_count, 0.0);
+
+  if (input_.size() < 4) {
+    return false;
+  }
+
+  rowsA_ = static_cast<int>(input_[0]);
+  colsA_ = static_cast<int>(input_[1]);
+  rowsB_ = static_cast<int>(input_[2]);
+  colsB_ = static_cast<int>(input_[3]);
+
+  return true;
+}
+
+bool ParallelStrassenStl::ValidationImpl() {
+  if (colsA_ != rowsB_) {
+    return false;
+  }
+
+  size_t needed = 4 + (static_cast<size_t>(rowsA_) * colsA_) + (static_cast<size_t>(rowsB_) * colsB_);
+
+  return input_.size() >= needed;
+}
+
+bool ParallelStrassenStl::RunImpl() {
+  size_t offset = 4;
+  std::vector<double> a(rowsA_ * colsA_);
+  for (int i = 0; i < rowsA_ * colsA_; ++i) {
+    a[i] = input_[offset + i];
+  }
+  offset += static_cast<size_t>(rowsA_ * colsA_);
+
+  std::vector<double> b(rowsB_ * colsB_);
+  for (int i = 0; i < rowsB_ * colsB_; ++i) {
+    b[i] = input_[offset + i];
+  }
+
+  int max_dim = std::max({rowsA_, colsA_, colsB_});
+  int m = NextPowerOfTwo(max_dim);
+
+  std::vector<double> a_exp(m * m, 0.0);
+  std::vector<double> b_exp(m * m, 0.0);
+
+  for (int i = 0; i < rowsA_; ++i) {
+    for (int j = 0; j < colsA_; ++j) {
+      a_exp[(i * m) + j] = a[(i * colsA_) + j];
+    }
+  }
+  for (int i = 0; i < rowsB_; ++i) {
+    for (int j = 0; j < colsB_; ++j) {
+      b_exp[(i * m) + j] = b[(i * colsB_) + j];
+    }
+  }
+
+  auto c_exp = StrassenRecursive(a_exp, b_exp, m);
+
+  std::vector<double> c(rowsA_ * colsB_, 0.0);
+  for (int i = 0; i < rowsA_; ++i) {
+    for (int j = 0; j < colsB_; ++j) {
+      c[(i * colsB_) + j] = c_exp[(i * m) + j];
+    }
+  }
+
+  output_[0] = static_cast<double>(rowsA_);
+  output_[1] = static_cast<double>(colsB_);
+  for (int i = 0; i < rowsA_ * colsB_; ++i) {
+    output_[2 + i] = c[i];
+  }
+
+  return true;
+}
+
+bool ParallelStrassenStl::PostProcessingImpl() {
+  auto *out_ptr = reinterpret_cast<double *>(task_data->outputs[0]);
+  for (size_t i = 0; i < output_.size(); ++i) {
+    out_ptr[i] = output_[i];
+  }
+  return true;
+}
+
+}  // namespace borisov_s_strassen_stl
+\end{lstlisting}
+
+\subsection*{MPI + STL}
+\begin{lstlisting}
+#include "all/borisov_s_strassen/include/ops_all.hpp"
+
+#include <algorithm>
+#include <boost/serialization/vector.hpp>  // NOLINT(*-include-cleaner)
+#include <cstddef>
+#include <thread>
+#include <utility>
+#include <vector>
+
+#include "boost/mpi/collectives/broadcast.hpp"
+
+namespace borisov_s_strassen_all {
+namespace {
+
+std::vector<double> MultiplyNaive(const std::vector<double>& a, const std::vector<double>& b, int n) {
+  std::vector<double> c(n * n, 0.0);
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < n; ++j) {
+      double s = 0.0;
+      for (int k = 0; k < n; ++k) {
+        s += a[(i * n) + k] * b[(k * n) + j];
+      }
+      c[(i * n) + j] = s;
+    }
+  }
+  return c;
+}
+
+std::vector<double> AddMatr(const std::vector<double>& a, const std::vector<double>& b, int n) {
+  std::vector<double> c(n * n);
+  for (int i = 0; i < n * n; ++i) {
+    c[i] = a[i] + b[i];
+  }
+  return c;
+}
+
+std::vector<double> SubMatr(const std::vector<double>& a, const std::vector<double>& b, int n) {
+  std::vector<double> c(n * n);
+  for (int i = 0; i < n * n; ++i) {
+    c[i] = a[i] - b[i];
+  }
+  return c;
+}
+
+std::vector<double> SubMatrix(const std::vector<double>& m, int n, int row, int col, int size) {
+  std::vector<double> sub_matr(size * size);
+  for (int i = 0; i < size; ++i) {
+    std::copy(m.begin() + (row + i) * n + col, m.begin() + (row + i) * n + col + size, sub_matr.begin() + i * size);
+  }
+  return sub_matr;
+}
+
+void SetSubMatrix(std::vector<double>& m, const std::vector<double>& sub_matr, int n, int row, int col, int size) {
+  for (int i = 0; i < size; ++i) {
+    std::copy(sub_matr.begin() + i * size, sub_matr.begin() + (i + 1) * size, m.begin() + (row + i) * n + col);
+  }
+}
+
+int NextPowerOfTwo(int n) {
+  int r = 1;
+  while (r < n) {
+    r <<= 1;
+  }
+  return r;
+}
+
+std::vector<double> StrassenRecursive(const std::vector<double>& a, const std::vector<double>& b, int n,
+                                      int depth = 0) {
+  const int parallel_depth = 2;
+  if (n <= 128) {
+    return MultiplyNaive(a, b, n);
+  }
+
+  int k = n / 2;
+  auto a11 = SubMatrix(a, n, 0, 0, k);
+  auto a12 = SubMatrix(a, n, 0, k, k);
+  auto a21 = SubMatrix(a, n, k, 0, k);
+  auto a22 = SubMatrix(a, n, k, k, k);
+  auto b11 = SubMatrix(b, n, 0, 0, k);
+  auto b12 = SubMatrix(b, n, 0, k, k);
+  auto b21 = SubMatrix(b, n, k, 0, k);
+  auto b22 = SubMatrix(b, n, k, k, k);
+
+  std::vector<double> m1;
+  std::vector<double> m2;
+  std::vector<double> m3;
+  std::vector<double> m4;
+  std::vector<double> m5;
+  std::vector<double> m6;
+  std::vector<double> m7;
+
+  if (depth < parallel_depth) {
+    std::thread t1([&] { m1 = StrassenRecursive(AddMatr(a11, a22, k), AddMatr(b11, b22, k), k, depth + 1); });
+    std::thread t2([&] { m2 = StrassenRecursive(AddMatr(a21, a22, k), b11, k, depth + 1); });
+    std::thread t3([&] { m3 = StrassenRecursive(a11, SubMatr(b12, b22, k), k, depth + 1); });
+    std::thread t4([&] { m4 = StrassenRecursive(a22, SubMatr(b21, b11, k), k, depth + 1); });
+    std::thread t5([&] { m5 = StrassenRecursive(AddMatr(a11, a12, k), b22, k, depth + 1); });
+    std::thread t6([&] { m6 = StrassenRecursive(SubMatr(a21, a11, k), AddMatr(b11, b12, k), k, depth + 1); });
+    std::thread t7([&] { m7 = StrassenRecursive(SubMatr(a12, a22, k), AddMatr(b21, b22, k), k, depth + 1); });
+    t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
+    t5.join();
+    t6.join();
+    t7.join();
+  } else {
+    m1 = StrassenRecursive(AddMatr(a11, a22, k), AddMatr(b11, b22, k), k, depth + 1);
+    m2 = StrassenRecursive(AddMatr(a21, a22, k), b11, k, depth + 1);
+    m3 = StrassenRecursive(a11, SubMatr(b12, b22, k), k, depth + 1);
+    m4 = StrassenRecursive(a22, SubMatr(b21, b11, k), k, depth + 1);
+    m5 = StrassenRecursive(AddMatr(a11, a12, k), b22, k, depth + 1);
+    m6 = StrassenRecursive(SubMatr(a21, a11, k), AddMatr(b11, b12, k), k, depth + 1);
+    m7 = StrassenRecursive(SubMatr(a12, a22, k), AddMatr(b21, b22, k), k, depth + 1);
+  }
+
+  std::vector<double> c(n * n, 0.0);
+  auto c11 = AddMatr(SubMatr(AddMatr(m1, m4, k), m5, k), m7, k);
+  auto c12 = AddMatr(m3, m5, k);
+  auto c21 = AddMatr(m2, m4, k);
+  auto c22 = AddMatr(SubMatr(AddMatr(m1, m3, k), m2, k), m6, k);
+
+  SetSubMatrix(c, c11, n, 0, 0, k);
+  SetSubMatrix(c, c12, n, 0, k, k);
+  SetSubMatrix(c, c21, n, k, 0, k);
+  SetSubMatrix(c, c22, n, k, k, k);
+  return c;
+}
+
+}  // namespace
+
+bool ParallelStrassenMpiStl::PreProcessingImpl() {
+  if (world_.rank() == 0) {
+    size_t in_cnt = task_data->inputs_count[0];
+    auto* dbl = reinterpret_cast<double*>(task_data->inputs[0]);
+    input_.assign(dbl, dbl + in_cnt);
+
+    rowsA_ = static_cast<int>(input_[0]);
+    colsA_ = static_cast<int>(input_[1]);
+    rowsB_ = static_cast<int>(input_[2]);
+    colsB_ = static_cast<int>(input_[3]);
+
+    int max_dim = std::max({rowsA_, colsA_, colsB_});
+    m_ = NextPowerOfTwo(max_dim);
+
+    std::vector<double> a(rowsA_ * colsA_);
+    std::vector<double> b(rowsB_ * colsB_);
+    size_t off = 4;
+    for (int i = 0; i < rowsA_ * colsA_; ++i) {
+      a[i] = input_[off + i];
+    }
+    off += rowsA_ * colsA_;
+    for (int i = 0; i < rowsB_ * colsB_; ++i) {
+      b[i] = input_[off + i];
+    }
+
+    a_pad_.assign(m_ * m_, 0.0);
+    b_pad_.assign(m_ * m_, 0.0);
+    for (int i = 0; i < rowsA_; ++i) {
+      for (int j = 0; j < colsA_; ++j) {
+        a_pad_[(i * m_) + j] = a[(i * colsA_) + j];
+      }
+    }
+    for (int i = 0; i < rowsB_; ++i) {
+      for (int j = 0; j < colsB_; ++j) {
+        b_pad_[(i * m_) + j] = b[(i * colsB_) + j];
+      }
+    }
+
+    output_.resize(2 + (rowsA_ * colsB_));
+  }
+  return true;
+}
+
+bool ParallelStrassenMpiStl::ValidationImpl() {
+  bool ok = true;
+  if (world_.rank() == 0) {
+    ok = (task_data->inputs_count[0] >= 4 + static_cast<size_t>((rowsA_ * colsA_) + (rowsB_ * colsB_)));
+  }
+  boost::mpi::broadcast(world_, ok, 0);
+  return ok;
+}
+
+bool ParallelStrassenMpiStl::RunImpl() {
+  boost::mpi::broadcast(world_, rowsA_, 0);
+  boost::mpi::broadcast(world_, colsA_, 0);
+  boost::mpi::broadcast(world_, rowsB_, 0);
+  boost::mpi::broadcast(world_, colsB_, 0);
+  boost::mpi::broadcast(world_, m_, 0);
+
+  if (world_.rank() != 0) {
+    a_pad_.resize(m_ * m_);
+    b_pad_.resize(m_ * m_);
+  }
+  boost::mpi::broadcast(world_, a_pad_, 0);
+  boost::mpi::broadcast(world_, b_pad_, 0);
+
+  if (m_ == 1) {
+    if (world_.rank() == 0) {
+      output_[0] = static_cast<double>(rowsA_);
+      output_[1] = static_cast<double>(colsB_);
+      output_[2] = a_pad_[0] * b_pad_[0];
+    }
+    world_.barrier();
+    return true;
+  }
+
+  constexpr int kNumP = 7;
+  int half = m_ / 2;
+  auto a11 = SubMatrix(a_pad_, m_, 0, 0, half);
+  auto a12 = SubMatrix(a_pad_, m_, 0, half, half);
+  auto a21 = SubMatrix(a_pad_, m_, half, 0, half);
+  auto a22 = SubMatrix(a_pad_, m_, half, half, half);
+  auto b11 = SubMatrix(b_pad_, m_, 0, 0, half);
+  auto b12 = SubMatrix(b_pad_, m_, 0, half, half);
+  auto b21 = SubMatrix(b_pad_, m_, half, 0, half);
+  auto b22 = SubMatrix(b_pad_, m_, half, half, half);
+
+  std::vector<std::vector<double>> local_p(kNumP);
+  for (int p = world_.rank(); p < kNumP; p += world_.size()) {
+    switch (p) {
+      case 0:
+        local_p[p] = StrassenRecursive(AddMatr(a11, a22, half), AddMatr(b11, b22, half), half);
+        break;
+      case 1:
+        local_p[p] = StrassenRecursive(AddMatr(a21, a22, half), b11, half);
+        break;
+      case 2:
+        local_p[p] = StrassenRecursive(a11, SubMatr(b12, b22, half), half);
+        break;
+      case 3:
+        local_p[p] = StrassenRecursive(a22, SubMatr(b21, b11, half), half);
+        break;
+      case 4:
+        local_p[p] = StrassenRecursive(AddMatr(a11, a12, half), b22, half);
+        break;
+      case 5:
+        local_p[p] = StrassenRecursive(SubMatr(a21, a11, half), AddMatr(b11, b12, half), half);
+        break;
+      case 6:
+        local_p[p] = StrassenRecursive(SubMatr(a12, a22, half), AddMatr(b21, b22, half), half);
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (world_.rank() == 0) {
+    std::vector<std::vector<double>> p(kNumP);
+    for (int i = 0; i < kNumP; ++i) {
+      int owner = i % world_.size();
+      if (owner != 0) {
+        world_.recv(owner, i, p[i]);
+      } else {
+        p[i] = std::move(local_p[i]);
+      }
+    }
+
+    std::vector<double> c_pad(m_ * m_, 0.0);
+    auto c11 = AddMatr(SubMatr(AddMatr(p[0], p[3], half), p[4], half), p[6], half);
+    auto c12 = AddMatr(p[2], p[4], half);
+    auto c21 = AddMatr(p[1], p[3], half);
+    auto c22 = AddMatr(SubMatr(AddMatr(p[0], p[2], half), p[1], half), p[5], half);
+    SetSubMatrix(c_pad, c11, m_, 0, 0, half);
+    SetSubMatrix(c_pad, c12, m_, 0, half, half);
+    SetSubMatrix(c_pad, c21, m_, half, 0, half);
+    SetSubMatrix(c_pad, c22, m_, half, half, half);
+
+    output_[0] = static_cast<double>(rowsA_);
+    output_[1] = static_cast<double>(colsB_);
+    for (int i = 0; i < rowsA_; ++i) {
+      for (int j = 0; j < colsB_; ++j) {
+        output_[2 + (i * colsB_) + j] = c_pad[(i * m_) + j];
+      }
+    }
+  } else {
+    for (int p = world_.rank(); p < kNumP; p += world_.size()) {
+      world_.send(0, p, local_p[p]);
+    }
+  }
+
+  world_.barrier();
+  return true;
+}
+
+bool ParallelStrassenMpiStl::PostProcessingImpl() {
+  if (world_.rank() == 0) {
+    auto* out = reinterpret_cast<double*>(task_data->outputs[0]);
+    std::ranges::copy(output_, out);
+  }
+
+  return true;
+}
+
+}  // namespace borisov_s_strassen_all
+\end{lstlisting}
+
+\end{document}
