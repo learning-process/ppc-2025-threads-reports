@@ -1,0 +1,485 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{amsmath}
+\usepackage{geometry}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{tocloft}
+\usepackage{xcolor} 
+\usepackage{listings}
+\geometry{a4paper, left=25mm, right=15mm, top=20mm, bottom=20mm}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=black,
+    pdftitle={Отчет по проекту},
+    pdfauthor={Коровин Никита},
+    pdfsubject={Сортировка Хоара с четно-нечетным слиянием Бэтчера}
+}
+
+\lstset{
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{blue},
+  commentstyle=\itshape\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=8pt,
+  backgroundcolor=\color{gray!10},
+  showspaces=false,
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  captionpos=b
+}
+
+\renewcommand{\cftsecaftersnum}{.}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\titleformat{\section}{\large\bfseries}{\thesection.}{1em}{}
+
+\begin{document}
+\begin{titlepage}
+    \centering
+    \large
+    Министерство образования и науки Российской Федерации\\
+    Федеральное государственное автономное образовательное учреждение высшего образования\\
+    \textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»}\\
+    (ННГУ)\\[1cm]
+    Институт информационных технологий, математики и механики\\
+    Направление подготовки: «Программная инженерия»\\[2cm]
+    
+    {\Large \textbf{ОТЧЕТ}}\\[0.5cm]
+    {\Large по задаче}\\[0.5cm]
+    {\Large \textbf{«Сортировка Хоара с четно-нечетным слиянием Бэтчера»}}\\[0.5cm]
+    {\Large Вариант №14}\\[4cm]
+    
+    \hfill\parbox{0.5\textwidth}{
+        Выполнил: студент группы 3822Б1ПР2\\
+        Коровин Никита\\[1.5em]
+        Преподаватель:\\
+        доцент, кандидат технических наук\\
+        Сысоев Александр Владимирович
+    }\\[3cm]
+    
+    \vspace*{\fill}
+    Нижний Новгород\\
+    2025
+\end{titlepage}
+
+\thispagestyle{empty}
+\clearpage
+\pagenumbering{arabic} 
+\setcounter{page}{2} 
+\tableofcontents
+\clearpage
+\setcounter{page}{3} 
+
+\section{Введение}
+\hspace*{1.25em}Сортировка Хоара (QuickSort) является одним из наиболее эффективных алгоритмов сортировки на практике благодаря среднему временному поведению $O(n\log n)$ и малому объёму дополнительной памяти. Однако при обработке больших массивов и желании ускорить выполнение на современных многоядерных системах необходимы параллельные подходы. 
+
+\hspace*{1.25em}Четно-нечетное слияние (Odd–Even Merge) по Бэтчеру представляет собой схему параллельного объединения уже отсортированных фрагментов, позволяющую сравнительно просто организовать слияние блоков без глобальных операций, лишь местных сравнений и обменов. Сочетание QuickSort для локальной сортировки и четно-нечетного слияния для объединения блоков образует гибридный алгоритм, способный эффективно использовать ресурсы многоядерных и распределённых систем. 
+
+\hspace*{1.25em}Цель данного отчёта — реализовать и сравнить пять версий гибридного алгоритма:
+\begin{itemize}
+    \item Последовательная реализация (Seq).
+    \item Параллельная реализация с использованием OpenMP.
+    \item Параллельная реализация с использованием Intel TBB.
+    \item Параллельная реализация с использованием стандартных потоков C++ (\texttt{std::thread}).
+    \item Гибридная версия с использованием Boost.MPI для распределения данных и OpenMP внутри каждого процесса.
+\end{itemize}
+
+\section{Постановка задачи}
+\hspace*{1.25em}Необходимо разработать пять версий алгоритма сортировки Хоара с четно-нечетным слиянием Бэтчера для массивов целых чисел:
+\begin{enumerate}
+    \item Последовательная реализация для базовой проверки корректности и замера опорного времени.
+    \item OpenMP-реализация, использующая директивы \texttt{\#pragma omp} для параллельной сортировки фрагментов и слияния блоков.
+    \item Intel TBB-реализация, использующая \texttt{tbb::parallel\_invoke} и \texttt{tbb::parallel\_for} вместе с \texttt{tbb::enumerable\_thread\_specific}.
+    \item STL-реализация на \texttt{std::thread} для создания задач параллельной сортировки и слияния.
+    \item Комбинированная MPI+OpenMP-версия, в которой Boost.MPI распределяет исходный массив по процессам, а внутри каждого процесса используется OpenMP.
+\end{enumerate}
+
+\hspace*{1.25em}Каждую версию необходимо протестировать на одном и том же наборе данных, замерить время выполнения двух тестов:
+\begin{itemize}
+    \item \texttt{test\_pipeline\_run}
+    \item \texttt{test\_task\_run}
+\end{itemize}
+
+\section{Общее описание алгоритма}
+\hspace*{1.25em}Алгоритм состоит из двух ключевых этапов:
+\begin{enumerate}
+    \item \textbf{Локальная сортировка (QuickSort)}: Рекурсивный алгоритм Хоара, в котором опорный элемент выбирается случайным образом из текущего диапазона, чтобы снизить вероятность худшего случая $O(n^2)$.
+    \item \textbf{Итеративное объединение фрагментов (Odd–Even Merge)}: После того, как каждый блок отсортирован независимо, соседние блоки сливаются через чередующиеся итерации «чётных» и «нечётных» пар с использованием функции \texttt{InPlaceMerge}.
+\end{enumerate}
+
+\hspace*{1.25em}В неспециализированной последовательной версии оба этапа выполняются последовательно. В параллельных версиях:
+\begin{itemize}
+    \item Этап QuickSort распараллеливается либо разделением рекурсии (OpenMP, TBB), либо распределением блоков (STL-потоки, MPI+OpenMP).
+    \item Этап слияния Odd–Even Merge распараллеливается по парам блоков либо через \texttt{\#pragma omp parallel for}, \texttt{tbb::parallel\_for} или запуск отдельных потоков.
+\end{itemize}
+
+\clearpage
+\section{Схемы распараллеливания}
+
+\subsection{Последовательная версия (Seq)}
+\hspace*{1.25em}В последовательной реализации отсутствует распараллеливание. Алгоритм выполняет:
+\begin{enumerate}
+    \item Чтение входных данных в вектор \texttt{input\_}.
+    \item Вызов \texttt{QuickSort(input\_, 0, n-1)} при $n>1$.
+    \item Копирование отсортированного результата в выходной буфер.
+\end{enumerate}
+
+\noindent\textbf{Ключевые детали реализации:}
+\begin{itemize}
+    \item \texttt{GetRandomIndex(int low, int high)} — генерация случайного индекса опорного элемента.
+    \item \texttt{QuickSort(std::vector<int>\& arr, int low, int high)}:
+    \begin{lstlisting}
+if (low >= high) return;
+int pivot_index = GetRandomIndex(low, high);
+int pivot = arr[pivot_index];
+auto part = std::partition(arr.begin()+low, arr.begin()+high+1,
+                           [pivot](int x){ return x <= pivot; });
+auto mid = std::partition(arr.begin()+low, part,
+                          [pivot](int x){ return x < pivot; });
+QuickSort(arr, low, mid_idx-1);
+QuickSort(arr, mid_idx+1, high);
+    \end{lstlisting}
+    \item \texttt{InPlaceMerge} и \texttt{OddEvenMerge} выполняются последовательно:
+    \begin{lstlisting}
+for (int iter = 0; iter < max_iters; ++iter) {
+  for (int b = iter%2; b < p; b+=2) {
+    InPlaceMerge(blocks[b], blocks[b+1], buffer);
+  }
+  if (!changed) break;
+}
+    \end{lstlisting}
+\end{itemize}
+
+\subsection{OpenMP-версия (OMP)}
+\hspace*{1.25em}В OpenMP-версии параллелизм организован двумя способами:
+\begin{enumerate}
+    \item \textbf{Локальная QuickSort с параллельными секциями}:
+    \begin{itemize}
+        \item Вычисляется \verb|max_depth = log2(omp_get_num_threads()) + 1|.
+        \item Если \verb|depth < max_depth|, рекурсивные вызовы выполняются в \verb|\#pragma omp parallel sections|.
+    \end{itemize}
+    \item \textbf{Объединение блоков через \#pragma omp parallel for}:
+    \begin{itemize}
+        \item Итеративное четно-нечетное слияние распараллеливается по индексам блоков.
+        \item Используется \verb|reduction(||:changed)| для объединения флагов изменений.
+    \end{itemize}
+\end{enumerate}
+
+\noindent\textbf{Описание кода:}
+\lstset{language=C++}
+\begin{lstlisting}
+void QuickSort(It low, It high, int depth) {
+  if (std::distance(low, high) <= 1) return;
+  int pivot = *std::next(low, GetRandomIndex(0, n-1));
+  auto part = std::partition(low, high, [pivot](int x){return x<=pivot;});
+  auto mid = std::partition(low, part, [pivot](int x){return x<pivot;});
+  int max_depth = log2(omp_get_max_threads()) + 1;
+  if (depth < max_depth) {
+    #pragma omp parallel sections
+    {
+      #pragma omp section
+      QuickSort(low, mid, depth+1);
+      #pragma omp section
+      QuickSort(part, high, depth+1);
+    }
+  } else {
+    QuickSort(low, mid, depth+1);
+    QuickSort(part, high, depth+1);
+  }
+}
+
+// Iterative merging
+for (int iter = 0; iter < 2*p; ++iter) {
+  bool changed = false;
+  #pragma omp parallel for schedule(static) reduction(||:changed)
+  for (int b = iter%2; b < p; b+=2) {
+    InPlaceMerge(blocks[b], blocks[b+1], buffer);
+  }
+  if (!changed) break;
+}
+\end{lstlisting}
+
+\subsection{Intel TBB-версия (TBB)}
+\hspace*{1.25em}В TBB-реализации используются:
+\begin{itemize}
+    \item \texttt{tbb::parallel\_invoke} для распараллеливания рекурсии QuickSort до глубины max\_depth = log2(numThreads) + 1.
+    \item \texttt{tbb::parallel\_for} совместно с \texttt{tbb::enumerable\_thread\_specific} для параллельного четно-нечетного слияния блоков.
+\end{itemize}
+
+\noindent\textbf{Фрагменты кода:}
+\lstset{language=C++}
+\begin{lstlisting}
+// QuickSort with TBB
+void QuickSort(It low, It high, int depth) {
+  if (distance(low, high) <= 1) return;
+  int pivot = *(low + GetRandomIndex(0, n-1));
+  auto part = partition(low, high, [pivot](int x){ return x<=pivot; });
+  auto mid  = partition(low, part,  [pivot](int x){ return x<pivot; });
+  int max_depth = log2(ppc::util::GetPPCNumThreads()) + 1;
+  if (depth < max_depth) {
+    tbb::parallel_invoke(
+      [&]{ QuickSort(low,  mid,   depth+1); },
+      [&]{ QuickSort(part, high,  depth+1); }
+    );
+  } else {
+    QuickSort(low,  mid,   depth+1);
+    QuickSort(part, high,  depth+1);
+  }
+}
+
+// Odd-Even Merge with TBB
+tbb::enumerable_thread_specific<vector<int>> buffers(
+    [=]{ return vector<int>(buffer_size); });
+for (int iter=0; iter<2*p; ++iter) {
+  atomic<bool> changed(false);
+  tbb::parallel_for(
+    tbb::blocked_range<int>(0, p/2),
+    [&](auto &range){
+      auto &buf = buffers.local();
+      for (int idx = range.begin(); idx < range.end(); ++idx) {
+        int i = ((iter + idx*2)%2) + idx*2;
+        if (i+1<p) {
+          if (InPlaceMerge(blocks[i], blocks[i+1], buf))
+            changed.store(true, memory_order_relaxed);
+        }
+      }
+    }
+  );
+  if (!changed.load()) break;
+}
+\end{lstlisting}
+
+\subsection{STL-потоки (std::thread) версия (STL)}
+\hspace*{1.25em}В данной реализации:
+\begin{itemize}
+    \item Разбиение массива на $p = \min(\text{numThreads},\, n/256)$ блоков.
+    \item Для каждого блока создаётся поток \texttt{std::thread}, в котором вызывается \texttt{QuickSort(..., 0)} без ограничения глубины (последовательная рекурсия внутри блока).
+    \item Объединение блоков через создание набора потоков на каждой итерации четно-нечетного слияния.
+\end{itemize}
+
+\noindent\textbf{Ключевые фрагменты:}
+\lstset{language=C++}
+\begin{lstlisting}
+// Starting block sorting
+int tasks = min(numThreads, max(1, n/256));
+vector<thread> threads;
+auto blocks = PartitionBlocks(input, tasks);
+for (int i = 0; i < tasks; ++i) {
+  threads.emplace_back([&, i]{
+    QuickSort(blocks[i].low, blocks[i].high, 0);
+  });
+}
+for (auto &t : threads) t.join();
+
+// Odd-Even Merge via streams
+for (int iter=0; iter<2*tasks; ++iter) {
+  atomic<bool> changed(false);
+  vector<thread> mergeThreads;
+  for (int b = iter%2; b < tasks; b+=2) {
+    mergeThreads.emplace_back([&, b]{
+      static thread_local vector<int> buf;
+      buf.resize(buffer_size);
+      if (InPlaceMerge(blocks[b], blocks[b+1], buf))
+        changed.store(true, memory_order_relaxed);
+    });
+  }
+  for (auto &t : mergeThreads) t.join();
+  if (!changed.load()) break;
+}
+\end{lstlisting}
+
+\subsection{Гибридная версия MPI+OpenMP (ALL)}
+\hspace*{1.25em}В комбинированной версии:
+\begin{enumerate}
+    \item \textbf{Распределение данных с Boost.MPI:}
+    \begin{itemize}
+        \item \texttt{scatterv} разбивает исходный массив по числу MPI-процессов.
+        \item Каждый процесс получает фрагмент \texttt{local}.
+    \end{itemize}
+    \item \textbf{Локальная обработка:}
+    \begin{itemize}
+        \item Фрагмент \texttt{local} разбивается на $p = \max(\text{omp\_max\_threads}, 1)$ блоков.
+        \item \texttt{\#pragma omp parallel for} запускает QuickSort с ограничением глубины в каждой секции.
+        \item \texttt{OddEvenMerge} выполняется параллельно теми же директивами.
+    \end{itemize}
+    \item \textbf{Сбор результата:}
+    \begin{itemize}
+        \item \texttt{gatherv} собирает отсортированные фрагменты на корневой процесс.
+        \item Дополнительная финальная фаза OpenMP-сортировки + слияния на корневом процессе.
+    \end{itemize}
+\end{enumerate}
+
+\noindent\textbf{Код MPI+OpenMP:}
+\lstset{language=C++}
+\begin{lstlisting}
+// Distribution via Boost.MPI
+vector<int> counts(size), displs(size);
+for (int i=0; i<size; ++i) {
+  counts[i] = chunk + (i<rem?1:0);
+  displs[i] = i==0 ? 0 : displs[i-1]+counts[i-1];
+}
+vector<int> local(counts[rank]);
+scatterv(world, root_ptr, counts, displs, local.data(), counts[rank], 0);
+
+// Local parallel sorting
+int p = max(omp_get_max_threads(),1);
+auto blocks = PartitionBlocks(local, p);
+#pragma omp parallel for schedule(static)
+for (int i=0; i<p; ++i)
+  QuickSort(blocks[i].low, blocks[i].high, 0);
+
+// Merging pairs of blocks
+#pragma omp parallel for schedule(static) reduction(||:changed)
+for (int b=iter%2; b<p; b+=2)
+  InPlaceMerge(blocks[b], blocks[b+1], buffer);
+
+// Collecting results
+gatherv(world, local.data(), counts[rank], input.data(), counts, displs, 0);
+if (rank==0) {
+  // The final parallel phase on root
+  auto blocks2 = PartitionBlocks(input, omp_get_max_threads());
+  #pragma omp parallel for schedule(static)
+  for (int i=0; i<blocks2.size(); ++i)
+    QuickSort(blocks2[i].low, blocks2[i].high, 0);
+  OddEvenMerge(blocks2);
+}
+\end{lstlisting}
+
+\clearpage
+\section{Результаты экспериментов}
+\hspace*{1.25em}Все замеры проводились на машине:
+\begin{itemize}
+  \item Операционная система: Windows 11.
+  \item Процессор: 12th Gen Intel(R) Core(TM) i7-12700H, 14 ядер, 20 логических процессоров.
+  \item Оперативная память: 16 ГБ.
+\end{itemize}
+
+\begin{table}[htbp]
+\centering
+\caption{Сравнительные результаты пяти версий алгоритма}
+\begin{tabular}{|l|r|r|r|r|r|}
+\hline
+\textbf{Версия} & \textbf{pipeline (мс)} & \textbf{task (мс)} & \textbf{всего (мс)} & \textbf{~Ускор. pipe~} & \textbf{~Ускор. task~} \\
+\hline
+Seq        & 2634 & 1088 & 3722 & 1.00  & 1.00  \\
+OMP        & 2593 &  975 & 3569 & 1.02  & 1.12  \\
+TBB        & 1844 &  683 & 2528 & 1.43  & 1.59  \\
+STL threads& 1508 &  625 & 2134 & 1.75  & 1.74  \\
+MPI+OMP    & 2458 & 1477 & 3924 & 1.07  & 0.74  \\
+\hline
+\end{tabular}
+\label{tab:results}
+\end{table}
+
+\section{Выводы из результатов}
+\hspace*{1.25em}Как видно из таблицы \ref{tab:results}, наиболее высокое ускорение по сравнению с последовательной версией достигнуто в реализации на базовых потоках STL и в TBB-версии. Это объясняется минимальными накладными расходами на создание потоков и эффективной балансировкой нагрузки:
+
+\begin{itemize}
+  \item STL-потоки: хорошая масштабируемость при $n/256$ блоках, низкая сложность синхронизации при слиянии.
+  \item TBB-версия использует динамическое планирование задач, а для локальных буферов при слиянии применяется \texttt{tbb::enumerable\_thread\_specific}.
+  \item OpenMP: практически не даёт значительного выигрыша из-за накладных расходов на создание параллельных секций.
+  \item MPI+OpenMP: распределение данных по процессам добавляет сетевые задержки, что ухудшает общую производительность.
+\end{itemize}
+
+\section{Заключение}
+\hspace*{1.25em}В рамках работы реализовано пять версий гибридного алгоритма сортировки Хоара с четно-нечетным слиянием Бэтчера. Проведён сравнительный анализ производительности, показавший:
+
+\begin{itemize}
+  \item Эффективность TBB и STL-потоков в локальных многопоточн. средах.
+  \item Ограниченную пользу от OpenMP для данного алгоритма.
+  \item Перегрузку из-за коммуникаций в распределённой MPI+OpenMP версии.
+\end{itemize}
+
+\hspace*{1.25em}Полученные результаты подчёркивают важность выбора подходящей параллельной модели в зависимости от архитектуры системы и характера задачи.
+
+\begin{thebibliography}{9}
+\bibitem{Hoare1962}
+  C.A.R. Hoare, \emph{QuickSort}, The Computer Journal, vol.5, no.1, pp.10–15, 1962.
+\bibitem{Batcher1968}
+  K. E. Batcher, \emph{Sorting networks and their applications}, Proc. AFIPS Spring Joint Computer Conference, 1968.
+\bibitem{OpenMP}
+  OpenMP Architecture Review Board, \emph{OpenMP Application Program Interface}, Version 4.5, 2015.
+\bibitem{OneTBB}
+  Intel, \emph{oneAPI Threading Building Blocks}, Version 2021.1.
+\end{thebibliography}
+
+\appendix
+\section*{Приложение}
+\addcontentsline{toc}{section}{Приложение}
+\hspace*{1.25em}В приложении приведены ключевые фрагменты кода всех пяти версий алгоритма:
+
+\subsection*{Seq: TestTaskSequential::QuickSort}
+\begin{lstlisting}
+// seq/ops_seq.cpp
+void TestTaskSequential::QuickSort(vector<int>& arr, int low, int high) {
+  if (low >= high) return;
+  int pi = GetRandomIndex(low, high);
+  int pv = arr[pi];
+  auto part = partition(arr.begin()+low, arr.begin()+high+1,
+                        [pv](int x){return x<=pv;});
+  auto mid = partition(arr.begin()+low, part,
+                       [pv](int x){return x<pv;});
+  int i = distance(arr.begin(), mid);
+  int j = distance(arr.begin(), part) - 1;
+  if (low < i-1) QuickSort(arr, low, i-1);
+  if (j+1 < high) QuickSort(arr, j+1, high);
+}
+\end{lstlisting}
+
+\subsection*{OMP: локальная сортировка и слияние}
+\begin{lstlisting}
+// omp/ops_omp.cpp
+#pragma omp parallel sections
+{
+  #pragma omp section
+    QuickSort(low, mid, depth+1);
+  #pragma omp section
+    QuickSort(part, high, depth+1);
+}
+#pragma omp parallel for schedule(static) reduction(||:changed)
+for (int b = iter%2; b < p; b+=2)
+  InPlaceMerge(blocks[b], blocks[b+1], buffer);
+\end{lstlisting}
+
+\subsection*{TBB}
+\begin{lstlisting}
+// tbb/ops_tbb.cpp
+tbb::parallel_invoke(
+  [&]{ QuickSort(low, mid, depth+1); },
+  [&]{ QuickSort(part, high, depth+1); }
+);
+tbb::parallel_for(tbb::blocked_range<int>(0,p/2), [&](auto &r){
+});
+\end{lstlisting}
+
+\subsection*{STL: создание потоков}
+\begin{lstlisting}
+// stl/ops_stl.cpp
+vector<thread> threads;
+for (int i = 0; i < tasks; ++i)
+  threads.emplace_back([&,i]{ QuickSort(blocks[i].low, blocks[i].high,0); });
+for (auto &t: threads) t.join();
+\end{lstlisting}
+
+\subsection*{MPI+OpenMP: scatterv, parallel for, gatherv}
+\begin{lstlisting}
+// all/ops_all.cpp
+boost::mpi::scatterv(world, root_ptr, counts, displs,
+                     local.data(), counts[rank], 0);
+#pragma omp parallel for schedule(static)
+for (int i=0; i<p; ++i)
+  QuickSort(blocks[i].low, blocks[i].high, 0);
+boost::mpi::gatherv(world, local.data(), counts[rank],
+                   input.data(), counts, displs, 0);
+\end{lstlisting}
+
+\end{document}
