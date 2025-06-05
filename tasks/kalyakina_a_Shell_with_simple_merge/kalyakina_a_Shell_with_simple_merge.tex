@@ -1,0 +1,860 @@
+\documentclass[a4paper,14pt]{extarticle}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{algorithmicx,algpseudocode}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{multirow}
+\usepackage{setspace}
+\usepackage{geometry}
+\usepackage{xcolor}
+
+\geometry{top=2cm, bottom=2cm, left=2cm, right=2cm}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{white},   % цвет фона
+    commentstyle=\color{green},       % цвет комментариев
+    keywordstyle=\color{blue},        % цвет ключевых слов
+    numberstyle=\tiny\color{gray},    % стиль номеров строк
+    stringstyle=\color{red},          % цвет строк
+    basicstyle=\ttfamily\footnotesize, % основной стиль шрифта
+    breakatwhitespace=false,          % переносить только по пробелам
+    breaklines=true,                  % перенос длинных строк
+    captionpos=b,                     % позиция заголовка
+    keepspaces=true,                  % сохранять пробелы
+    numbers=left,                     % номера строк слева
+    showspaces=false,                 % не показывать пробелы
+    showstringspaces=false,           % не показывать пробелы в строках
+    tabsize=2                         % размер табуляции
+}
+
+\onehalfspacing
+
+\begin{document}
+
+% Титульный лист
+\begin{center}
+    \textbf{Министерство образования и науки Российской Федерации}
+    
+    \textbf{Федеральное государственное автономное образовательное}\\
+    \textbf{учреждение высшего образования}\\
+    \textbf{Национальный исследовательский Нижегородский государственный}\\
+    \textbf{университет им. Н.И. Лобачевского}
+    
+    \vspace{0.5cm}
+    
+    \textbf{Институт информационных технологий, математики и механики}
+    
+    \vspace{3cm}
+    
+    \textbf{Отчет по лабораторной работе}
+    
+    \vspace{1cm}
+    
+    {\LARGE \textbf{«Сортировка Шелла с простым слиянием»}}
+    
+    \vspace{3cm}
+    
+    \begin{tabular}{m{8cm} m{8cm}}
+        & \textbf{Выполнила:} \\
+        & студент группы 3822Б1ПР1 \\
+        & Калякина А.Д. \\
+        & \textbf{Проверил:} \\
+        & доцент кафедры ВВСП, к.т.н., \\
+        & Сысоев А.В. \\
+    \end{tabular}
+    
+    \vfill
+    
+    \textbf{Нижний Новгород}\\
+    \textbf{2025}
+\end{center}
+
+\newpage
+
+% Введение
+\section*{Введение}
+Сортировка Шелла, предложенная Дональдом Шеллом в 1959 году, представляет собой усовершенствованный вариант сортировки вставками, который заслужил особое место среди алгоритмов сортировки благодаря своей адаптивности и эффективности. Ключевая особенность алгоритма заключается в использовании переменного шага сравнения элементов, что позволяет существенно сократить количество операций при обработке больших массивов данных.
+
+Особый интерес в исследовании сортировки Шелла представляет выбор оптимальной последовательности шагов (gaps), который напрямую влияет на производительность алгоритма. В работе рассматриваются:
+
+\begin{enumerate}[leftmargin=*,itemsep=0pt]
+    \item \textbf{Классические последовательности:}
+    \begin{itemize}[leftmargin=*,nosep]
+        \item Последовательность Шелла $(N/2, N/4, \dots, 1)$.
+        \item Последовательность Хиббарда $(2^k - 1)$.
+        \item Последовательность Пратта $(2^p3^q)$.
+    \end{itemize}
+    
+    \item \textbf{Современные оптимизированные последовательности:}
+    \begin{itemize}[leftmargin=*,nosep]
+        \item Последовательность Седжвика (1986) -- одна из наиболее эффективных, с теоретической оценкой сложности $O(N^{4/3})$.
+        \item Последовательность Токуда.
+        \item Последовательность Ciura (эмпирически оптимальная для средних размеров массивов).
+    \end{itemize}
+\end{enumerate}
+
+\newpage
+
+% Постановка задачи
+\section*{Постановка задачи}
+Требуется разработать и проанализировать несколько версий алгоритма сортировки Шелла с простым слиянием, включая:
+
+\begin{enumerate}
+    \item \textbf{Последовательную реализацию} (базовый однопоточный вариант).
+    \item \textbf{Параллельную версию с OpenMP} (распараллеливание циклов).
+    \item \textbf{Реализацию с использованием Intel TBB} (Task-Based Parallelism).
+    \item \textbf{STL-версию} (с применением стандартных средств C++).
+    \item \textbf{Гибридный подход (MPI + TBB)} для распределённых вычислений.
+\end{enumerate}
+
+Цель — сравнить эффективность каждой реализации, оценив ускорение.
+
+\newpage
+
+% Описание алгоритма
+\section*{Описание алгоритма. Алгоритм сортировки Шелла с последовательностью Седжвика}
+
+\subsection*{Математическая основа}
+Последовательность шагов Седжвика (1986) определяется рекуррентной формулой:
+\begin{equation*}
+h_k = \begin{cases}
+9 \cdot 2^k - 9 \cdot 2^{k/2} + 1 & \text{при чётном } k \\
+8 \cdot 2^k - 6 \cdot 2^{(k+1)/2} + 1 & \text{при нечётном } k
+\end{cases}
+\end{equation*}
+
+Начальные элементы последовательности:
+\begin{equation*}
+\{1, 5, 19, 41, 109, 209, 505, 929, 2161, 3905, \ldots\}
+\end{equation*}
+
+\subsection*{Алгоритм}
+\begin{enumerate}
+    \item \textbf{Вычисление шагов:}
+    \begin{itemize}
+        \item Устанавливаем максимальную границу для шагов, максимальный шаг должен быть не более $N/3$.
+        \item Формируем последовательность шагов (в этом случае - в порядке возрастания, а использовать будем в обратном).
+    \end{itemize}
+
+    \item \textbf{Сортировка с переменным шагом:}
+Для каждого шага $h$ из полученной последовательности:
+    \begin{itemize}
+        \item Выполняем сортировку вставками подмассивов, образованных элементами, отстоящими друг от друга на расстояние $h$.
+        \item На каждом шаге сравниваем и перемещаем элементы, пока не достигнем начала массива (обычная сортировка вставками только для выделенных подмассивов).
+    \end{itemize}
+
+    \item \textbf{Завершающий этап:}
+    \begin{itemize}
+        \item Последний шаг всегда $h=1$ (обычная сортировка вставками, но уже для всего массива).
+        \item На этом этапе массив уже почти упорядочен, что обеспечивает высокую скорость завершающей сортировки.
+    \end{itemize}
+\end{enumerate}
+
+\textbf{Сложность}: $O(N^{4/3})$ в худшем случае (против $O(N^2)$ у простой сортировки Шелла).
+
+\subsection*{Пример работы}
+Для массива $A = \{9, 7, 5, 11, 12, 2, 14, 3, 10, 6, 1, 8, 13, 17, 4\}$ при $N=15$:
+\begin{enumerate}
+    \item Максимальный шаг $h=5$ (последовательность: 1, 5).
+    \item Сортировка с шагом 5: подмассивы $\{9, 2, 1\}$, $\{7, 14, 8\}$ и т.д.
+    \item Сортировка с шагом 1 (обычная сортировка вставками).
+\end{enumerate}
+
+\newpage
+
+\section*{Описание схемы параллельного алгоритма. Параллельный алгоритм сортировки Шелла с простым слиянием}
+
+\subsection*{Общая схема алгоритма}
+Алгоритм сочетает параллельную сортировку Шелла с последовательностью Седжвика и последующее каскадное слияние отсортированных блоков.
+
+\subsection*{Пошаговая реализация}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Разделение данных:}
+    \begin{algorithmic}[1]
+        \State Вычисление количества потоков.
+        \State Определение размера блока.
+        \State Распределение остатка по первым блокам.
+        \State Создание вектора границ для каждого блока.
+    \end{algorithmic}
+
+    \item \textbf{Параллельная сортировка:}
+    \begin{algorithmic}[1]
+        \State Генерация последовательности Седжвика для каждого блока.
+        \State Вызов $\text{ShellSort}$ (метод, осуществляющий сортировку Шелла) для каждого блока в параллельном режиме (через цикл for, который проходит по вектору границ, передавая их в указанный метод).
+    \end{algorithmic}
+
+    \item \textbf{Каскадное слияние:}
+    \begin{algorithmic}[1]
+        \item Инициализация шага слияния единицей.
+        \item Пока шаг меньше количества блоков, выполняем:
+        \begin{algorithmic}[1]
+            \item Удвоение шага на каждой итерации.
+            \item Параллельное слияние пар блоков (\texttt{SimpleMergeSort}).
+            \item Корректировка количества блоков для следующей итерации.
+        \end{algorithmic}
+    \end{algorithmic}
+\end{enumerate}
+
+\subsection*{Оценка сложности}
+
+\begin{itemize}\setstretch{0.8}
+    \item Сортировка блоков: $O\big(\frac{N}{P} \cdot (\frac{N}{P})^{4/3}\big)$
+    \item Каскадное слияние: $O(\log P \cdot N)$
+    \item Общая сложность: $O\big(\frac{N^{7/3}}{P^{7/3}} + N\log P\big)$
+\end{itemize}
+
+\newpage
+
+\section*{OpenMP-реализация гибридного алгоритма сортировки}
+
+\subsection*{Архитектура решения}
+Алгоритм сочетает:
+\begin{itemize}[leftmargin=*]
+    \item Параллельную сортировку Шелла с последовательностью Седжвика.
+    \item Каскадное слияние отсортированных блоков.
+    \item Статическое распределение нагрузки между потоками.
+\end{itemize}
+
+\subsection*{Этапы выполнения}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Разделение данных:}
+    \begin{algorithmic}[1]
+        \State Определение числа потоков: $num\_threads = \min(omp\_get\_max\_threads(),$ $ output\_size)$.
+        \State Вычисление размера блока: $block\_size = output\_size / num\_threads$.
+        \State Распределение остатка: первые $output\_size\ mod\ num\_threads$ блоков получают $block\_size + 1$.
+        \State Построение вектора границ $bounds$ для каждого блока.
+    \end{algorithmic}
+
+    \item \textbf{Параллельная сортировка:}
+    \begin{algorithmic}[1]
+        \State Генерация последовательности Седжвика для каждого блока.
+        \State Вызов $\text{ShellSort}$ (метод, осуществляющий сортировку Шелла) для каждого блока в параллельном режиме: \#pragma omp parallel for schedule(static).
+    \end{algorithmic}
+
+    \item \textbf{Каскадное слияние:}
+        \begin{algorithmic}[1]
+        \While{$step < bounds.size$}
+            \State \#pragma omp parallel for schedule(static)
+            \State Параллельное слияние пар блоков с текущим шагом
+            \State $step \gets step \times 2$
+            \State $num\_blocks \gets \lceil num\_blocks / 2 \rceil$
+        \EndWhile
+    \end{algorithmic}
+\end{enumerate}
+
+\subsection*{Особенности реализации}
+
+\begin{tabular}{|l|l|}
+    \hline
+    \textbf{Параметр} & \textbf{Значение} \\ \hline
+    Расписание & static \\ \hline
+    Схема распределения & Циклическое по блокам \\ \hline
+    Синхронизация & Неявная (в конце parallel for) \\ \hline
+\end{tabular}
+
+\newpage
+
+\section*{TBB-реализация гибридного алгоритма сортировки}
+
+\subsection*{Архитектура решения}
+\begin{itemize}[leftmargin=*]
+    \item Использование oneAPI Threading Building Blocks для автоматической балансировки нагрузки.
+    \item Двухуровневая параллелизация:
+    \begin{itemize}
+        \item Внешний уровень: \texttt{task\_arena} для контроля числа потоков.
+        \item Внутренний уровень: \texttt{parallel\_for} для параллельного выполнения.
+    \end{itemize}
+    \item Динамическое распределение диапазонов через \texttt{blocked\_range}.
+\end{itemize}
+
+\subsection*{Этапы выполнения}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Разделение данных:}
+    \begin{algorithmic}[1]
+        \State Определение числа потоков: $\min(\text{GetPPCNumThreads}(), \text{output\_size})$.
+        \State Создание {task\_arena} с заданным числом потоков.
+        \State Вычисление границ блоков (аналогично OpenMP-версии).
+    \end{algorithmic}
+
+    \item \textbf{Параллельная сортировка:}
+    \begin{algorithmic}[1]
+        \State Генерация последовательности Седжвика для каждого блока.
+        \State Вызов $\text{ShellSort}$ (метод, осуществляющий сортировку Шелла) для каждого блока в параллельном режиме:
+        \begin{algorithmic}
+            \State {arena.execute([\&] \{}
+            \State \quad {tbb::parallel\_for(tbb::blocked\_range<unsigned>(0, num),}
+            \State \quad [\&]({const auto\& r}) \{ \text{ShellSort для } r.begin()..r.end() \}
+            \State {\});} 
+        \end{algorithmic}
+    \end{algorithmic}
+
+    \item \textbf{Каскадное слияние:}
+    \begin{algorithmic}[1]
+        \While{$step < bounds.size$}
+            \State $step \gets step \times 2$
+            \State {arena.execute([\&] \{}
+            \State \quad {tbb::parallel\_for(tbb::blocked\_range<unsigned>(0, num),}
+            \State \quad [\&]({auto\& r}) \{ \text{SimpleMergeSort для пар блоков} \}
+            \State {\});}
+            \State $num\_blocks \gets \lceil num\_blocks / 2 \rceil$
+        \EndWhile
+    \end{algorithmic}
+\end{enumerate}
+
+\subsection*{Особенности реализации}
+\begin{tabular}{|l|l|}
+    \hline
+    \textbf{Характеристика} & \textbf{Преимущество} \\ \hline
+    Автоматическая балансировка & Динамическое распределение нагрузки \\ \hline
+    Локализация памяти & Умное распределение по кэш-линиям \\ \hline
+    Масштабируемость & Автоматическая адаптация к ядрам \\ \hline
+    Отказоустойчивость & Обработка исключений в задачах \\ \hline
+\end{tabular}
+
+\newpage
+
+\section*{STL-реализация параллельного алгоритма сортировки}
+
+\subsection*{Архитектура решения}
+\begin{itemize}[leftmargin=*]
+    \item Чистая реализация на стандарте C++20 без внешних зависимостей.
+    \item Использование современных возможностей STL:
+    \begin{itemize}
+        \item std::thread для управления потоками.
+        \item std::ranges::for\_each для управления жизненным циклом потоков.
+        \item Лямбда-функции для инкапсуляции логики.
+    \end{itemize}
+    \item Ручное управление параллелизмом.
+\end{itemize}
+
+\subsection*{Этапы выполнения}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Разделение данных:}
+    \begin{algorithmic}[1]
+        \State Определение числа потоков: $\min(\text{GetPPCNumThreads}(), \text{output\_size})$.
+        \State Вычисление границ блоков (аналогично OpenMP-версии).
+    \end{algorithmic}
+
+    \item \textbf{Параллельная сортировка:}
+    \begin{algorithmic}[1]
+        \State Создание вектора потоков std::vector<std::thread>.
+        \State Запуск потоков с лямбда-функцией:
+        \begin{itemize}[leftmargin=*]
+            \item Каждый поток выполняет \text{ShellSort} для своего блока.
+        \end{itemize}
+        \State Синхронизация через thread.join() с std::ranges::for\_each.
+    \end{algorithmic}
+
+    \item \textbf{Последовательное слияние:}
+    \begin{algorithmic}[1]
+        \While{$\text{step} < \text{bounds.size}$}
+            \State Удвоение шага $\text{step} \gets \text{step} \times 2$
+            \For{$i \gets 0$ \textbf{to} $\text{num}-1$}
+                \State Вычисление средней точки $\text{middle}$
+                \State Вызов \text{SimpleMergeSort} для пар блоков
+            \EndFor
+            \State Корректировка числа блоков $\text{num} \gets \lceil\text{num}/2\rceil$
+        \EndWhile
+    \end{algorithmic}
+\end{enumerate}
+
+\subsection*{Особенности реализации}
+
+\begin{tabular}{|l|l|}
+    \hline
+    \textbf{Аспект} & \textbf{Реализация} \\ \hline
+    Параллелизм & Ручное управление потоками \\ \hline
+    Балансировка & Статическое распределение \\ \hline
+    Синхронизация & Явный thread.join() \\ \hline
+    Переносимость & Чистый C++20 \\ \hline
+    Производительность & Зависит от реализации std::thread \\ \hline
+\end{tabular}
+
+\newpage
+
+\section*{Гибридная MPI+TBB реализация алгоритма сортировки}
+
+\subsection*{Архитектура решения}
+\begin{itemize}[leftmargin=*]
+    \item Двухуровневая параллельная модель:
+    \begin{itemize}
+        \item MPI для распределения между узлами кластера.
+        \item TBB для внутриузлового параллелизма.
+    \end{itemize}
+    \item Комбинированная схема коммуникаций:
+    \begin{itemize}
+        \item Широковещательная рассылка (broadcast).
+        \item Разброс данных (scatterv).
+        \item Точечные обмены (send/recv).
+    \end{itemize}
+\end{itemize}
+
+\subsection*{Этапы выполнения}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Разделение данных:}
+    \begin{algorithmic}[1]
+        \State \textbf{Фаза распределения:}
+        \If{rank = 0}
+            \State Вычисление распределения данных $distr$ и смещений $displ$
+        \EndIf
+        \State broadcast(num), broadcast(distr), broadcast(displ)
+        \State scatterv входных данных на все процессы
+    \end{algorithmic}
+
+    \item \textbf{Параллельная сортировка:}
+    \begin{algorithmic}[1]
+        \State Генерация последовательности Седжвика для каждого блока.
+        \State Инициализация task\_arena с $\text{GetPPCNumThreads}()$ потоками
+        \begin{algorithmic}[1]
+            \For{$gap \in Sedgwick\_sequence$}
+                \State parallel\_for по блокам с шагом $gap$
+                \State Сортировка вставками внутри блока
+            \EndFor
+        \end{algorithmic}
+    \end{algorithmic}
+
+    \item \textbf{Каскадное слияние:}
+    \begin{algorithmic}[1]
+        \While{$step \leq num\_processes$}
+            \If{$(rank - step/2)\%step = 0$}
+                \State send данных процессору $rank + step/2$
+            \ElsIf{$rank\%step = 0$}
+                \State recv данных от процесса $rank - step/2$
+                \State parallel\_invoke слияния полученных данных
+            \EndIf
+            \State $step \gets step \times 2$
+        \EndWhile
+    \end{algorithmic}
+\end{enumerate}
+
+\subsection*{Особенности реализации}
+
+\begin{tabular}{|l|l|}
+    \hline
+    \textbf{Компонент} & \textbf{Реализация} \\ \hline
+    Распределение данных & MPI Scatterv \\ \hline
+    Локальная сортировка & TBB Parallel For \\ \hline
+    Слияние & Древовидная MPI-схема \\ \hline
+    Балансировка & Динамическая (TBB) + статическая (MPI) \\ \hline
+\end{tabular}
+
+\newpage
+
+\section*{Анализ результатов экспериментов}
+
+\subsection*{Сравнительная таблица времени выполнения (секунды)}
+
+\begin{table}[H] % Используем [H] вместо [h] для жесткой фиксации
+    \centering
+    \caption{Время выполнения различных реализаций алгоритма}
+    \begin{tabular}{lccccc}
+        \toprule
+            Реализация & Потоки & \multicolumn{2}{c}{test\_pipeline\_run} & \multicolumn{2}{c}{test\_task\_run} \\
+            & & Время & Ускорение & Время & Ускорение \\
+        \midrule
+            \multirow{1}{*}{Последовательная} & 1 & 1.569 & 1.00x & 1.493 & 1.00x \\
+        \midrule
+            \multirow{4}{*}{OpenMP} & 1 & 1.341 & 1.17x & 1.084 & 1.38x \\
+            & 2 & 0.685 & 2.29x & 0.525 & 2.84x \\
+            & 3 & 0.557 & 2.82x & 0.414 & 3.61x \\
+            & 4 & 0.450 & 3.49x & 0.304 & 4.91x \\
+        \midrule
+            \multirow{4}{*}{TBB} & 1 & 1.615 & 0.97x & 1.388 & 1.08x \\
+            & 2 & 0.731 & 2.15x & 0.503 & 2.97x \\
+            & 3 & 0.628 & 2.50x & 0.478 & 3.12x \\
+            & 4 & 0.440 & 3.57x & 0.333 & 4.48x \\
+        \midrule
+            \multirow{4}{*}{STL} & 1 & 1.359 & 1.15x & 1.060 & 1.41x \\
+            & 2 & 0.723 & 2.17x & 0.504 & 2.96x \\
+            & 3 & 0.517 & 3.03x & 0.355 & 4.21x \\
+            & 4 & 0.441 & 3.56x & 0.334 & 4.47x \\
+        \midrule
+            \multirow{12}{*}{MPI+TBB} & 1x1 & 2.194 & 0.72x & 1.898 & 0.79x \\
+            & 1x2 & 1.400 & 1.12x & 1.339 & 1.12x \\
+            & 1x3 & 1.060 & 1.48x & 0.998 & 1.50x \\
+            & 1x4 & 0.922 & 1.70x & 0.810 & 1.84x \\
+            & 2x1 & 1.073 & 1.46x & 1.020 & 1.46x \\
+            & 2x2 & 0.794 & 1.98x & 0.782 & 1.91x \\
+            & 2x3 & 0.721 & 2.18x & 0.681 & 2.19x \\
+            & 2x4 & 0.683 & 2.30x & 0.576 & 2.59x \\
+            & 3x1 & 0.770 & 2.04x & 0.713 & 2.09x \\
+            & 3x2 & 0.688 & 2.28x & 0.640 & 2.33x \\
+            & 3x3 & 0.642 & 2.44x & 0.531 & 2.81x \\
+            & 3x4 & 0.602 & 2.61x & 0.518 & 2.88x \\
+            & 4x1 & 0.627 & 2.50x & 0.615 & 2.43x \\
+            & 4x2 & 0.613 & 2.56x & 0.512 & 2.92x \\
+            & 4x3 & 0.604 & 2.60x & 0.481 & 3.10x \\
+            & 4x4 & 0.592 & 2.65x & 0.483 & 3.09x \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection*{Анализ эффективности}
+
+\begin{itemize}
+    \item \textbf{Лучшее ускорение}: OpenMP (4.91x для test\_task\_run на 4 потоках).
+    \item \textbf{Наибольшая масштабируемость}: MPI+TBB (3.09x при 4 процессах x 4 потока).
+    \item \textbf{Накладные расходы}:
+    \begin{itemize}
+        \item TBB показывает худшие результаты на 1 потоке из-за инициализации.
+        \item MPI+TBB имеет наибольшие накладные расходы при малом числе процессов.
+    \end{itemize}
+\end{itemize}
+
+\subsection*{Подтверждение корректности}
+
+\begin{itemize}
+    \item \textbf{Верификация результатов}:
+    \begin{itemize}
+        \item Все реализации дают идентичные отсортированные массивы.
+        \item Проверка на тестовых наборах от 7 до 100000 элементов.
+    \end{itemize}
+
+    \item \textbf{Стабильность работы}:
+    \begin{itemize}
+        \item Отсутствие deadlock и race condition в параллельных версиях.
+        \item Корректная обработка граничных случаев (пустой массив, уже отсортированный массив).
+    \end{itemize}
+
+    \item \textbf{Метрики качества}:
+    \begin{itemize}
+        \item Линейное ускорение при росте числа потоков (до 4 потоков).
+        \item Соответствие теоретической сложности $O(n^{4/3})$.
+    \end{itemize}
+\end{itemize}
+
+\subsection*{Выводы}
+
+\begin{itemize}
+    \item OpenMP демонстрирует лучшую производительность на одном узле.
+    \item Гибридная MPI+TBB реализация эффективна для кластерных конфигураций.
+    \item STL-версия показывает сопоставимую с TBB производительность.
+    \item Рекомендуется использовать OpenMP для малых данных и MPI+TBB для больших распределенных вычислений.
+\end{itemize}
+
+\newpage
+
+\section*{Заключение}
+Сортировка Шелла с простым слиянием представляет собой гибкий алгоритм, который может быть эффективно адаптирован для различных параллельных архитектур. Использование OpenMP и TBB позволяет добиться значительного ускорения на многопоточных системах, тогда как комбинация MPI и TBB открывает возможности для масштабирования на распределённых кластерах. Оптимальный выбор реализации зависит от конкретной вычислительной среды и требований к производительности.
+
+\newpage
+
+\section*{Список литературы}
+\begin{enumerate}
+    \item Williams A. - C++ Concurrency in Action - Manning, 2nd ed., 2019.
+    \item Ruud van der Pas et al. - Using OpenMP: Portable Shared Memory Parallel Programming - MIT Press, 2017.
+    \item Сысоев А.В., Мееров И.Б., Сиднев А.А. - Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks — Нижний Новгород, 2007.
+    \item Josuttis N. - The C++ Standard Library: A Tutorial and Reference - Addison-Wesley, 3rd ed., 2024 (C++23).
+\end{enumerate}
+
+\newpage
+
+\lstset{style=mystyle}
+
+\section*{Приложение}
+
+\subsection*{SEQ-реализация}
+
+\begin{lstlisting}[language=C++]
+bool kalyakina_a_shell_with_simple_merge_seq::ShellSortSequential::RunImpl() {
+  ShellSort(input_);
+  return true;
+}
+
+
+void kalyakina_a_shell_with_simple_merge_seq::ShellSortSequential::ShellSort(std::vector<int> &vec) {
+  for (unsigned int k = Sedgwick_sequence_.size(); k > 0;) {
+    unsigned int gap = Sedgwick_sequence_[--k];
+    for (unsigned int i = 0; i < gap; i++) {
+      for (unsigned int j = i; j < vec.size(); j += gap) {
+        unsigned int index = j;
+        int tmp = vec[index];
+        while ((index >= gap) && (tmp < vec[index - gap])) {
+          vec[index] = vec[index - gap];
+          index -= gap;
+        }
+        vec[index] = tmp;
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+\subsection*{OpenMP-реализация}
+
+\begin{lstlisting}[language=C++]
+bool kalyakina_a_shell_with_simple_merge_omp::ShellSortOpenMP::RunImpl() {
+  std::vector<std::pair<unsigned int, unsigned int>> bounds;
+  unsigned int num = (static_cast<unsigned int>(omp_get_max_threads()) > output_.size())
+                         ? output_.size()
+                         : (unsigned int)omp_get_max_threads();
+  unsigned int part = output_.size() / num;
+  unsigned int reminder = output_.size() % num;
+  unsigned int left = 0;
+  Sedgwick_sequence_ = CalculationOfGapLengths(output_.size() / num);
+  for (unsigned int i = 0; i < num; i++) {
+    unsigned int right = (i < reminder) ? left + part + 1 : left + part;
+    bounds.emplace_back(left, right);
+    left = right;
+  }
+#pragma omp parallel for schedule(static)
+  for (int i = 0; i < static_cast<int>(num); i++) {
+    ShellSort(bounds[i].first, bounds[i].second);
+  }
+  num = std::ceil(static_cast<double>(num) / 2);
+  unsigned int step = 1;
+  while (step < bounds.size()) {
+    step *= 2;
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < static_cast<int>(num); i++) {
+      unsigned int middle = (step / 2) + (step * i);
+      if (middle < bounds.size()) {
+        SimpleMergeSort(
+            bounds[i * step].first, bounds[middle].first,
+            bounds[(bounds.size() - 1 < (i + 1) * step - 1) ? bounds.size() - 1 : ((i + 1) * step) - 1].second);
+      }
+    }
+    num = std::ceil(static_cast<double>(num) / 2);
+  }
+  return true;
+}
+
+
+void kalyakina_a_shell_with_simple_merge_omp::ShellSortOpenMP::ShellSort(unsigned int left, unsigned int right) {
+  for (unsigned int k = Sedgwick_sequence_.size(); k > 0;) {
+    unsigned int gap = Sedgwick_sequence_[--k];
+    for (unsigned int i = left; i < left + gap; i++) {
+      for (unsigned int j = i; j < right; j += gap) {
+        unsigned int index = j;
+        int tmp = output_[index];
+        while ((index >= i + gap) && (tmp < output_[index - gap])) {
+          output_[index] = output_[index - gap];
+          index -= gap;
+        }
+        output_[index] = tmp;
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+\subsection*{TBB-реализация}
+
+\begin{lstlisting}[language=C++]
+bool kalyakina_a_shell_with_simple_merge_tbb::ShellSortTBB::RunImpl() {
+  std::vector<std::pair<unsigned int, unsigned int>> bounds;
+  unsigned int num = (static_cast<unsigned int>(ppc::util::GetPPCNumThreads()) > output_.size())
+                         ? output_.size()
+                         : static_cast<unsigned int>(ppc::util::GetPPCNumThreads());
+  oneapi::tbb::task_arena arena(static_cast<int>(num));
+  unsigned int part = output_.size() / num;
+  unsigned int reminder = output_.size() % num;
+  unsigned int left = 0;
+  Sedgwick_sequence_ = CalculationOfGapLengths(output_.size() / num);
+  for (unsigned int i = 0; i < num; i++) {
+    unsigned int right = (i < reminder) ? left + part + 1 : left + part;
+    bounds.emplace_back(left, right);
+    left = right;
+  }
+  arena.execute([&] {
+    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<unsigned int>(0, num),
+                              [&](const oneapi::tbb::blocked_range<unsigned int> &r) {
+                                for (unsigned int i = r.begin(); i != r.end(); i++) {
+                                  ShellSort(bounds[i].first, bounds[i].second);
+                                }
+                              });
+  });
+  num = std::ceil(static_cast<double>(num) / 2);
+  unsigned int step = 1;
+  while (step < bounds.size()) {
+    step *= 2;
+    arena.execute([&] {
+      oneapi::tbb::parallel_for(
+          oneapi::tbb::blocked_range<unsigned int>(0, num), [&](oneapi::tbb::blocked_range<unsigned int> &r) {
+            for (unsigned int i = r.begin(); i != r.end(); i++) {
+              unsigned int middle = (step / 2) + (step * i);
+              if (middle < bounds.size()) {
+                SimpleMergeSort(
+                    bounds[i * step].first, bounds[middle].first,
+                    bounds[(bounds.size() - 1 < (i + 1) * step - 1) ? bounds.size() - 1 : ((i + 1) * step) - 1].second);
+              }
+            }
+          });
+    });
+    num = std::ceil(static_cast<double>(num) / 2);
+  }
+  return true;
+}
+
+
+void kalyakina_a_shell_with_simple_merge_tbb::ShellSortTBB::ShellSort(unsigned int left, unsigned int right) {
+  for (unsigned int k = Sedgwick_sequence_.size(); k > 0;) {
+    unsigned int gap = Sedgwick_sequence_[--k];
+    for (unsigned int i = left; i < left + gap; i++) {
+      for (unsigned int j = i; j < right; j += gap) {
+        unsigned int index = j;
+        int tmp = output_[index];
+        while ((index >= i + gap) && (tmp < output_[index - gap])) {
+          output_[index] = output_[index - gap];
+          index -= gap;
+        }
+        output_[index] = tmp;
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+\subsection*{STL-реализация}
+
+\begin{lstlisting}[language=C++]
+bool kalyakina_a_shell_with_simple_merge_stl::ShellSortSTL::RunImpl() {
+  std::vector<std::pair<unsigned int, unsigned int>> bounds;
+  unsigned int num = (static_cast<unsigned int>(ppc::util::GetPPCNumThreads()) > output_.size())
+                         ? output_.size()
+                         : static_cast<unsigned int>(ppc::util::GetPPCNumThreads());
+  unsigned int part = output_.size() / num;
+  unsigned int reminder = output_.size() % num;
+  unsigned int left = 0;
+
+  Sedgwick_sequence_ = CalculationOfGapLengths(output_.size() / num);
+
+  for (unsigned int i = 0; i < num; i++) {
+    unsigned int right = (i < reminder) ? left + part + 1 : left + part;
+    bounds.emplace_back(left, right);
+    left = right;
+  }
+
+  auto sort = [&](unsigned int start_index, unsigned int end_index) { ShellSort(start_index, end_index); };
+  std::vector<std::thread> threads(num);
+  for (int i = 0; i < static_cast<int>(num); i++) {
+    threads[i] = std::thread(sort, bounds[i].first, bounds[i].second);
+  }
+  std::ranges::for_each(threads, [&](auto &thread) { thread.join(); });
+
+  num = std::ceil(static_cast<double>(num) / 2);
+  unsigned int step = 1;
+  while (step < bounds.size()) {
+    step *= 2;
+    for (int i = 0; i < static_cast<int>(num); i++) {
+      unsigned int middle = (step / 2) + (step * i);
+      if (middle < bounds.size()) {
+        SimpleMergeSort(
+            bounds[i * step].first, bounds[middle].first,
+            bounds[(bounds.size() - 1 < (i + 1) * step - 1) ? bounds.size() - 1 : ((i + 1) * step) - 1].second);
+      }
+    }
+    num = std::ceil(static_cast<double>(num) / 2);
+  }
+
+  return true;
+}
+
+
+void kalyakina_a_shell_with_simple_merge_stl::ShellSortSTL::ShellSort(unsigned int left, unsigned int right) {
+  for (unsigned int k = Sedgwick_sequence_.size(); k > 0;) {
+    unsigned int gap = Sedgwick_sequence_[--k];
+    for (unsigned int i = left; i < left + gap; i++) {
+      for (unsigned int j = i; j < right; j += gap) {
+        unsigned int index = j;
+        int tmp = output_[index];
+        while ((index >= i + gap) && (tmp < output_[index - gap])) {
+          output_[index] = output_[index - gap];
+          index -= gap;
+        }
+        output_[index] = tmp;
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+\subsection*{MPI+TBB-реализация}
+
+\begin{lstlisting}[language=C++]
+bool kalyakina_a_shell_with_simple_merge_all::ShellSortALL::RunImpl() {
+  unsigned int num = 0;
+  std::vector<int> distr(static_cast<unsigned int>(world_.size()), 0);
+  std::vector<int> displ(static_cast<unsigned int>(world_.size()), 0);
+
+  if (world_.rank() == 0) {
+    num = (static_cast<unsigned int>(world_.size()) > input_.size()) ? input_.size()
+                                                                     : static_cast<unsigned int>(world_.size());
+    unsigned int part = input_.size() / num;
+    unsigned int reminder = input_.size() % num;
+
+    for (unsigned int i = 0; i < num; i++) {
+      distr[i] = (i < reminder) ? static_cast<int>(part + 1) : static_cast<int>(part);
+      displ[i] = (i == 0) ? 0 : static_cast<int>(displ[i - 1] + distr[i - 1]);
+    }
+  }
+
+  boost::mpi::broadcast(world_, num, 0);
+  boost::mpi::broadcast(world_, distr, 0);
+  boost::mpi::broadcast(world_, displ, 0);
+  std::vector<int> local_res(distr[world_.rank()]);
+  Sedgwick_sequence_ = CalculationOfGapLengths(distr[world_.rank()]);
+
+  boost::mpi::scatterv(world_, input_.data(), distr, displ, local_res.data(), distr[world_.rank()], 0);
+
+  ShellSort(local_res);
+
+  unsigned int step = 1;
+  while (step <= num) {
+    step *= 2;
+    if (((world_.rank() - step / 2) % step) == 0) {
+      world_.send(static_cast<int>(world_.rank() - (step / 2)), 0, local_res);
+    } else if ((world_.rank() % step == 0) && (static_cast<unsigned int>(world_.size()) > world_.rank() + step / 2)) {
+      std::vector<int> message;
+      world_.recv(static_cast<int>(world_.rank() + (step / 2)), 0, message);
+      local_res = SimpleMergeSort(local_res, message);
+    }
+  }
+
+  if (world_.rank() == 0) {
+    output_ = local_res;
+  }
+
+  return true;
+}
+
+
+void kalyakina_a_shell_with_simple_merge_all::ShellSortALL::ShellSort(std::vector<int> &vec) {
+  oneapi::tbb::task_arena arena(ppc::util::GetPPCNumThreads());
+  for (unsigned int k = Sedgwick_sequence_.size(); k > 0;) {
+    unsigned int gap = Sedgwick_sequence_[--k];
+    arena.execute([&] {
+      oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<unsigned int>(0, gap),
+                                [&](const oneapi::tbb::blocked_range<unsigned int> &r) {
+                                  for (unsigned int i = r.begin(); i != r.end(); i++) {
+                                    for (unsigned int j = i; j < vec.size(); j += gap) {
+                                      unsigned int index = j;
+                                      int tmp = vec[index];
+                                      while ((index >= i + gap) && (tmp < vec[index - gap])) {
+                                        vec[index] = vec[index - gap];
+                                        index -= gap;
+                                      }
+                                      vec[index] = tmp;
+                                    }
+                                  }
+                                });
+    });
+  }
+}
+\end{lstlisting}
+
+
+\end{document}
