@@ -1,0 +1,1163 @@
+\documentclass[12pt,a4paper]{extarticle}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{url}
+\usepackage{framed}
+\usepackage{listings}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{tocloft}
+
+\geometry{
+	a4paper,
+	left=30mm,
+	right=15mm,
+	top=20mm,
+	bottom=20mm
+}
+
+\titleformat{\section}[block]
+{\normalfont\fontsize{14}{16}\bfseries}
+{\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries}
+{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries}
+{\thesubsubsection.}{0.5em}{}
+
+\lstset{
+	basicstyle=\ttfamily\small,
+	keywordstyle=\color{blue},
+	commentstyle=\color{green},
+	stringstyle=\color{red},
+	frame=single,
+	tabsize=4,
+	showstringspaces=false,
+	breaklines=true
+}
+
+\sloppy
+
+\onehalfspacing
+
+\setlength{\parindent}{1.25cm}
+
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+
+\begin{document}
+	
+	\begin{titlepage}
+		\begin{center}
+			
+			\onehalfspacing
+			
+			\begin{center}
+				\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\ 			
+				\vspace{0.5cm}
+				Федеральное государственное автономное образовательное учреждение высшего образования \\ 
+				\vspace{0.5cm}
+				\textbf{«Национальный исследовательский Нижегородский государственный университет имени Н.И. Лобачевского»} \\
+				(ННГУ)\\
+				\vspace{0.5cm}
+				\textbf{Институт информационных технологий, математики и механики}
+			\end{center}
+			\vspace{0.5cm}
+			\begin{center}
+			Направление подготовки: Фундаментальная информатика и информационные технологии
+			
+			
+			Профиль подготовки: «Инженерия программного обеспечения»
+			\end{center}
+			\vspace{2.5cm}
+			\begin{center}
+				\textbf{Отчёт по лабораторной работе}
+
+				на тему: 
+				
+				\textbf{"Умножение плотных матриц. Элементы типа double. Блочная схема, алгоритм Фокса."}
+			\end{center}
+			
+			\vspace{2.5cm}
+			
+			\begin{flushright}
+				\textbf{Выполнил:} \\
+				студент 3 курса группы 3822Б1ФИ3 \\
+				Лысов И.М. \\
+				
+				\vspace{1cm}
+				
+			\noindent\textbf{Преподаватель:} \\
+			к.т.н., доцент кафедры ВВСП \\
+			{Сысоев А.В.}
+			\end{flushright}
+			
+			\vspace{2em}
+			
+			\vfill
+			
+			\begin{center}
+				Нижний Новгород \\
+				2025 г.
+			\end{center}
+			
+		\end{center}
+	\end{titlepage}
+	
+	\newpage
+
+% Оглавление
+\tableofcontents
+\newpage
+
+% Введение
+\clearpage
+\phantomsection
+\section*{Введение}
+\addcontentsline{toc}{section}{Введение}
+Умножение матриц — одна из фундаментальных операций численной линейной алгебры, которая лежит в основе большого числа алгоритмов в научных, инженерных и прикладных задачах. Она активно используется при решении систем линейных уравнений, в моделировании физических процессов, обработке изображений, численном решении дифференциальных уравнений, а также в алгоритмах машинного обучения и компьютерной графике.
+
+С ростом объёмов обрабатываемых данных классический алгоритм умножения матриц оказывается недостаточно эффективным. Одним из подходов к оптимизации вычислений является использование блочных алгоритмов, которые делят исходные матрицы на подматрицы и выполняют операции блочно. Среди таких алгоритмов выделяется алгоритм Фокса — метод блочного параллельного умножения матриц, ориентированный на работу в распределённых системах с топологией сетки.
+
+Суть алгоритма Фокса заключается в блочном перемножении матриц с согласованными обменами данных между вычислительными узлами, организованными в двумерную сетку. На каждом шаге алгоритма блоки одной из матриц передаются по строкам, а блоки второй — сдвигаются по столбцам, что позволяет эффективно использовать локальные вычисления и сократить объём коммуникаций. В данной работе реализуется также последовательный вариант алгоритма, имитирующий описанную схему передачи и обработки блоков без реального параллелизма.
+
+Для повышения производительности были реализованы параллельные версии алгоритма Фокса с использованием технологий параллельного программирования: OpenMP, Intel Threading Building Blocks (TBB), std::thread (STL), а также MPI в сочетании с TBB. Каждая из технологий демонстрирует разные подходы к организации вычислений — от работы с общей памятью до взаимодействия между процессами в распределённой среде.
+
+Целью данной работы является реализация алгоритма Фокса в последовательной и параллельной формах, а также проведение сравнения производительности и анализа эффективности различных моделей параллелизма в контексте задачи умножения квадратных матриц.
+
+\newpage
+\section{Постановка задачи}
+
+Задача состоит в вычислении произведения двух квадратных матриц с использованием блочной схемы, основанной на алгоритме Фокса. Пусть даны матрицы \( A, B \in \mathbf{R}^{n \times n} \). Требуется найти матрицу \( C \in \mathbf{R}^{n \times n} \) такую, что
+\[
+C = A \cdot B
+\]
+где перемножение осуществляется по блочной схеме: каждая из матриц разбивается на блоки размера \( block \_ size \times block \_ size \), после чего выполняется пошаговое суммирование произведений соответствующих блоков по правилам алгоритма Фокса.
+
+В работе рассматриваются как последовательная реализация алгоритма Фокса, имитирующая логику передачи блоков в сетке процессов, так и параллельные версии, реализованные с использованием технологий OpenMP, Intel Threading Building Blocks (TBB), стандартной библиотеки потоков C++ (STL) и MPI.
+
+\subsection{Входные данные}
+
+\begin{itemize}
+	\item \( n \in \mathbf{N} \) — размерность квадратных матриц;
+	\item \( A = [a_{ij}] \in \mathbf{R}^{n \times n} \) — первая входная матрица;
+	\item \( B = [b_{ij}] \in \mathbf{R}^{n \times n} \) — вторая входная матрица;
+	\item \( block \_ size \in \mathbf{N} \) — размер блока.
+\end{itemize}
+
+\subsection{Выходные данные}
+
+\begin{itemize}
+	\item \( C = [c_{ij}] \in \mathbf{R}^{n \times n} \) — результирующая матрица произведения \( C = A \cdot B \), вычисленного с использованием блочной схемы алгоритма Фокса.
+\end{itemize}
+
+\newpage
+\section{Описание алгоритма}
+
+Алгоритм Фокса предназначен для блочного перемножения квадратных матриц и может быть эффективно реализован как в последовательной, так и в параллельной форме. Он базируется на представлении матриц в виде сетки блоков и последовательном выполнении операций с этими блоками в фиксированном порядке, что обеспечивает равномерную нагрузку и предсказуемый доступ к данным.
+
+Пусть \( A, B \in \mathbf{R}^{n \times n} \) — две квадратные матрицы. Размер блоков обозначим через \( s \), а количество блоков по строке и столбцу — через \( q = \left\lceil \frac{n}{s} \right\rceil \). Тогда каждая матрица разбивается на \( q \times q \) блоков.
+
+\subsection{Последовательный алгоритм}
+
+Последовательная реализация алгоритма Фокса имитирует пошаговое выполнение вычислений, характерное для распределённой реализации, но выполняет все операции в пределах одного потока. Алгоритм включает следующие этапы:
+
+\begin{enumerate}
+	\item \textbf{Разбиение матриц на блоки:}  
+	Матрицы \( A \) и \( B \) рассматриваются, как состоящие из \( q \times q \) подматриц \( A_{ij}, B_{ij} \in \mathbf{R}^{s \times s} \).
+	
+	\item \textbf{Выполнение $q$ шагов алгоритма:}  
+	Алгоритм выполняется в $q$ итераций. На каждой итерации $k = 0, 1, \dots, q-1$:
+	
+	\begin{enumerate}
+		\item Для каждой строки индексов \( i \) и каждого столбца \( j \) вычисляется индекс блока:
+		\[
+		a\_block\_row = (i + k) \bmod q
+		\]
+		
+		\item Выбираются блоки \( A_{i,a\_block\_row} \) и \( B_{a\_block\_row,j} \)
+		
+		\item Вычисляется произведение соответствующих блоков:
+		\[
+		C_{ij} \mathrel{+}= A_{i,(i+k)\bmod q} \cdot B_{(i+k)\bmod q,j}
+		\]
+	\end{enumerate}
+	
+	\item \textbf{Адаптация к краевым условиям:}  
+	Если \( n \) не делится нацело на \( s \), крайние блоки могут иметь меньший размер. Это учитывается при обходе элементов в блочном умножении.
+\end{enumerate}
+
+\subsection{Параллельный алгоритм}
+
+Параллельная версия алгоритма Фокса реализует ту же самую логику пошагового перемножения блоков, но распределяет работу между несколькими потоками или процессами. Каждая пара индексов \( (i, j) \) обрабатывается независимо, что делает алгоритм удобным для распараллеливания.
+
+Алгоритм включает следующие этапы:
+
+\begin{enumerate}
+	\item \textbf{Распределение блоков:}  
+	Каждому потоку или процессу назначается одна или несколько пар индексов \( (i, j) \), соответствующих блокам результата \( C_{ij} \).
+	
+	\item \textbf{Параллельное выполнение:}  
+	На каждом шаге \( k = 0, 1, \dots, q-1 \), каждый поток:
+	
+	\begin{enumerate}
+		\item Вычисляет сдвинутый индекс блока:
+		\[
+		a\_block\_row = (i + k) \bmod q
+		\]
+		
+		\item Получает блоки \( A_{i,a\_block\_row} \) и \( B_{a\_block\_row,j} \)
+		
+		\item Вычисляет блочное произведение и добавляет результат к локальному блоку результата:
+		\[
+		C_{ij} \mathrel{+}= A_{i,(i+k)\bmod q} \cdot B_{(i+k)\bmod q,j}
+		\]
+	\end{enumerate}
+	
+	\item \textbf{Синхронизация:}  
+	В реализациях с общей памятью (OpenMP, TBB, std::thread) потоки работают с общей матрицей \( C \) с защитой от гонок данных.  
+	В реализациях с распределённой памятью (MPI) необходим обмен блоками: передача \( A \) по строкам (broadcast) и циклический сдвиг блоков \( B \) вверх по столбцам.
+\end{enumerate}
+		
+\newpage
+\section{Описание реализации}
+\subsection{Общая схема алгоритма Фокса}
+Алгоритм работает с блочной декомпозицией квадратных матриц $A$, $B$ и $C$
+(размер $n\times n$, размер блока $s\times s$) и выполняется в пять шагов.
+
+\begin{enumerate}
+	\item Определяется число блоков по строке (и столбцу):
+	\[
+	q=\Bigl\lceil \frac{n}{s}\Bigr\rceil.
+	\]
+	\item Запускается внешний цикл по шагам
+	$k=0,1,\dots,q-1$.
+	\item На каждом шаге перебираются индексы блоков
+	$i\in[0,q-1]$ и $j\in[0,q-1]$ ― строка и столбец блока результата $C_{ij}$.
+	\item Для пары $(i,j)$ вычисляется «сдвинутый» индекс строки блока матрицы $A$:
+	\[
+	a\_block\_row = (i+k)\bmod q.
+	\]
+	\item Вызывается
+	\texttt{ProcessBlock($A_{i,a\_block\_row}$, $B_{a\_block\_row,j}$, $C_{ij}$)},
+	которая перемножает два блока и накопительно добавляет результат в $C_{ij}$.
+\end{enumerate}
+
+Функция \texttt{ProcessBlock} идентична во всех версиях и содержит обычный тройной цикл
+по локальным индексам \texttt{i}, \texttt{j}, \texttt{k}.
+
+\vspace{1em}
+\begin{lstlisting}[language=C++,basicstyle=\ttfamily\small,
+	caption={Общий каркас цикла RunImpl}]
+	std::size_t q = (n_ + block_size_ - 1) / block_size_;
+	for (std::size_t k = 0; k < q; ++k){
+		for (std::size_t i = 0; i < q; ++i) {
+			std::size_t a_row = (i + k) % q;
+			for (std::size_t j = 0; j < q; ++j){
+				ProcessBlock(a_, b_, c_, i, j, a_row, block_size_, n_);
+			}
+		}
+	}
+\end{lstlisting}
+
+\subsection{Реализации на общей памяти}
+
+\subsubsection*{Последовательная версия (SEQ)}
+Последовательная версия алгоритма реализована в файле \texttt{ops\_seq.cpp}. Она реализована прямым копированием общего каркаса без каких-либо директив или потоков.
+Всё выполняется в одном потоке; код полностью соответствует листингу \ref{lst:seq}.
+\begin{lstlisting}[language=C++,basicstyle=\ttfamily\small,
+	caption={RunImpl в последовательной версии},
+	label={lst:seq}]
+	std::size_t q = (n_ + block_size_ - 1) / block_size_;
+	for (std::size_t k = 0; k < q; ++k){
+		for (std::size_t i = 0; i < q; ++i) {
+			std::size_t a_row = (i + k) % q;
+			for (std::size_t j = 0; j < q; ++j){
+				ProcessBlock(a_, b_, c_, i, j, a_row, block_size_, n_);
+			}
+		}
+	}
+\end{lstlisting}
+
+\subsubsection*{OpenMP-версия}
+Параллельная версия алгоритма с использованием OpenMP реализована в файле \texttt{ops\_omp.cpp}.
+Параллельность достигается вставкой директивы
+\texttt{\#pragma omp for schedule(static)\,nowait}
+перед вложенным циклом по~$i$.
+Статическое распределение (равные порции) подходит, потому что все блоки одинакового
+или почти одинакового размера; модификатор \texttt{nowait} убирает барьер
+после цикла и снижает накладные расходы.
+
+\begin{lstlisting}[language=C++,basicstyle=\ttfamily\small,
+	caption={Различия OpenMP},
+	label={lst:omp}]
+	#pragma omp parallel
+	for (int k = 0; k < q; ++k) {
+	#pragma omp for schedule(static) nowait
+		for (int i = 0; i < q; ++i){
+			for (int j = 0; j < q; ++j){
+				ProcessBlock(...);
+			}
+		}
+	}
+\end{lstlisting}
+
+\subsubsection*{Intel TBB-версия}
+Параллельная версия алгоритма с использованием TBB реализована в файле \texttt{ops\_tbb.cpp}.
+Вместо ручных циклов используется диапазон
+\texttt{[0,\,q{\textsuperscript{2}})} и вызов
+\texttt{tbb::parallel\_for}; значение \texttt{index} распаковывается
+в~$i=index/q$, $j=index\bmod q$.
+Планировщик TBB автоматически делит диапазон, а
+\texttt{auto\_partitioner} динамически балансирует нагрузку
+(work stealing). Синхронизации между потоками не требуются.
+
+\begin{lstlisting}[language=C++,basicstyle=\ttfamily\small,
+	caption={Различия TBB},
+	label={lst:tbb}]
+	const int q = (n_ + block_size_ - 1) / block_size_;
+	tbb::parallel_for(0, q*q, [&](int index) {
+		int i = index / q;
+		int j = index % q;
+		for (int k = 0; k < q; ++k) {
+			int a_row = (i + k) % q;
+			ProcessBlock(a_, b_, c_, i, j, a_row, block_size_, n_);
+		}
+	});
+\end{lstlisting}
+\subsection*{STL-версия}
+
+STL-реализация алгоритма Фокса находится в файле \texttt{ops\_stl.cpp} и использует явное создание потоков через \texttt{std::thread}.  
+В отличие от TBB и OpenMP, где используется автоматическое управление пулами потоков, здесь логика многопоточности реализуется вручную.
+
+\begin{itemize}
+	\item Общее число блоков:
+	\[
+	q = \left\lceil \frac{n}{s} \right\rceil
+	\]
+	где \( s \) — размер блока, \( n \) — размерность матрицы.
+	
+	\item Число потоков выбирается через функцию \texttt{ppc::util::GetPPCNumThreads()}.  
+	Если функция возвращает 0, по умолчанию используются 4 потока.
+	
+	\item Для балансировки нагрузки между потоками используется атомарный счётчик задач \texttt{task\_idx},  
+	который инкрементируется каждым потоком с помощью \texttt{fetch\_add}:
+	\[
+	\text{task\_idx} \rightarrow i = \left\lfloor \frac{\text{task\_idx}}{q} \right\rfloor,\quad j = \text{task\_idx} \bmod q
+	\]
+	
+	\item Каждая задача соответствует вычислению одного блока \texttt{C\_ij} с учётом текущего шага алгоритма \( k \),  
+	на котором выбирается строка блока \( A \):  
+	\[
+	a\_row = (i + k) \bmod q
+	\]
+	
+	\item Для каждого шага создаётся пул потоков (\texttt{std::thread}),  
+	который параллельно вытаскивает задачи из счётчика и вызывает \texttt{ProcessBlock}.  
+	После выполнения задач потоки завершаются и на следующем шаге создаются заново.
+	
+	\item Такая модель ближе к ручному управлению пулами: создание потоков, синхронизация (\texttt{join}) и контроль за очередью задач.
+	
+\end{itemize}
+
+\vspace{1em}
+\noindent Фрагмент кода метода \texttt{RunImpl}:
+
+\begin{lstlisting}[language=C++,basicstyle=\ttfamily\small,caption={Функция RunImpl с использованием std::thread}]
+	const std::size_t num_blocks = (n_ + block_size_ - 1) / block_size_;
+	std::size_t max_thr = ppc::util::GetPPCNumThreads();
+	if (max_thr == 0) max_thr = 4;
+	
+	std::atomic<std::size_t> task_idx{0};
+	
+	auto worker = [&](std::size_t step) {
+		const std::size_t total_tasks = num_blocks * num_blocks;
+		while (true) {
+			std::size_t idx = task_idx.fetch_add(1, std::memory_order_relaxed);
+			if (idx >= total_tasks) break;
+			
+			std::size_t i = idx / num_blocks;
+			std::size_t j = idx % num_blocks;
+			std::size_t a_row = (i + step) % num_blocks;
+			ProcessBlock(a_, b_, c_, i, j, a_row, block_size_, n_);
+		}
+	};
+	
+	for (std::size_t step = 0; step < num_blocks; ++step) {
+		task_idx.store(0, std::memory_order_relaxed);
+		std::vector<std::thread> pool;
+		const std::size_t threads_to_run = std::min(max_thr, num_blocks * num_blocks);
+		pool.reserve(threads_to_run);
+		for (std::size_t t = 0; t < threads_to_run; ++t) {
+			pool.emplace_back(worker, step);
+		}
+		for (auto& th : pool) th.join();
+	}
+\end{lstlisting}
+\subsection*{Гибридная MPI+TBB версия}
+Гибридная реализация алгоритма Фокса реализована в файле \texttt{ops\_all.cpp}.
+Она сочетает распределённые и многопоточные вычисления с использованием технологий MPI и Intel TBB.
+
+\begin{itemize}
+	\item MPI распределяет блоки входных матриц между процессами.  
+	Размер вычислительной сетки \( q \times q \) подбирается с учётом количества доступных процессов \( P \) и делимости размера матрицы \( n \).  
+	Каждому процессу назначается уникальный блок из матрицы A и B.
+	
+	\item На каждом шаге \( k = 0, 1, \dots, q-1 \) каждый процесс:
+	\begin{enumerate}
+		\item Вычисляет индекс сдвинутого блока:
+		\[
+		a\_block\_row = (i + k) \bmod q
+		\]
+		\item Получает соответствующий блок матрицы \( A \) с помощью \texttt{boost::mpi::send/recv} или использует локальный.
+		\item Выполняет блочное перемножение текущих блоков \( A \) и \( B \) с накоплением результата в \( C \).
+		\item Пересылает блоки матрицы \( B \) между процессами одного столбца с помощью \texttt{MPI\_Sendrecv}.
+	\end{enumerate}
+	
+	\item Локальное перемножение блоков реализовано с помощью функции \texttt{MultiplyMatrixBlocks},  
+	в которой используется \texttt{tbb::parallel\_for} с диапазоном \texttt{tbb::blocked\_range}.  
+	Это позволяет эффективно распараллелить строки результирующего блока матрицы \( C \).
+	
+	\item Каждое выполнение TBB-кода обёрнуто в объект \texttt{tbb::task\_arena}, это даёт возможность гибко управлять пулом потоков.  
+	Так же позволяет избежать нежеланных пересечений с другими внутренними пулами потоков.
+	
+	\item После завершения всех шагов локальные блоки \( C \) собираются на нулевом процессе с помощью  
+	\texttt{boost::mpi::gather} и объединяются в итоговую матрицу через функцию \texttt{GatherMatrix}.
+\end{itemize}
+
+\vspace{1em}
+\noindent Фрагмент параллельного перемножения блоков:
+
+\begin{lstlisting}[language=C++,basicstyle=\ttfamily\small,caption={TBB-умножение блоков}]
+	tbb::parallel_for(
+	tbb::blocked_range<int>(0, block_size),
+	[&](const tbb::blocked_range<int>& r) {
+		for (int i = r.begin(); i < r.end(); ++i) {
+			const double* ai = a + (i * block_size);
+			double* ci = c + (i * block_size);
+			for (int k = 0; k < block_size; ++k) {
+				double aik = ai[k];
+				const double* bk = b + (k * block_size);
+				for (int j = 0; j < block_size; ++j) {
+					ci[j] += aik * bk[j];
+				}
+			}
+		}
+	},
+	tbb::auto_partitioner());
+\end{lstlisting}
+
+\newpage
+\section{Результаты экспериментов}
+Эксперименты проводились на случайных матрицах размером 800\texttimes 800 и размером блока 30 на системе с процессором Intel Core i5 5300U. Тестирование проводилось на 4 потоках для каждой из параллельных реализаций. Замер производился на тесте $task\_run$. Результаты тестирования приведены в таблице:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+\textbf{Версия} & \textbf{Время (с)} & \textbf{Ускорение} \\
+\midrule
+Последовательная & 8,43 & 1,00 \\
+OMP (4 потока) & 1.86 & 4,53   \\
+TBB (4 потока) & 1,806 & 4,667 \\
+STL (4 потока) & 1,832 & 4,601 \\
+MPI+TBB (4 узла $\times$ 4 потока) & 3,142 & 2,683 \\
+
+\bottomrule
+
+\end{tabular}
+\caption{Производительность реализаций}
+\label{tab:performance}
+\end{table}
+
+\subsection{Анализ полученных результатов}
+
+Проведённые эксперименты показали значительное ускорение при использовании параллельных реализаций алгоритма Фокса по сравнению с последовательной версией.  
+Рассмотрим особенности производительности каждой из реализаций.
+
+\begin{itemize}
+	
+	\item \textbf{Последовательная версия}: Время выполнения составляет 8{,}43~с. и служит базовым эталоном для оценки ускорения.  
+	Алгоритм последовательно обходит блоки по индексам \(i, j\), на каждом шаге вычисляя блочное произведение и аккумулируя результат в матрицу \(C\).  
+	Так как вся работа выполняется в одном потоке, производительность ограничена только тактовой частотой CPU и эффективностью кэширования.
+	
+	\item \textbf{OpenMP}: Ускорение 4{,}53 при времени 1{,}86~с. достигается за счёт эффективной распараллеленной обработки строк блоков с помощью директивы \texttt{\#pragma omp for schedule(static) nowait}.  
+	Распределение задач между потоками происходит заранее (статически), что эффективно при равномерной вычислительной нагрузке на каждом блоке.  
+	Отсутствие барьера синхронизации (\texttt{nowait}) между итерациями цикла по шагам \(k\) дополнительно снижает накладные расходы.  
+	Такой подход обеспечивает почти линейное ускорение при фиксированном количестве потоков и матрицах умеренного размера.
+	
+	\item \textbf{TBB}: Демонстрирует наилучшее время --- 1{,}806~с. и ускорение 4{,}667.  
+	В данной реализации используется параллелизм двух уровней: на первом — итерации по блокам \(i, j\),  
+	а на втором — внутренняя обработка строк блока с помощью \texttt{tbb::parallel\_for}.  
+	Балансировка задач выполняется автоматически за счёт механизма \texttt{auto\_partitioner} и \texttt{blocked\_range},  
+	что особенно эффективно при наличии кэш-промахов и неоднородной загрузке.  
+	TBB способен перераспределять работу между потоками во время выполнения, что минимизирует простой и делает реализацию устойчивой к небольшим флуктуациям во времени обработки отдельных блоков.
+	
+	\item \textbf{STL (std::thread)}: Время --- 1{,}832~с., ускорение --- 4{,}601.  
+	Распределение задач осуществляется вручную с использованием атомарной переменной \texttt{task\_idx},  
+	которая индексирует текущий обрабатываемый блок.  
+	Такой способ похож на динамическое распределение, но требует постоянного доступа к разделяемой переменной,  
+	что вносит дополнительные накладные расходы (особенно при большом числе потоков).  
+	
+	\item \textbf{MPI+TBB}: Объединяет распределённые вычисления (MPI) с многопоточными (TBB).  
+	При времени 3{,}142~с. достигается ускорение 2{,}683, что существенно ниже по сравнению с другими реализациями.  
+	Это объясняется тем, что затраты на пересылку данных между процессами (вызовы \texttt{MPI\_Sendrecv}, \texttt{gather}, \texttt{scatter})  
+	оказываются сопоставимыми по времени с собственными вычислениями.  
+	Хотя TBB внутри каждого процесса обеспечивает эффективную обработку блоков,  
+	общая производительность ограничивается скоростью обмена, синхронизацией и особенностями межпроцессного взаимодействия.  
+	Также значим вклад синхронизаций между шагами \(k\) — для каждого процесса приходится пересылать и ждать данные от других узлов.
+	
+\end{itemize}
+\newpage
+
+\section*{Заключение}
+\addcontentsline{toc}{section}{Заключение}
+
+
+В работе реализованы пять вариантов алгоритма Фокса: базовая последовательная версия, многопоточные варианты на OpenMP, Intel TBB и стандартных потоках STL, а также гибридная схема MPI + TBB. Все реализации используют одинаковую блочную декомпозицию матрицы и циклическое смещение блоков, но различаются способом организации параллелизма. Эксперименты выполнялись на процессоре Intel Core i5-5300U (четыре логических потока, 2 $\times$ 2,9 ГГц) для матриц $800\times800$ с блоком $30\times30$; для параллельных реализаций запускалось ровно четыре нити, а в гибридном варианте — четыре процесса по четыре нити. Корректность всех вариантов проверялась сравнением с последовательной реализацией.
+
+Последовательная версия показала время 8,43 с и служит эталоном. OpenMP-реализация с директивой \texttt{\#pragma omp for schedule(static)\,nowait} сократила время до 1,86 с, обеспечив ускорение 4,53. Intel TBB, использующий двухуровневую параллельность и динамическое планирование задач через \texttt{parallel\_for} и \texttt{auto\_partitioner}, завершил вычисления за 1,806 с, то есть ускорил алгоритм в 4,667 и оказался самым быстрым среди всех однопроцессных решений. STL-вариант с ручным управлением пулом \texttt{std::thread} и атомарным счётчиком задач дал время 1,832 с (ускорение 4,60); результат почти не уступает OpenMP, однако требует более сложного кода и несёт лишние издержки на создание потоков. Гибридная реализация MPI + TBB при четырёх «узлах» и тех же четырёх нитях на узел выполнила задачу за 3,142 с, что соответствует ускорению лишь 2,68: при таком размере матрицы объём локальных вычислений на процесс слишком мал, а затраты на передачи блоков через \texttt{MPI\_Sendrecv}, \texttt{scatter} и \texttt{gather} оказываются доминирующими.
+
+Главные численные итоги сведены в таблице \ref{tab:performance}. Многопоточные реализации на одной машине дали примерно 4,6-кратный выигрыш, тогда как гибридная схема показала себя хуже из-за накладных расходов. Таким образом, на настольном или серверном узле с ограниченным числом ядер наиболее рационально использовать Intel TBB, чуть менее — OpenMP или STL-threads; гибридный MPI + TBB становится оправданным выбором лишь при гораздо больших матрицах и реальном кластере, где вычислительная нагрузка на процесс перекрывает стоимость коммуникаций. В целом работа подтверждает, что оптимальный подход к параллелизации зависит не только от алгоритмической сложности, но и от объёма данных, архитектуры памяти и стоимости обмена между вычислительными единицами.
+\newpage
+
+\section*{Список литературы}
+\addcontentsline{toc}{section}{Список литературы}
+\begin{enumerate}
+	\item Алгоритм Фокса перемножения матриц // Центр суперкомпьютерных технологий URL: \url{http://www.hpcc.unn.ru/?dir=1034}
+	\item Перемножение матриц. Алгоритм Фокса // Центр суперкомпьютерных технологий URL: \url{http://www.hpcc.unn.ru/?dir=889}
+	\item Параллельные вычисления с использованием MPI // OpenNET URL: \url{https://www.opennet.ru/docs/RUS/linux_parallel/node158.html}
+\end{enumerate}
+\newpage
+
+\section*{Приложение}
+\addcontentsline{toc}{section}{Приложение}
+\phantomsection
+\subsection*{Файл ops\_seq.cpp}
+\addcontentsline{toc}{subsection}{Файл ops\_seq.cpp}
+\begin{lstlisting}[language=C++]
+#include "seq/lysov_i_matrix_multiplication_Fox_algorithm/include/ops_seq.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <vector>
+
+void lysov_i_matrix_multiplication_fox_algorithm_seq::ProcessBlock(const std::vector<double> &a,
+const std::vector<double> &b, std::vector<double> &c,
+std::size_t i, std::size_t j,
+std::size_t a_block_row, std::size_t block_size,
+std::size_t n) {
+	std::size_t block_h = std::min(block_size, n - (i * block_size));
+	std::size_t block_w = std::min(block_size, n - (j * block_size));
+	for (std::size_t ii = 0; ii < block_h; ++ii) {
+		for (std::size_t jj = 0; jj < block_w; ++jj) {
+			double sum = 0.0;
+			for (std::size_t kk = 0; kk < std::min(block_size, n - (a_block_row * block_size)); ++kk) {
+				std::size_t row_a = (i * block_size) + ii;
+				std::size_t col_a = (a_block_row * block_size) + kk;
+				std::size_t row_b = (a_block_row * block_size) + kk;
+				std::size_t col_b = (j * block_size) + jj;
+				if (row_a < n && col_a < n && row_b < n && col_b < n) {
+					sum += a[(row_a * n) + col_a] * b[(row_b * n) + col_b];
+				}
+			}
+			std::size_t row_c = (i * block_size) + ii;
+			std::size_t col_c = (j * block_size) + jj;
+			if (row_c < n && col_c < n) {
+				c[(row_c * n) + col_c] += sum;
+			}
+		}
+	}
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_seq::TestTaskSequential::PreProcessingImpl() {
+	n_ = reinterpret_cast<std::size_t *>(task_data->inputs[0])[0];
+	block_size_ = reinterpret_cast<std::size_t *>(task_data->inputs[3])[0];
+	a_.resize(n_ * n_);
+	b_.resize(n_ * n_);
+	c_.resize(n_ * n_, 0.0);
+	std::copy(reinterpret_cast<double *>(task_data->inputs[1]),
+	reinterpret_cast<double *>(task_data->inputs[1]) + (n_ * n_), a_.begin());
+	std::copy(reinterpret_cast<double *>(task_data->inputs[2]),
+	reinterpret_cast<double *>(task_data->inputs[2]) + (n_ * n_), b_.begin());
+	return true;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_seq::TestTaskSequential::ValidationImpl() {
+	n_ = reinterpret_cast<std::size_t *>(task_data->inputs[0])[0];
+	block_size_ = reinterpret_cast<std::size_t *>(task_data->inputs[3])[0];
+	if (task_data->inputs_count.size() != 3 || task_data->outputs_count.size() != 1) {
+		return false;
+	}
+	if (task_data->inputs_count[1] != n_ * n_ || task_data->inputs_count[0] != n_ * n_) {
+		return false;
+	}
+	return task_data->outputs_count[0] == n_ * n_ && block_size_ > 0;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_seq::TestTaskSequential::RunImpl() {
+	std::size_t num_blocks = (n_ + block_size_ - 1) / block_size_;
+	for (std::size_t step = 0; step < num_blocks; ++step) {
+		for (std::size_t i = 0; i < num_blocks; ++i) {
+			std::size_t a_block_row = (i + step) % num_blocks;
+			for (std::size_t j = 0; j < num_blocks; ++j) {
+				ProcessBlock(a_, b_, c_, i, j, a_block_row, block_size_, n_);
+			}
+		}
+	}
+	return true;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_seq::TestTaskSequential::PostProcessingImpl() {
+	std::ranges::copy(c_, reinterpret_cast<double *>(task_data->outputs[0]));
+	return true;
+}
+
+\end{lstlisting}
+
+\clearpage
+\phantomsection
+\subsection*{Файл ops\_omp.cpp}
+\addcontentsline{toc}{subsection}{Файл ops\_omp.cpp}
+\begin{lstlisting}[language=C++]
+#include "omp/lysov_i_matrix_multiplication_Fox_algorithm/include/ops_omp.hpp"
+
+#include <omp.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <vector>
+
+void lysov_i_matrix_multiplication_fox_algorithm_omp::ProcessBlock(const std::vector<double> &a,
+const std::vector<double> &b, std::vector<double> &c,
+std::size_t i, std::size_t j,
+std::size_t a_block_row, std::size_t block_size,
+std::size_t n) {
+	std::size_t block_h = std::min(block_size, n - (i * block_size));
+	std::size_t block_w = std::min(block_size, n - (j * block_size));
+	std::size_t block_k = std::min(block_size, n - (a_block_row * block_size));
+	
+	double *c_ptr = &c[((i * block_size) * n) + (j * block_size)];
+	const double *a_ptr = &a[((i * block_size) * n) + (a_block_row * block_size)];
+	const double *b_ptr = &b[((a_block_row * block_size) * n) + (j * block_size)];
+	
+	for (std::size_t ii = 0; ii < block_h; ++ii) {
+		for (std::size_t jj = 0; jj < block_w; ++jj) {
+			double sum = 0.0;
+			const double *a_row = a_ptr + (ii * n);
+			const double *b_col = b_ptr + (jj);
+			
+			for (std::size_t kk = 0; kk + 1 < block_k; kk += 2) {
+				sum += a_row[kk] * b_col[kk * n] + a_row[kk + 1] * b_col[(kk + 1) * n];
+			}
+			if (block_k % 2 != 0) {
+				sum += a_row[block_k - 1] * b_col[(block_k - 1) * n];
+			}
+			
+			c_ptr[(ii * n) + jj] += sum;
+		}
+	}
+}
+// Init value
+bool lysov_i_matrix_multiplication_fox_algorithm_omp::TestTaskOpenMP::PreProcessingImpl() {
+	n_ = reinterpret_cast<std::size_t *>(task_data->inputs[0])[0];
+	block_size_ = reinterpret_cast<std::size_t *>(task_data->inputs[3])[0];
+	a_.resize(n_ * n_);
+	b_.resize(n_ * n_);
+	c_.clear();
+	c_.resize(n_ * n_, 0.0);
+	std::copy(reinterpret_cast<double *>(task_data->inputs[1]),
+	reinterpret_cast<double *>(task_data->inputs[1]) + (n_ * n_), a_.begin());
+	std::copy(reinterpret_cast<double *>(task_data->inputs[2]),
+	reinterpret_cast<double *>(task_data->inputs[2]) + (n_ * n_), b_.begin());
+	return true;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_omp::TestTaskOpenMP::ValidationImpl() {
+	n_ = reinterpret_cast<std::size_t *>(task_data->inputs[0])[0];
+	block_size_ = reinterpret_cast<std::size_t *>(task_data->inputs[3])[0];
+	if (task_data->inputs_count.size() != 3 || task_data->outputs_count.size() != 1) {
+		return false;
+	}
+	if (task_data->inputs_count[1] != n_ * n_ || task_data->inputs_count[0] != n_ * n_) {
+		return false;
+	}
+	return task_data->outputs_count[0] == n_ * n_ && block_size_ > 0;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_omp::TestTaskOpenMP::RunImpl() {
+	int num_blocks = static_cast<int>((n_ + block_size_ - 1) / block_size_);
+	#pragma omp parallel
+	for (int step = 0; step < num_blocks; ++step) {
+		#pragma omp for schedule(static) nowait
+		for (int i = 0; i < num_blocks; ++i) {
+			for (int j = 0; j < num_blocks; ++j) {
+				int a_block_row = (i + step) % num_blocks;
+				ProcessBlock(a_, b_, c_, i, j, a_block_row, block_size_, n_);
+			}
+		}
+	}
+	return true;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_omp::TestTaskOpenMP::PostProcessingImpl() {
+	std::ranges::copy(c_, reinterpret_cast<double *>(task_data->outputs[0]));
+	return true;
+}
+
+\end{lstlisting}
+
+\clearpage
+\phantomsection
+\subsection*{Файл ops\_tbb.cpp}
+\addcontentsline{toc}{subsection}{Файл ops\_tbb.cpp}
+\begin{lstlisting}[language=C++]
+#include "tbb/lysov_i_matrix_multiplication_Fox_algorithm/include/ops_tbb.hpp"
+
+#include <tbb/tbb.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <vector>
+
+#include "oneapi/tbb/parallel_for.h"
+void lysov_i_matrix_multiplication_fox_algorithm_tbb::ProcessBlock(const std::vector<double> &a,
+const std::vector<double> &b, std::vector<double> &c,
+std::size_t i, std::size_t j,
+std::size_t a_block_row, std::size_t block_size,
+std::size_t n) {
+	std::size_t block_h = std::min(block_size, n - (i * block_size));
+	std::size_t block_w = std::min(block_size, n - (j * block_size));
+	std::size_t block_k = std::min(block_size, n - (a_block_row * block_size));
+	
+	double *c_ptr = &c[((i * block_size) * n) + (j * block_size)];
+	const double *a_ptr = &a[((i * block_size) * n) + (a_block_row * block_size)];
+	const double *b_ptr = &b[((a_block_row * block_size) * n) + (j * block_size)];
+	
+	for (std::size_t ii = 0; ii < block_h; ++ii) {
+		for (std::size_t jj = 0; jj < block_w; ++jj) {
+			double sum = 0.0;
+			const double *a_row = a_ptr + (ii * n);
+			const double *b_col = b_ptr + (jj);
+			
+			for (std::size_t kk = 0; kk + 1 < block_k; kk += 2) {
+				sum += a_row[kk] * b_col[kk * n] + a_row[kk + 1] * b_col[(kk + 1) * n];
+			}
+			if (block_k % 2 != 0) {
+				sum += a_row[block_k - 1] * b_col[(block_k - 1) * n];
+			}
+			
+			c_ptr[(ii * n) + jj] += sum;
+		}
+	}
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_tbb::TestTaskTBB::PreProcessingImpl() {
+	// Init value for input and output
+	n_ = reinterpret_cast<std::size_t *>(task_data->inputs[0])[0];
+	block_size_ = reinterpret_cast<std::size_t *>(task_data->inputs[3])[0];
+	a_.resize(n_ * n_);
+	b_.resize(n_ * n_);
+	c_.clear();
+	c_.resize(n_ * n_, 0.0);
+	std::copy(reinterpret_cast<double *>(task_data->inputs[1]),
+	reinterpret_cast<double *>(task_data->inputs[1]) + (n_ * n_), a_.begin());
+	std::copy(reinterpret_cast<double *>(task_data->inputs[2]),
+	reinterpret_cast<double *>(task_data->inputs[2]) + (n_ * n_), b_.begin());
+	return true;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_tbb::TestTaskTBB::ValidationImpl() {
+	n_ = reinterpret_cast<std::size_t *>(task_data->inputs[0])[0];
+	block_size_ = reinterpret_cast<std::size_t *>(task_data->inputs[3])[0];
+	if (task_data->inputs_count.size() != 3 || task_data->outputs_count.size() != 1) {
+		return false;
+	}
+	if (task_data->inputs_count[1] != n_ * n_ || task_data->inputs_count[0] != n_ * n_) {
+		return false;
+	}
+	return task_data->outputs_count[0] == n_ * n_ && block_size_ > 0;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_tbb::TestTaskTBB::RunImpl() {
+	const int num_blocks = static_cast<int>((n_ + block_size_ - 1) / block_size_);
+	tbb::parallel_for(0, num_blocks * num_blocks, [&](int index) {
+		int i = index / num_blocks;
+		int j = index % num_blocks;
+		for (int step = 0; step < num_blocks; ++step) {
+			int a_block_row = (i + step) % num_blocks;
+			ProcessBlock(a_, b_, c_, i, j, a_block_row, block_size_, n_);
+		}
+	});
+	
+	return true;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_tbb::TestTaskTBB::PostProcessingImpl() {
+	std::ranges::copy(c_, reinterpret_cast<double *>(task_data->outputs[0]));
+	return true;
+}
+
+\end{lstlisting}
+
+\clearpage
+\phantomsection
+\subsection*{Файл ops\_stl.cpp}
+\addcontentsline{toc}{subsection}{Файл ops\_stl.cpp}
+\begin{lstlisting}[language=C++]
+#include "stl/lysov_i_matrix_multiplication_Fox_algorithm/include/ops_stl.hpp"
+
+#include <algorithm>
+#include <atomic>
+#include <cmath>
+#include <core/util/include/util.hpp>
+#include <cstddef>
+#include <thread>
+#include <vector>
+
+void lysov_i_matrix_multiplication_fox_algorithm_stl::ProcessBlock(const std::vector<double> &a,
+const std::vector<double> &b, std::vector<double> &c,
+std::size_t i, std::size_t j,
+std::size_t a_block_row, std::size_t block_size,
+std::size_t n) {
+	std::size_t block_h = std::min(block_size, n - (i * block_size));
+	std::size_t block_w = std::min(block_size, n - (j * block_size));
+	std::size_t block_k = std::min(block_size, n - (a_block_row * block_size));
+	
+	double *c_ptr = &c[((i * block_size) * n) + (j * block_size)];
+	const double *a_ptr = &a[((i * block_size) * n) + (a_block_row * block_size)];
+	const double *b_ptr = &b[((a_block_row * block_size) * n) + (j * block_size)];
+	
+	for (std::size_t ii = 0; ii < block_h; ++ii) {
+		for (std::size_t jj = 0; jj < block_w; ++jj) {
+			double sum = 0.0;
+			const double *a_row = a_ptr + (ii * n);
+			const double *b_col = b_ptr + (jj);
+			
+			for (std::size_t kk = 0; kk + 1 < block_k; kk += 2) {
+				sum += a_row[kk] * b_col[kk * n] + a_row[kk + 1] * b_col[(kk + 1) * n];
+			}
+			if (block_k % 2 != 0) {
+				sum += a_row[block_k - 1] * b_col[(block_k - 1) * n];
+			}
+			
+			c_ptr[(ii * n) + jj] += sum;
+		}
+	}
+}
+// Init value
+bool lysov_i_matrix_multiplication_fox_algorithm_stl::TestTaskSTL::PreProcessingImpl() {
+	n_ = reinterpret_cast<std::size_t *>(task_data->inputs[0])[0];
+	block_size_ = reinterpret_cast<std::size_t *>(task_data->inputs[3])[0];
+	a_.resize(n_ * n_);
+	b_.resize(n_ * n_);
+	c_.clear();
+	c_.resize(n_ * n_, 0.0);
+	std::copy(reinterpret_cast<double *>(task_data->inputs[1]),
+	reinterpret_cast<double *>(task_data->inputs[1]) + (n_ * n_), a_.begin());
+	std::copy(reinterpret_cast<double *>(task_data->inputs[2]),
+	reinterpret_cast<double *>(task_data->inputs[2]) + (n_ * n_), b_.begin());
+	return true;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_stl::TestTaskSTL::ValidationImpl() {
+	n_ = reinterpret_cast<std::size_t *>(task_data->inputs[0])[0];
+	block_size_ = reinterpret_cast<std::size_t *>(task_data->inputs[3])[0];
+	if (task_data->inputs_count.size() != 3 || task_data->outputs_count.size() != 1) {
+		return false;
+	}
+	if (task_data->inputs_count[1] != n_ * n_ || task_data->inputs_count[0] != n_ * n_) {
+		return false;
+	}
+	return task_data->outputs_count[0] == n_ * n_ && block_size_ > 0;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_stl::TestTaskSTL::RunImpl() {
+	const std::size_t num_blocks = (n_ + block_size_ - 1) / block_size_;
+	
+	std::size_t max_thr = ppc::util::GetPPCNumThreads();
+	if (max_thr == 0) {
+		max_thr = 4;
+	}
+	
+	std::atomic<std::size_t> task_idx{0};
+	
+	auto worker = [&](std::size_t step) {
+		const std::size_t total_tasks = num_blocks * num_blocks;
+		while (true) {
+			std::size_t idx = task_idx.fetch_add(1, std::memory_order_relaxed);
+			if (idx >= total_tasks) {
+				break;
+			}
+			
+			std::size_t i = idx / num_blocks;
+			std::size_t j = idx % num_blocks;
+			std::size_t a_row = (i + step) % num_blocks;
+			
+			ProcessBlock(a_, b_, c_, i, j, a_row, block_size_, n_);
+		}
+	};
+	
+	for (std::size_t step = 0; step < num_blocks; ++step) {
+		task_idx.store(0, std::memory_order_relaxed);
+		const std::size_t threads_to_run = std::min<std::size_t>(max_thr, num_blocks * num_blocks);
+		
+		std::vector<std::thread> pool;
+		pool.reserve(threads_to_run);
+		for (std::size_t t = 0; t < threads_to_run; ++t) {
+			pool.emplace_back(worker, step);
+		}
+		for (auto &th : pool) {
+			th.join();
+		}
+	}
+	return true;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_stl::TestTaskSTL::PostProcessingImpl() {
+	std::ranges::copy(c_, reinterpret_cast<double *>(task_data->outputs[0]));
+	return true;
+}
+
+\end{lstlisting}
+
+\clearpage
+\phantomsection
+\subsection*{Файл ops\_all.cpp}
+\addcontentsline{toc}{subsection}{Файл ops\_all.cpp}
+\begin{lstlisting}[language=C++]
+#include "all/lysov_i_matrix_multiplication_Fox_algorithm/include/ops_all.hpp"
+
+#include <mpi.h>
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+#include <tbb/task_arena.h>
+
+#include <algorithm>
+#include <boost/mpi/collectives.hpp>
+#include <boost/mpi/communicator.hpp>
+#include <boost/mpi/status.hpp>
+#include <cmath>
+#include <cstddef>
+#include <cstring>
+#include <vector>
+
+#include "boost/mpi/collectives/broadcast.hpp"
+#include "boost/mpi/collectives/gather.hpp"
+#include "boost/mpi/collectives/scatter.hpp"
+#include "oneapi/tbb/parallel_for.h"
+#include "oneapi/tbb/task_arena.h"
+int lysov_i_matrix_multiplication_fox_algorithm_mpi_tbb::ComputeProcessGrid(int world_size, std::size_t n) {
+	int q = static_cast<int>(std::floor(std::sqrt(world_size)));
+	while (q > 1 && (world_size % q != 0 || (n % q) != 0)) {
+		--q;
+	}
+	return std::max(q, 1);
+}
+void lysov_i_matrix_multiplication_fox_algorithm_mpi_tbb::ExtractSubmatrixBlock(const std::vector<double>& matrix,
+double* block, int total_columns,
+int block_size, int block_row_index,
+int block_col_index) {
+	const double* src0 =
+	matrix.data() + ((block_row_index * block_size) * total_columns) + (block_col_index * block_size);
+	for (int i = 0; i < block_size; ++i) {
+		std::memcpy(block + (i * block_size), src0 + (i * total_columns), block_size * sizeof(double));
+	}
+}
+
+void lysov_i_matrix_multiplication_fox_algorithm_mpi_tbb::MultiplyMatrixBlocks(const double* a, const double* b,
+double* c, int block_size) {
+	tbb::parallel_for(
+	tbb::blocked_range<int>(0, block_size),
+	[&](const tbb::blocked_range<int>& r) {
+		for (int i = r.begin(); i < r.end(); ++i) {
+			const double* ai = a + (i * block_size);
+			double* ci = c + (i * block_size);
+			for (int k = 0; k < block_size; ++k) {
+				double aik = ai[k];
+				const double* bk = b + (k * block_size);
+				for (int j = 0; j < block_size; ++j) {
+					ci[j] += aik * bk[j];
+				}
+			}
+		}
+	},
+	tbb::auto_partitioner());
+}
+std::vector<double> lysov_i_matrix_multiplication_fox_algorithm_mpi_tbb::ScatterMatrix(const std::vector<double>& m,
+std::size_t n, int q, int k) {
+	std::vector<double> buf(n * n);
+	int idx = 0;
+	for (int br = 0; br < q; ++br) {
+		for (int bc = 0; bc < q; ++bc) {
+			ExtractSubmatrixBlock(m, buf.data() + idx, static_cast<int>(n), k, br, bc);
+			idx += k * k;
+		}
+	}
+	return buf;
+}
+
+std::vector<double> lysov_i_matrix_multiplication_fox_algorithm_mpi_tbb::GatherMatrix(const std::vector<double>& buf,
+std::size_t n, int q, int k) {
+	std::vector<double> c(n * n, 0.0);
+	int idx = 0;
+	for (int br = 0; br < q; ++br) {
+		for (int bc = 0; bc < q; ++bc) {
+			for (int i = 0; i < k; ++i) {
+				double* dest = c.data() + (((br * k) + i) * n) + (bc * k);
+				const double* src = buf.data() + idx + (i * k);
+				std::memcpy(dest, src, k * sizeof(double));
+			}
+			idx += k * k;
+		}
+	}
+	return c;
+}
+void lysov_i_matrix_multiplication_fox_algorithm_mpi_tbb::PerformFoxAlgorithmStep(boost::mpi::communicator& world,
+int rank, int cnt_work_process, int k,
+std::vector<double>& local_a,
+std::vector<double>& local_b,
+std::vector<double>& local_c) {
+	if (cnt_work_process == 1) {
+		MultiplyMatrixBlocks(local_a.data(), local_b.data(), local_c.data(), k);
+		return;
+	}
+	
+	std::vector<double> temp_a(k * k);
+	std::vector<double> temp_b(k * k);
+	int row = rank / cnt_work_process;
+	int col = rank % cnt_work_process;
+	
+	for (int l = 0; l < cnt_work_process; ++l) {
+		if (col == (row + l) % cnt_work_process) {
+			for (int tc = 0; tc < cnt_work_process; ++tc) {
+				if (tc == col) {
+					continue;
+				}
+				int target = (row * cnt_work_process) + tc;
+				world.send(target, 0, local_a.data(), k * k);
+			}
+			temp_a = local_a;
+		} else {
+			int sender = (row * cnt_work_process) + ((row + l) % cnt_work_process);
+			world.recv(sender, 0, temp_a.data(), k * k);
+		}
+		
+		world.barrier();
+		MultiplyMatrixBlocks(temp_a.data(), local_b.data(), local_c.data(), k);
+		int send_to = (((row - 1 + cnt_work_process) % cnt_work_process) * cnt_work_process) + col;
+		int recv_from = (((row + 1) % cnt_work_process) * cnt_work_process) + col;
+		
+		MPI_Sendrecv(local_b.data(), k * k, MPI_DOUBLE, send_to, 0, temp_b.data(), k * k, MPI_DOUBLE, recv_from, 0, world,
+		MPI_STATUS_IGNORE);
+		
+		local_b.swap(temp_b);
+	}
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_mpi_tbb ::TestTaskMPITBB::PreProcessingImpl() {
+	if (world_.rank() == 0) {
+		n_ = reinterpret_cast<std::size_t*>(task_data->inputs[0])[0];
+		block_size_ = reinterpret_cast<std::size_t*>(task_data->inputs[3])[0];
+		elements_ = n_ * n_;
+		a_.resize(elements_);
+		b_.resize(elements_);
+		resultC_.clear();
+		b_.resize(elements_, 0.0);
+		std::copy(reinterpret_cast<double*>(task_data->inputs[1]),
+		reinterpret_cast<double*>(task_data->inputs[1]) + (n_ * n_), a_.begin());
+		std::copy(reinterpret_cast<double*>(task_data->inputs[2]),
+		reinterpret_cast<double*>(task_data->inputs[2]) + (n_ * n_), b_.begin());
+		resultC_.assign(elements_, 0.0);
+	}
+	return true;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_mpi_tbb::TestTaskMPITBB::ValidationImpl() {
+	if (world_.rank() != 0) {
+		return true;
+	}
+	n_ = *reinterpret_cast<std::size_t*>(task_data->inputs[0]);
+	std::size_t total = n_ * n_;
+	if (total == 0) {
+		return false;
+	}
+	auto& ic = task_data->inputs_count;
+	auto& oc = task_data->outputs_count;
+	if (ic.size() != 3 || oc.size() != 1) {
+		return false;
+	}
+	if (ic[0] != total || ic[1] != total || ic[2] != 1) {
+		return false;
+	}
+	if (oc[0] != total) {
+		return false;
+	}
+	auto* ptr_a = reinterpret_cast<double*>(task_data->inputs[1]);
+	auto* ptr_b = reinterpret_cast<double*>(task_data->inputs[2]);
+	return (ptr_a != nullptr && ptr_b != nullptr);
+	;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_mpi_tbb::TestTaskMPITBB::RunImpl() {
+	int rank = world_.rank();
+	int size = world_.size();
+	boost::mpi::broadcast(world_, n_, 0);
+	elements_ = static_cast<int>(n_ * n_);
+	boost::mpi::broadcast(world_, elements_, 0);
+	int q = ComputeProcessGrid(size, n_);
+	int k = static_cast<int>(n_ / q);
+	int process_group = (rank < q * q) ? 1 : MPI_UNDEFINED;
+	MPI_Comm computation_comm = MPI_COMM_NULL;
+	MPI_Comm_split(world_, process_group, rank, &computation_comm);
+	if (process_group == MPI_UNDEFINED) {
+		return true;
+	}
+	boost::mpi::communicator my_comm(computation_comm, boost::mpi::comm_take_ownership);
+	rank = my_comm.rank();
+	std::vector<double> scatter_a(elements_);
+	std::vector<double> scatter_b(elements_);
+	if (rank == 0) {
+		scatter_a = ScatterMatrix(a_, n_, q, k);
+		scatter_b = ScatterMatrix(b_, n_, q, k);
+	}
+	std::vector<double> local_a(k * k);
+	std::vector<double> local_b(k * k);
+	std::vector<double> local_c(k * k, 0.0);
+	boost::mpi::scatter(my_comm, scatter_a, local_a.data(), static_cast<int>(local_a.size()), 0);
+	boost::mpi::scatter(my_comm, scatter_b, local_b.data(), static_cast<int>(local_b.size()), 0);
+	tbb::task_arena arena;
+	arena.execute([&] { PerformFoxAlgorithmStep(my_comm, rank, q, k, local_a, local_b, local_c); });
+	std::vector<double> gathered(elements_);
+	boost::mpi::gather(my_comm, local_c.data(), static_cast<int>(local_c.size()), gathered, 0);
+	
+	if (rank == 0) {
+		resultC_ = GatherMatrix(gathered, n_, q, k);
+	}
+	return true;
+}
+
+bool lysov_i_matrix_multiplication_fox_algorithm_mpi_tbb::TestTaskMPITBB::PostProcessingImpl() {
+	if (world_.rank() == 0) {
+		std::ranges::copy(resultC_, reinterpret_cast<double*>(task_data->outputs[0]));
+	}
+	return true;
+}
+
+\end{lstlisting}
+
+\end{document}
