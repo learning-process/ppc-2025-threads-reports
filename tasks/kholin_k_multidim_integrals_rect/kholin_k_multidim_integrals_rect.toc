@@ -1,0 +1,30 @@
+\babel@toc {russian}{}\relax 
+\contentsline {section}{\numberline {1}ВВЕДЕНИЕ}{2}{}%
+\contentsline {section}{\numberline {2}ОСНОВНАЯ ЧАСТЬ}{3}{}%
+\contentsline {subsection}{\numberline {2.1}Постановка задачи}{3}{}%
+\contentsline {subsubsection}{\numberline {2.1.1}Одномерный случай}{3}{}%
+\contentsline {subsubsection}{\numberline {2.1.2}Многомерный случай}{3}{}%
+\contentsline {subsection}{\numberline {2.2}Описание алгоритма}{4}{}%
+\contentsline {subsection}{\numberline {2.3}Описание схемы параллельного алгоритма}{5}{}%
+\contentsline {subsubsection}{\numberline {2.3.1}OpenMP}{5}{}%
+\contentsline {subsubsection}{\numberline {2.3.2}TBB}{5}{}%
+\contentsline {subsubsection}{\numberline {2.3.3}std::thread}{5}{}%
+\contentsline {subsubsection}{\numberline {2.3.4}MPI + OpenMP}{6}{}%
+\contentsline {subsection}{\numberline {2.4}Описание программной реализации}{7}{}%
+\contentsline {subsubsection}{\numberline {2.4.1}OpenMP}{7}{}%
+\contentsline {subsubsection}{\numberline {2.4.2}TBB}{8}{}%
+\contentsline {subsubsection}{\numberline {2.4.3}std::thread}{9}{}%
+\contentsline {subsubsection}{\numberline {2.4.4}MPI + OpenMP}{11}{}%
+\contentsline {subsection}{\numberline {2.5}Результаты экспериментов}{15}{}%
+\contentsline {subsection}{\numberline {2.6}Выводы из результатов}{16}{}%
+\contentsline {subsubsection}{\numberline {2.6.1}Сравнение технологий}{16}{}%
+\contentsline {subsubsection}{\numberline {2.6.2}Лучшая производительность}{16}{}%
+\contentsline {subsubsection}{\numberline {2.6.3}Обоснование лучшей производительности}{16}{}%
+\contentsline {section}{\numberline {3}ЗАКЛЮЧЕНИЕ}{17}{}%
+\contentsline {section}{\numberline {4}СПИСОК ЛИТЕРАТУРЫ}{18}{}%
+\contentsline {section}{\numberline {5}ПРИЛОЖЕНИЕ}{19}{}%
+\contentsline {subsection}{ПРИЛОЖЕНИЕ А}{19}{}%
+\contentsline {subsection}{ПРИЛОЖЕНИЕ Б}{21}{}%
+\contentsline {subsection}{ПРИЛОЖЕНИЕ В}{23}{}%
+\contentsline {subsection}{ПРИЛОЖЕНИЕ Г}{26}{}%
+\contentsline {subsection}{ПРИЛОЖЕНИЕ Г}{29}{}%

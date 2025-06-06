@@ -1,0 +1,26 @@
+\babel@toc {russian}{}\relax 
+\contentsline {section}{\numberline {1}Введение}{2}{}%
+\contentsline {section}{\numberline {2}Постановка задачи}{4}{}%
+\contentsline {subsection}{\numberline {2.1}Входные данные}{4}{}%
+\contentsline {subsection}{\numberline {2.2}Выходные данные}{4}{}%
+\contentsline {subsection}{\numberline {2.3}Задачи исследования}{4}{}%
+\contentsline {section}{\numberline {3}Описание алгоритма}{5}{}%
+\contentsline {subsection}{\numberline {3.1}Последовательный алгоритм}{5}{}%
+\contentsline {subsection}{\numberline {3.2}Параллельные версии алгоритма}{6}{}%
+\contentsline {subsubsection}{\numberline {3.2.1}Общая схема}{6}{}%
+\contentsline {subsubsection}{\numberline {3.2.2}Ключевые аспекты параллелизации}{6}{}%
+\contentsline {section}{\numberline {4}Описание реализаций}{7}{}%
+\contentsline {subsection}{\numberline {4.1}Последовательная версия}{7}{}%
+\contentsline {subsection}{\numberline {4.2}OpenMP версия}{7}{}%
+\contentsline {subsection}{\numberline {4.3}TBB версия}{8}{}%
+\contentsline {subsection}{\numberline {4.4}STL версия}{9}{}%
+\contentsline {subsection}{\numberline {4.5}Гибридная MPI+OpenMP версия}{10}{}%
+\contentsline {section}{\numberline {5}Результаты экспериментов}{12}{}%
+\contentsline {subsection}{\numberline {5.1}Выводы}{12}{}%
+\contentsline {section}{\numberline {6}Заключение}{14}{}%
+\contentsline {section}{\numberline {7}Приложение}{16}{}%
+\contentsline {subsection}{\numberline {7.1}lopatinMonteCarloSeq.cpp}{16}{}%
+\contentsline {subsection}{\numberline {7.2}lopatinMonteCarloOMP.cpp}{17}{}%
+\contentsline {subsection}{\numberline {7.3}lopatinMonteCarloTBB.cpp}{20}{}%
+\contentsline {subsection}{\numberline {7.4}lopatinMonteCarloSTL.cpp}{22}{}%
+\contentsline {subsection}{\numberline {7.5}lopatinMonteCarloALL.cpp}{25}{}%

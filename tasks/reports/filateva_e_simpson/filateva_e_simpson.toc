@@ -1,0 +1,29 @@
+\babel@toc {russian}{}\relax 
+\contentsline {section}{\numberline {1.}Введение}{3}{section.1}%
+\contentsline {section}{\numberline {2.}Постановка задачи}{4}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Математическая постановка}{4}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Программная постановка задачи}{4}{subsection.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.1}Входные данные}{4}{subsubsection.2.2.1}%
+\contentsline {subsubsection}{\numberline {2.2.2}Выходные данные}{4}{subsubsection.2.2.2}%
+\contentsline {section}{\numberline {3.}Описание метода Симпсона для многомерных интегралов}{5}{section.3}%
+\contentsline {section}{\numberline {4.}Детали реализации и схемы распараллеливания}{6}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Общая структура алгоритма}{6}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Последовательная реализация (SEQ)}{6}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}OpenMP реализация (OMP)}{6}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}TBB реализация}{6}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4.5}STL реализация}{7}{subsection.4.5}%
+\contentsline {subsection}{\numberline {4.6}MPI + TBB реализация (ALL)}{7}{subsection.4.6}%
+\contentsline {section}{\numberline {5.}Эксперименты}{8}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Условия проведения}{8}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Результаты}{8}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Анализ результатов}{8}{subsection.5.3}%
+\contentsline {section}{\numberline {6.}Выводы по результатам экспериментов}{10}{section.6}%
+\contentsline {section}{\numberline {7.}Заключение}{11}{section.7}%
+\contentsline {section}{\numberline {8.}Литература}{12}{section.8}%
+\contentsline {section}{{\cyrillictext \CYRS \cyrp \cyri \cyrs \cyro \cyrk \ \cyrl \cyri \cyrt \cyre \cyrr \cyra \cyrt \cyru \cyrr \cyrery }}{12}{section.8}%
+\contentsline {section}{\numberline {9.}Приложение}{13}{section.9}%
+\contentsline {subsection}{\numberline {9.1}Последовательная реализация (SEQ) - RunImpl}{13}{subsection.9.1}%
+\contentsline {subsection}{\numberline {9.2}OpenMP реализация (OMP) - RunImpl}{14}{subsection.9.2}%
+\contentsline {subsection}{\numberline {9.3}TBB реализация - RunImpl}{15}{subsection.9.3}%
+\contentsline {subsection}{\numberline {9.4}STL реализация - RunImpl и IntegralFunc}{16}{subsection.9.4}%
+\contentsline {subsection}{\numberline {9.5}MPI + TBB реализация (ALL) - RunImpl и IntegralFunc}{17}{subsection.9.5}%
