@@ -1,0 +1,24 @@
+\babel@toc {russian}{}\relax 
+\contentsline {section}{\numberline {1}Постановка задачи}{2}{section.3}%
+\contentsline {section}{\numberline {2}Описание алгоритма}{2}{section.9}%
+\contentsline {section}{\numberline {3}Описание схемы параллельного алгоритма}{3}{section.13}%
+\contentsline {section}{\numberline {4}Описание всех версий реализации}{3}{section.17}%
+\contentsline {subsection}{\numberline {4.1}Последовательная версия (SEQ)}{3}{subsection.18}%
+\contentsline {subsection}{\numberline {4.2}Версия с использованием OpenMP}{3}{subsection.19}%
+\contentsline {subsection}{\numberline {4.3}Версия с использованием Intel TBB}{4}{subsection.20}%
+\contentsline {subsection}{\numberline {4.4}Версия с использованием STL-потоков}{4}{subsection.21}%
+\contentsline {subsection}{\numberline {4.5}Гибридная версия MPI + TBB}{4}{subsection.22}%
+\contentsline {section}{\numberline {5}Результаты экспериментов}{4}{section.27}%
+\contentsline {subsection}{\numberline {5.1}Тестовая конфигурация}{4}{subsection.28}%
+\contentsline {subsection}{\numberline {5.2}Корректность реализации}{4}{subsection.29}%
+\contentsline {subsection}{\numberline {5.3}Производительность}{5}{subsection.30}%
+\contentsline {subsection}{\numberline {5.4}Анализ Perf-метрик}{5}{subsection.32}%
+\contentsline {section}{\numberline {6}Выводы из результатов}{5}{section.33}%
+\contentsline {section}{\numberline {7}Заключение}{5}{section.39}%
+\contentsline {section}{\numberline {8}Список литературы}{6}{section.40}%
+\contentsline {section}{\numberline {A}Приложение: исходные коды реализаций}{7}{appendix.45}%
+\contentsline {subsection}{\numberline {A.1}Последовательная версия}{7}{subsection.46}%
+\contentsline {subsection}{\numberline {A.2}Версия OpenMP}{8}{subsection.104}%
+\contentsline {subsection}{\numberline {A.3}Версия TBB}{9}{subsection.170}%
+\contentsline {subsection}{\numberline {A.4}Версия STL}{10}{subsection.230}%
+\contentsline {subsection}{\numberline {A.5}Гибридная версия MPI+OMP}{11}{subsection.264}%
