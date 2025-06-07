@@ -1,25 +1,51 @@
 \documentclass[12pt]{article}
-\usepackage[T2A]{fontenc}
 \usepackage[utf8]{inputenc}
-\usepackage[english,russian]{babel}
+\usepackage[russian]{babel}
+\usepackage[T1]{fontenc}
 \usepackage{amsmath}
-\usepackage{graphicx}
-\usepackage{listings}
 \usepackage{geometry}
-\usepackage{caption}
+\usepackage{multirow}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{tocloft}
+\usepackage{xcolor}
+\usepackage{listings}
 \usepackage{float}
-\usepackage[hypertexnames=false]{hyperref}
-\usepackage{booktabs}
-\geometry{a4paper, margin=1in}
+\usepackage{longtable}
+
+\geometry{a4paper, left=25mm, right=15mm, top=20mm, bottom=20mm}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=black,
+    pdftitle={Отчет по проекту},
+    pdfauthor={},
+    pdfsubject={Решение СЛАУ методом сопряженных градиентов}
+}
 
 \lstset{
-    basicstyle=\ttfamily\footnotesize,
-    breaklines=true,
-    numbers=left,
-    numberstyle=\tiny,
-    frame=single,
-    captionpos=b
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{blue},
+  commentstyle=\itshape\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=8pt,
+  backgroundcolor=\color{gray!10},
+  showspaces=false,
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  captionpos=b
 }
+
+\renewcommand{\cftsecaftersnum}{.}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\titleformat{\section}{\large\bfseries}{\thesection.}{1em}{}
 
 \begin{document}
 
@@ -54,9 +80,13 @@
     2025
 \end{titlepage}
 
+\thispagestyle{empty}
+\clearpage
+\pagenumbering{arabic} 
+\setcounter{page}{2} 
 \tableofcontents
-\newpage
-
+\clearpage
+\setcounter{page}{3} 
 \section*{Введение}
 
 Решение систем линейных уравнений (СЛАУ) является фундаментальной задачей вычислительной математики. Метод сопряженных градиентов (Conjugate Gradient, CG) — эффективный итерационный алгоритм для решения СЛАУ с симметричными положительно определенными матрицами. Цель работы — реализация и сравнительный анализ различных параллельных версий CG-алгоритма, включая последовательную, OpenMP, TBB, STL и гибридную MPI+TBB реализации. Эксперименты проводились на матрицах размерности до 10,000×10,000 элементов с использованием фреймворка Perf для объективной оценки производительности.
@@ -202,27 +232,6 @@ A\mathbf{x} = \mathbf{b},
     \item Поэлементное сравнение с эталоном (SEQ): максимальное отклонение \(< 10^{-7}\).
 \end{itemize}
 
-\subsection{Производительность}
-
-Результаты замеров времени выполнения (среднее по 10 запускам):
-
-\begin{table}[h]
-\centering
-\caption{Время решения СЛАУ (матрица 10,000×10,000)}
-\label{tab:timings}
-\begin{tabular}{@{}lc@{}}
-\toprule
-\textbf{Версия} & \textbf{Время (с)} \\
-\midrule
-SEQ & 58.7 \\
-STL (8 потоков) & 12.4 \\
-OpenMP (32 потока) & 4.2 \\
-TBB (32 потока) & 3.8 \\
-MPI+TBB (4 узла × 8 потоков) & 1.5 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
 \subsection{Анализ Perf-метрик}
 
 \begin{itemize}
@@ -255,6 +264,8 @@ MPI+TBB (4 узла × 8 потоков) & 1.5 \\
 
 \section{Список литературы}
 \begin{enumerate}
+    \item Корняков К. В., Кустикова В. Д., Мееров И. Б., Сиднев А. А., Сысоев А. В., Шишков А. В. \textit{Инструменты параллельного программирования в системах с общей памятью}, 2010. 272 с.
+    \item Воеводин В.В., Воеводин Вл.В. \textit{Параллельные вычисления} – СПб.: БХВ-Петербург, 2002.
     \item Golub G.H., Van Loan C.F. Matrix Computations. — JHU Press, 2013.
     \item Shewchuk J.R. An Introduction to the Conjugate Gradient Method. — Carnegie Mellon University, 1994.
     \item Reinders J. Intel Threading Building Blocks. — O’Reilly, 2007.
