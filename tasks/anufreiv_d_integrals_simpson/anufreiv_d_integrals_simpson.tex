@@ -806,7 +806,7 @@ double IntegralsSimpsonOmp::RecursiveSimpsonSum(int dim_index, std::vector<int>&
     std::vector<double> coords(dimension_);
     for (int d = 0; d < dimension_; ++d) {
       coords[d] = a_[d] + idx[d] * steps[d];
-      coeff *= SimpsonCoeff(idx[d], n_[d]); // Нужна видимость SimpsonCoeff
+      coeff *= SimpsonCoeff(idx[d], n_[d]);
     }
     return coeff * FunctionN(coords);
   }
