@@ -715,7 +715,7 @@ bool IntegralsSimpsonAll::RunImpl() {
 
 \subsection{ops\_seq.cpp}
 \begin{lstlisting}[language=C++, caption=Ключевые функции из ops\_seq.cpp, basicstyle=\ttfamily\tiny]
-namespace { // Анонимное пространство имен из ops_seq.cpp
+namespace {
 int SimpsonCoeff(int i, int n) {
   if (i == 0 || i == n) {
     return 1;
@@ -761,7 +761,7 @@ double IntegralsSimpsonSequential::RecursiveSimpsonSum(int dim_index, std::vecto
     std::vector<double> coords(dimension_);
     for (int d = 0; d < dimension_; ++d) {
       coords[d] = a_[d] + idx[d] * steps[d];
-      coeff *= SimpsonCoeff(idx[d], n_[d]); // Используется SimpsonCoeff из анонимного пространства
+      coeff *= SimpsonCoeff(idx[d], n_[d]);
     }
     return coeff * FunctionN(coords);
   }
@@ -796,19 +796,11 @@ bool IntegralsSimpsonSequential::RunImpl() {
 \newpage
 \subsection{ops\_omp.cpp}
 \begin{lstlisting}[language=C++, caption=Функция RunImpl из ops\_omp.cpp, basicstyle=\ttfamily\tiny]
-// SimpsonCoeff и FunctionN аналогичны ops_seq.cpp
-// RecursiveSimpsonSum также аналогична ops_seq.cpp (но вызывается из параллельного контекста)
 
 namespace anufriev_d_integrals_simpson_omp {
 
-// ... FunctionN, RecursiveSimpsonSum (как в seq, но в этом namespace) ...
-// Предполагается, что SimpsonCoeff доступна (например, из анонимного пространства имен выше)
-
 double IntegralsSimpsonOmp::RecursiveSimpsonSum(int dim_index, std::vector<int>& idx,
                                                 const std::vector<double>& steps) const {
-  // Реализация идентична IntegralsSimpsonSequential::RecursiveSimpsonSum
-  // ... (код опущен для краткости, см. ops_seq.cpp) ...
-  // Важно: эта функция должна быть const и thread-safe, что она и есть.
   if (dim_index == dimension_) {
     double coeff = 1.0;
     std::vector<double> coords(dimension_);
@@ -837,14 +829,14 @@ bool IntegralsSimpsonOmp::RunImpl() {
 
 #pragma omp parallel
   {
-    std::vector<int> idx(dimension_); // Локальная для каждого потока
+    std::vector<int> idx(dimension_);
 
 #pragma omp for reduction(+ : total_sum)
     for (int i0 = 0; i0 <= n_[0]; ++i0) {
       idx[0] = i0;
 
       if (dimension_ == 1) {
-        double coeff = SimpsonCoeff(idx[0], n_[0]); // Нужна видимость SimpsonCoeff
+        double coeff = SimpsonCoeff(idx[0], n_[0]);
         std::vector<double> coords = {a_[0] + (idx[0] * steps[0])};
         total_sum += coeff * FunctionN(coords);
       } else {
@@ -867,12 +859,8 @@ bool IntegralsSimpsonOmp::RunImpl() {
 \newpage
 \subsection{ops\_tbb.cpp}
 \begin{lstlisting}[language=C++, caption=Функция RunImpl из ops\_tbb.cpp, basicstyle=\ttfamily\tiny]
-// SimpsonCoeff и FunctionN аналогичны ops_seq.cpp
 
 namespace anufriev_d_integrals_simpson_tbb {
-
-// ... FunctionN (как в seq, но в этом namespace) ...
-// Предполагается, что SimpsonCoeff доступна
 
 bool IntegralsSimpsonTBB::RunImpl() {
   std::vector<double> steps(dimension_);
@@ -881,28 +869,23 @@ bool IntegralsSimpsonTBB::RunImpl() {
 
   for (int i = 0; i < dimension_; i++) {
     if (n_[i] == 0) {
-      return false; // Или другая обработка ошибки
+      return false;
     }
     steps[i] = (b_[i] - a_[i]) / n_[i];
     coeff_mult *= steps[i] / 3.0;
     size_t points_in_dim = static_cast<size_t>(n_[i]) + 1;
-    // Проверка на переполнение total_points
     if (total_points > std::numeric_limits<size_t>::max() / points_in_dim) {
       return false; 
     }
     total_points *= points_in_dim;
   }
 
-  // Если total_points == 0 (например, если dimension_ == 0 изначально, хотя это должно быть обработано)
-  // или если какой-то n_[i] был некорректен, но это должно отсечься раньше
-  if (dimension_ > 0 && total_points == 0 && n_[0] >=0 ) { // более точная проверка, если n_ пуст или dimension = 0
-      // Случай, когда dimension > 0, но total_points стало 0 из-за n_[i] = -1 (что не должно проходить preproc)
-      // Если total_points валидно 0 (например, dimension_ = 0), то sum будет 0.
+  if (dimension_ > 0 && total_points == 0 && n_[0] >=0 ) {
   }
 
 
   double total_sum = tbb::parallel_reduce(
-      tbb::blocked_range<size_t>(0, total_points), 0.0, // total_points может быть 0
+      tbb::blocked_range<size_t>(0, total_points), 0.0,
       [&](const tbb::blocked_range<size_t>& r, double running_sum) {
         std::vector<double> coords(dimension_);
         std::vector<int> current_idx(dimension_);
@@ -918,7 +901,7 @@ bool IntegralsSimpsonTBB::RunImpl() {
             current_k /= points_in_this_dim;
 
             coords[dim] = a_[dim] + current_idx[dim] * steps[dim];
-            current_coeff_prod *= SimpsonCoeff(current_idx[dim], n_[dim]); // Нужна видимость SimpsonCoeff
+            current_coeff_prod *= SimpsonCoeff(current_idx[dim], n_[dim]);
           }
           running_sum += current_coeff_prod * FunctionN(coords);
         }
@@ -935,78 +918,62 @@ bool IntegralsSimpsonTBB::RunImpl() {
 \newpage
 \subsection{ops\_stl.cpp}
 \begin{lstlisting}[language=C++, caption=Ключевые функции из ops\_stl.cpp, basicstyle=\ttfamily\tiny]
-// SimpsonCoeff и FunctionN аналогичны ops_seq.cpp
-// RecursiveSimpsonSum также аналогична ops_seq.cpp
 
 namespace anufriev_d_integrals_simpson_stl {
 
-// ... FunctionN, RecursiveSimpsonSum (как в seq, но в этом namespace) ...
-// Предполагается, что SimpsonCoeff доступна
-
-// Вспомогательная структура, если используется (в коде не показана, но подразумевается DistributeIterations)
 struct IterationRange { int start; int end; }; 
 
 void IntegralsSimpsonSTL::ThreadTaskRunner(int start_idx, int end_idx, 
                                            const std::vector<double>& steps,
                                            double* partial_sum_output) {
   double local_partial_sum = 0.0;
-  *partial_sum_output = 0.0; // Инициализация перед циклом
+  *partial_sum_output = 0.0;
 
   for (int i = start_idx; i < end_idx; ++i) {
-    // if (this->dimension_ < 1) { return; } // Проверка dimension_ лучше делать до вызова
-    std::vector<int> local_idx(dimension_); // Должна быть размерность this->dimension_
+    // if (this->dimension_ < 1) { return; }
+    std::vector<int> local_idx(dimension_);
     local_idx[0] = i;
     local_partial_sum += RecursiveSimpsonSum(1, local_idx, steps);
   }
   *partial_sum_output = local_partial_sum;
 }
 
-// DetermineNumThreads и DistributeIterations - вспомогательные, их код можно добавить при желании
-// ...
-
 bool IntegralsSimpsonSTL::RunImpl() {
   if (dimension_ < 1) { return false; }
-  if (n_.empty() || n_[0] < 0) { return false; } // n_[0] должен быть >=0 и четным
+  if (n_.empty() || n_[0] < 0) { return false; }
 
   std::vector<double> steps(dimension_);
   for (int i = 0; i < dimension_; i++) {
-    if (n_[i] <= 0 || (n_[i] % 2) != 0) { return false; } // n_[i] д.б. >0 и четным
+    if (n_[i] <= 0 || (n_[i] % 2) != 0) { return false; }
     steps[i] = (b_[i] - a_[i]) / n_[i];
   }
 
   const int total_iterations_dim0 = n_[0] + 1;
   unsigned int num_actual_threads = DetermineNumThreads(total_iterations_dim0);
   if (num_actual_threads == 0 && total_iterations_dim0 > 0) { num_actual_threads = 1;}
-  // Если total_iterations_dim0 == 0 (например n_[0] = -1, что не пройдет валидацию), 
-  // то num_actual_threads будет 0.
 
   std::vector<double> partial_sums(num_actual_threads, 0.0);
   std::vector<std::thread> threads;
 
-  if (total_iterations_dim0 > 0) { // Только если есть что считать
+  if (total_iterations_dim0 > 0) {
     if (num_actual_threads == 1) {
         ThreadTaskRunner(0, total_iterations_dim0, steps, partial_sums.data());
-    } else if (num_actual_threads > 1) { // > 1, не != 0
+    } else if (num_actual_threads > 1) {
         std::vector<IterationRange> ranges = DistributeIterations(total_iterations_dim0, num_actual_threads);
-        // ... (код по созданию потоков и join) ...
-        // Коррекция размера partial_sums, если ranges.size() < num_actual_threads
         if (ranges.size() < num_actual_threads && !ranges.empty()) {
             partial_sums.resize(ranges.size());
         } else if (ranges.empty() && num_actual_threads > 0) {
-            // Этого случая не должно быть, если total_iterations_dim0 > 0 и num_actual_threads > 0
             partial_sums.clear(); 
         }
         
-        threads.resize(ranges.size()); // Важно, чтобы размер вектора потоков соответствовал ranges
+        threads.resize(ranges.size());
         for (size_t i = 0; i < ranges.size(); ++i) {
             const auto& range = ranges[i];
-            // partial_sums должен иметь соответствующий размер
             threads[i] = std::thread(&IntegralsSimpsonSTL::ThreadTaskRunner, this, 
                                      range.start, range.end, std::cref(steps), &partial_sums[i]);
         }
     }
   }
-
 
   for (auto& th : threads) {
     if (th.joinable()) {
@@ -1032,11 +999,10 @@ bool IntegralsSimpsonSTL::RunImpl() {
 \newpage
 \subsection{ops\_all.cpp (MPI+TBB)}
 \begin{lstlisting}[language=C++, caption=Ключевые функции из ops\_all.cpp, basicstyle=\ttfamily\tiny]
-// Вспомогательные структуры и функции из анонимного пространства имен
 namespace { 
 // struct ParsedRootInput { ... };
 // ParsedRootInput ParseAndValidateOnRoot(...) { ... }
-// int SimpsonCoeff(int i, int n) { ... } // Такая же, как в seq
+// int SimpsonCoeff(int i, int n) { ... }
 // struct RunParameters { ... };
 // RunParameters CalculateRunParameters(...) { ... }
 // struct MpiWorkDistribution { ... };
@@ -1045,18 +1011,15 @@ namespace {
 
 namespace anufriev_d_integrals_simpson_all {
 
-// ... FunctionN (как в seq, но в этом namespace) ...
-// Предполагается, что SimpsonCoeff доступна из анонимного пространства имен
-
 bool IntegralsSimpsonAll::PreProcessingImpl() {
   int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  ParsedRootInput parsed_input_data; // Определена в анонимном namespace
+  ParsedRootInput parsed_input_data;
   int root_preprocessing_status = 0;
 
   if (rank == 0) {
-    parsed_input_data = ParseAndValidateOnRoot(task_data); // Вызов функции из anonymous namespace
+    parsed_input_data = ParseAndValidateOnRoot(task_data);
     root_preprocessing_status = parsed_input_data.parse_successful ? 1 : 0;
   }
 
@@ -1071,23 +1034,20 @@ bool IntegralsSimpsonAll::PreProcessingImpl() {
   MPI_Bcast(&func_code_, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
   if (dimension_ == 0) {
-    result_ = 0.0; // Для всех процессов, хотя важно только для rank 0
+    result_ = 0.0;
     return true;
   }
 
-  // Рассылка векторов a_, b_, n_
   a_.resize(dimension_); b_.resize(dimension_); n_.resize(dimension_);
   if (rank == 0) {
     a_ = parsed_input_data.a_vec;
     b_ = parsed_input_data.b_vec;
     n_ = parsed_input_data.n_vec;
-    // func_code_ уже установлен и разослан, если dimension_ !=0
   }
   MPI_Bcast(a_.data(), dimension_, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   MPI_Bcast(b_.data(), dimension_, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   MPI_Bcast(n_.data(), dimension_, MPI_INT, 0, MPI_COMM_WORLD);
-  
-  // ... (проверки n_ на других процессах) ...
+
   result_ = 0.0;
   return true;
 }
@@ -1103,15 +1063,15 @@ bool IntegralsSimpsonAll::RunImpl() {
   }
 
   std::vector<double> steps; 
-  RunParameters params = CalculateRunParameters(dimension_, n_, a_, b_, steps); // Из anonymous namespace
+  RunParameters params = CalculateRunParameters(dimension_, n_, a_, b_, steps);
   if (!params.success) return false;
-  if (params.total_points == 0 && dimension_ > 0) { // Если total_points == 0, но не из-за dim_ == 0
-      if(rank == 0) result_ = 0.0; // Например, если n_[i] были некорректны
-      return true; // Или false, если это ошибка
+  if (params.total_points == 0 && dimension_ > 0) {
+      if(rank == 0) result_ = 0.0;
+      return true;
   }
 
 
-  MpiWorkDistribution dist = DistributeWorkAmongMpiRanks(params.total_points, rank, world_size); // Из anonymous
+  MpiWorkDistribution dist = DistributeWorkAmongMpiRanks(params.total_points, rank, world_size);
 
   double local_sum = 0.0;
   if (dist.num_points_for_this_rank > 0) {
@@ -1129,7 +1089,7 @@ bool IntegralsSimpsonAll::RunImpl() {
               current_idx[dim_idx] = static_cast<int>(index_in_this_dim);
               current_k_val /= points_in_this_dim;
               coords[dim_idx] = a_[dim_idx] + current_idx[dim_idx] * steps[dim_idx];
-              current_coeff_prod *= SimpsonCoeff(current_idx[dim_idx], n_[dim_idx]); // Из anonymous
+              current_coeff_prod *= SimpsonCoeff(current_idx[dim_idx], n_[dim_idx]);
             }
             running_sum += current_coeff_prod * FunctionN(coords);
           }
