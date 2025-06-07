@@ -424,7 +424,7 @@ void IntegralsSimpsonSTL::ThreadTaskRunner(int start_idx, int end_idx,
       *partial_sum_output = 0.0; return;
     }
     std::vector<int> local_idx(dimension_);
-    local_idx[0] = i; // Итерация по первой размерности
+    local_idx[0] = i;
     local_partial_sum += RecursiveSimpsonSum(1, local_idx, steps);
   }
   *partial_sum_output = local_partial_sum;
