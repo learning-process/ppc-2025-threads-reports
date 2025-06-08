@@ -1,0 +1,653 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{geometry}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+\geometry{a4paper, margin=1in}
+
+\lstset{
+	basicstyle=\ttfamily\footnotesize,
+	breaklines=true,
+	numbers=left,
+	numberstyle=\tiny,
+	frame=single,
+	captionpos=b
+}
+
+\lstset{
+	basicstyle=\ttfamily,
+	tabsize=2,
+	showtabs=false,
+	keepspaces=true
+}
+
+\begin{document}
+\begin{titlepage}
+	\begin{center}
+		\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\[0.5cm]
+		\textbf{Федеральное государственное автономное образовательное учреждение высшего образования} \\[0.5cm]
+		\textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»} \\[0.5cm]
+		Институт информационных технологий, математики и механики \\
+		\vfill
+		{\Large
+			\textbf{Отчёт по лабораторной работе на тему:} \\[0.5cm]
+			\textbf{Линейная фильтрация изображений (вертикальное разбиение). Ядро Гаусса 3x3} \\
+		}
+		\vfill
+		\begin{flushright}
+			Выполнил: студент группы 3822Б1ПР1 \\
+			Рамс Сергей \\
+			\vspace{1cm}
+			Преподаватель: \\
+			Сысоев А.В., доцент, кандидат технических наук \\
+		\end{flushright}
+		\vfill
+		Нижний Новгород \\
+		2025
+	\end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+
+Линейная фильтрация изображений является одной из базовых задач цифровой обработки изображений. Она применяется для шумоподавления, сглаживания, повышения контраста, а также выделения ключевых особенностей изображения.
+Одним из наиболее широко используемых фильтров является фильтр Гаусса, который эффективно сглаживает изображения, сохраняя при этом основные структурные детали за счет использования функции нормального распределения в качестве ядра. 
+В данной работе рассматривается задача реализации линейной фильтрации с использованием ядра Гаусса размером 3×3.
+
+
+Цель работы заключается в рассмотрении различных методов распараллеливания алгоритма: OpenMP, TBB (Intel Threading Building Blocks), а также многопоточность с использованием стандартной библиотеки C++ (\texttt{std::thread}) для систем с общей памятью.
+Кроме того, исследуется гибридный подход, сочетающий MPI и \texttt{std::thread} для обеспечения параллелизма как между узлами, так и внутри каждого узла.
+Основной целью является проведение сравнительного анализа производительности и масштабируемости указанных решений.
+
+\section{Постановка задачи}
+
+Цель работы — реализация и анализ алгоритмов линейной фильтрации изображений с применением свёртки с ядром Гаусса $3 \times 3$.
+Задачи:
+\begin{itemize}
+	\item Реализовать последовательную версию алгоритма линейной фильтрации с ядром Гаусса $3 \times 3$.
+	\item Разработать параллельные версии с использованием следующих технологий:
+	\begin{itemize}
+		\item OpenMP
+		\item Intel TBB
+		\item std::thread
+		\item MPI + std::thread
+	\end{itemize}
+	\item Обеспечить проверку корректности выходных изображений (сравнение с эталоном).
+	\item Сравнить производительность и масштабируемость различных реализаций.
+\end{itemize}
+
+Ожидаемый результат --- определение наиболее эффективной реализации линейной фильтрации по критериям времени выполнения и простоты масштабирования на многопроцессорных системах.
+
+\section{Описание алгоритма}
+
+Пусть задано изображение $\texttt{input}(x, y)$ размера $H \times W$, где каждый пиксель представлен значением яркости от $0$ до $255$. Задача заключается в применении к изображению двумерного ядра Гаусса размером $3 \times 3$, определённого следующим образом:
+\[
+kernel = \frac{1}{16}
+\begin{pmatrix}
+	1 & 2 & 1 \\
+	2 & 4 & 2 \\
+	1 & 2 & 1
+\end{pmatrix}
+\]
+
+Фильтрация осуществляется путём свёртки ядра с исходным изображением:
+\[
+\texttt{output}(x, y) = \sum_{i=-1}^{1} \sum_{j=-1}^{1} \texttt{kernel}(i+1, j+1) \cdot \texttt{input}(x+i, y+j)
+\]
+
+Граничные пиксели (при $x = 0$, $x = H - 1$, $y = 0$, $y = W - 1$) при фильтрации остаются неизменными.
+
+\section{Описание схемы распараллеливания}
+
+Поскольку операция является локальной — выходное значение пикселя зависит только от его ближайших соседей — алгоритм допускает эффективное распараллеливание. В данной схеме используется вертикальное разбиение изображения по столбцам.
+
+\begin{itemize}
+	\item Изображение размера \(H \times W\) разбивается на вертикальные полосы (поддиапазоны столбцов).	
+	\item Каждый поток (или задача) обрабатывает все строки в одном вертикальном блоке.
+	\item Для каждой точки в блоке выполняется свёртка с ядром Гаусса \(3\times3\).
+	\item Результаты записываются в соответствующую область выходного изображения.
+\end{itemize}
+
+\section{Описание всех версий реализации}
+
+\subsection{Последовательная версия}
+
+В последовательной реализации алгоритма линейной фильтрации с ядром Гаусса \(3\times3\) изображение обрабатывается при помощи двух вложенных циклов, проходящих через все внутренние пиксели (индексы \(x = 1 \ldots W-1\), \(y = 1 \ldots H-1\)). Для каждого пикселя в цикле по трём цветовым каналам вычисляется новая яркость посредством свёртки соседних пикселей с ядром Гаусса размером \(3\times3\). Значения яркости вычисляются по формуле:
+\[
+\texttt{output}_{(y \times W + x) \times 3 + c} = \texttt{clamp}\left(\texttt{round}\left(\sum_{\Delta y=-1}^{1}\sum_{\Delta x=-1}^{1} \texttt{input}_{((y+\Delta y)\times W + (x+\Delta x))\times 3 + c}\times \texttt{kernel}[\Delta y,\Delta x]\right)\right).
+\]
+
+
+\begin{lstlisting}[language=C++, caption=Фрагмент SEQ-реализации]
+for (std::size_t x = 1; x < width_ - 1; x++) {
+	for (std::size_t y = 1; y < height_ - 1; y++) {
+		for (std::size_t i = 0; i < 3; i++) {
+			output_[((y * width_ + x) * 3) + i] = std::clamp(static_cast<int>(std::round(
+#define INNER(Y_SHIFT, X_SHIFT) \
+			input_[((((y + (Y_SHIFT)) * width_) + x + (X_SHIFT)) * 3) + i] * kernel_[4 + (3 * (Y_SHIFT)) + (X_SHIFT)]
+#define OUTER(Y) (INNER(Y, -1) + INNER(Y, 0) + INNER(Y, 1))
+			(OUTER(-1) + OUTER(0) + OUTER(1))
+#undef OUTER
+#undef INNER
+			)),
+			0, 255);
+		}
+	}
+}
+\end{lstlisting}
+
+\subsection{Версия с использованием OMP}
+
+OpenMP-версия реализуется путём добавления одной директивы параллельного выполнения перед внешним циклом по координате \(x\):
+\begin{verbatim}
+	#pragma omp parallel for
+\end{verbatim}
+
+Компилятор автоматически разбивает изображение по вертикали, распределяя полосы между потоками. Циклы по \(y\) и по трём каналам вложены внутрь параллельного цикла. Распределение нагрузки между потоками осуществляется автоматически. Значения яркости вычисляются аналогично эталонной реализации, при этом промежуточные переменные локальны для каждого потока.
+
+
+\subsection{Версия с использованием TBB}
+
+В реализации с использованием библиотеки Intel TBB применяется подход, аналогичный OpenMP. Для распараллеливания диапазона по ширине используется функция \texttt{tbb::parallel\_for}, которая автоматически балансирует нагрузку между потоками. Пул потоков создается с помощью \texttt{tbb::task\_arena}. Изображение делится на вертикальные полосы, и каждый поток выполняет свёртку с ядром Гаусса для пикселей внутри своей полосы. Внутренние циклы остаются идентичными последовательной реализации, а синхронизация потоков не требуется, так как данные полос не пересекаются.
+
+\subsection{Версия с использованием STL-потоков}
+
+Подход с использованием \texttt{std::thread} аналогичен подходу с применением TBB: изображение вертикально разбивается на полосы по ширине, и каждая из них обрабатывается отдельно. Каждый поток последовательно выполняет свёртку с ядром Гаусса для пикселей своей полосы, вычисляя значения аналогично последовательной версии. Доступ к данным независим, поэтому синхронизация потоков не требуется.
+
+\subsection{Гибридная версия MPI + STL}
+
+Гибридная реализация объединяет MPI и STL для вертикального разбиения и параллельной обработки:
+
+\begin{enumerate}
+	\item Изображение вертикально разделяется между MPI-процессами с помощью \texttt{mpi::scatterv}. Каждый MPI-процесс получает диапазон своих полос.
+
+	\item Внутри каждого MPI-процесса локальная полоса обрабатывается параллельно с помощью STL. Используется вызов \texttt{std::thread} для обработки пикселей локального диапазона.
+
+	\item После завершения локальной обработки MPI-процессы объединяют результаты посредством операции сбора (\texttt{mpi::gatherv}), формируя полное изображение.
+\end{enumerate}
+
+Такой подход обеспечивает эффективное распараллеливание задачи как между процессами (через MPI), так и внутри процесса --- между потоками.
+
+\section{Результаты экспериментов}
+
+Для анализа эффективности и точности реализации параллельного алгоритма были проведены следующие испытания:
+
+\begin{enumerate}
+	\item \textbf{Функциональное тестирование:}
+	\begin{itemize}
+		\item Проверка правильности выполнения алгоритма на заранее подготовленных тест-кейсах.
+		\item Были задействованы различные входные данные.
+	\end{itemize}
+	
+	\item \textbf{Оценка производительности:}
+	\begin{itemize}
+		\item Измерение времени исполнения алгоритма при последовательной и параллельной обработке.
+		\item Анализ различий во времени выполнения и выходных данных для оценки эффективности параллельной реализации.
+		\item Каждый тест запускался 10 раз для получения усреднённых и достоверных показателей.
+	\end{itemize}
+\end{enumerate}
+
+\textbf{Проверка корректности:}
+Достоверность результатов подтверждалась следующими методами:
+\begin{enumerate}
+	\item Сопоставление полученных значений с эталонными результатами из набора тестов.
+	\item Сравнение выходных данных параллельной и последовательной версий алгоритма.
+	\item Многократные запуски экспериментов с целью выявления возможных нестабильностей и случайных отклонений.
+\end{enumerate}
+
+\subsection{Результаты оценки производительности}
+
+Замеры проводились на процессоре AMD Ryzen 7 5800H (8 ядер, 16 потоков, 4.4 ГГц).
+
+\begin{itemize}
+\item OMP/TBB/STL --- 8 потоков;
+\item MPI+STL --- 2 процесса + 4 потока;
+\end{itemize}
+
+Для всех экспериментов использовался единый тестовый массив пикселей размером $3123 \times 3123$ (всего $29\,259\,387$ элементов --- количество пикселей * 3).
+
+Корректность результатов проверялась сравнением с эталонным значением.
+
+\begin{table}[H]
+	\centering
+	\begin{tabular}{|l|l|l|}
+		\hline
+		\textbf{Версия} & \textbf{Время (Pipeline), мс} & \textbf{Время (Task), мс} \\
+		\hline
+		SEQ & $2\,049$ & $1\,895$ \\
+		OMP & 421 & 279 \\
+		TBB & 440 & 275 \\
+		STL & 437 & 291 \\
+		MPI + STL & $1\,598$ & $1\,512$ \\
+		\hline
+	\end{tabular}
+	\caption{Замеры производительности}
+\end{table}
+
+\subsection{Выводы из результатов}
+
+\begin{itemize}
+	\item Параллелизация даёт значительное ускорение по сравнению с последовательной (SEQ) версией:
+	
+		Все параллельные версии на потоках (OMP, TBB, STL) превосходят SEQ по времени выполнения примерно в 6.7 раз.
+		
+	\item MPI + STL дало ускорение всего в 1.25 раза.
+	
+		Это вызвано следующими причинами:
+		
+		\begin{itemize}
+			\item Вертикальное разбиение требует разослать данные между MPI-процессами $H$ раз (количество строк в изображении)
+			\item Межпроцессное взаимодействие имеет очень большие накладные расходы
+		\end{itemize}
+\end{itemize}
+
+\newpage
+
+\section{Список литературы}
+\begin{enumerate}
+	\item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks}. — Нижний Новгород, 2007.
+	
+	\item OpenMP Architecture Review Board. OpenMP Specifications. \\ 
+	\url{https://www.openmp.org/specifications/}
+	
+	\item Intel® oneAPI Threading Building Blocks (TBB) Documentation. \\ 
+	\url{https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb}
+	
+	\item C++ Standard Library Reference — cppreference.com. \\ 
+	\url{https://en.cppreference.com/w/}
+	
+	\item Boost C++ Libraries. Boost.MPI Documentation. \\ 
+	\url{https://www.boost.org/doc/libs/release/libs/mpi/}
+\end{enumerate}
+
+\newpage
+
+\section{Приложение}
+
+\subsection{seq.cpp}
+
+\begin{lstlisting}[language=C++]
+#include "seq/rams_s_vertical_gauss_3x3/include/main.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+bool rams_s_vertical_gauss_3x3_seq::TaskSequential::PreProcessingImpl() {
+	width_ = task_data->inputs_count[0];
+	height_ = task_data->inputs_count[1];
+	input_ = std::vector<uint8_t>(task_data->inputs[0], task_data->inputs[0] + (height_ * width_ * 3));
+	auto *k = reinterpret_cast<float *>(task_data->inputs[1]);
+	kernel_ = std::vector<float>(k, k + task_data->inputs_count[2]);
+	
+	output_ = std::vector<uint8_t>(input_);
+	
+	return true;
+}
+
+bool rams_s_vertical_gauss_3x3_seq::TaskSequential::ValidationImpl() {
+	return task_data->inputs_count[2] == 9 &&
+	(task_data->inputs_count[0] * task_data->inputs_count[1] * 3) == task_data->outputs_count[0];
+}
+
+bool rams_s_vertical_gauss_3x3_seq::TaskSequential::RunImpl() {
+	if (height_ == 0 || width_ == 0) {
+		return true;
+	}
+	for (std::size_t x = 1; x < width_ - 1; x++) {
+		for (std::size_t y = 1; y < height_ - 1; y++) {
+			for (std::size_t i = 0; i < 3; i++) {
+				output_[((y * width_ + x) * 3) + i] = std::clamp(static_cast<int>(std::round(
+#define INNER(Y_SHIFT, X_SHIFT) \
+				input_[((((y + (Y_SHIFT)) * width_) + x + (X_SHIFT)) * 3) + i] * kernel_[4 + (3 * (Y_SHIFT)) + (X_SHIFT)]
+#define OUTER(Y) (INNER(Y, -1) + INNER(Y, 0) + INNER(Y, 1))
+				(OUTER(-1) + OUTER(0) + OUTER(1))
+#undef OUTER
+#undef INNER
+				)),
+				0, 255);
+			}
+		}
+	}
+	return true;
+}
+
+bool rams_s_vertical_gauss_3x3_seq::TaskSequential::PostProcessingImpl() {
+	std::ranges::copy(output_, task_data->outputs[0]);
+	return true;
+}
+\end{lstlisting}
+
+\subsection{omp.cpp}
+
+\begin{lstlisting}[language=C++]
+#include "omp/rams_s_vertical_gauss_3x3/include/main.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+bool rams_s_vertical_gauss_3x3_omp::TaskOmp::PreProcessingImpl() {
+	width_ = task_data->inputs_count[0];
+	height_ = task_data->inputs_count[1];
+	input_ = std::vector<uint8_t>(task_data->inputs[0], task_data->inputs[0] + (height_ * width_ * 3));
+	auto *k = reinterpret_cast<float *>(task_data->inputs[1]);
+	kernel_ = std::vector<float>(k, k + task_data->inputs_count[2]);
+	
+	output_ = std::vector<uint8_t>(input_);
+	
+	return true;
+}
+
+bool rams_s_vertical_gauss_3x3_omp::TaskOmp::ValidationImpl() {
+	return task_data->inputs_count[2] == 9 &&
+	(task_data->inputs_count[0] * task_data->inputs_count[1] * 3) == task_data->outputs_count[0];
+}
+
+bool rams_s_vertical_gauss_3x3_omp::TaskOmp::RunImpl() {
+	if (height_ == 0 || width_ == 0) {
+		return true;
+	}
+	int right = static_cast<int>(width_) - 1;
+	#pragma omp parallel for
+	for (int x = 1; x < right; x++) {
+		for (std::size_t y = 1; y < height_ - 1; y++) {
+			for (std::size_t i = 0; i < 3; i++) {
+				output_[((y * width_ + x) * 3) + i] = std::clamp(static_cast<int>(std::round(
+#define INNER(Y_SHIFT, X_SHIFT) \
+				input_[((((y + (Y_SHIFT)) * width_) + x + (X_SHIFT)) * 3) + i] * kernel_[4 + (3 * (Y_SHIFT)) + (X_SHIFT)]
+#define OUTER(Y) (INNER(Y, -1) + INNER(Y, 0) + INNER(Y, 1))
+				(OUTER(-1) + OUTER(0) + OUTER(1))
+#undef OUTER
+#undef INNER
+				)),
+				0, 255);
+			}
+		}
+	}
+	return true;
+}
+
+bool rams_s_vertical_gauss_3x3_omp::TaskOmp::PostProcessingImpl() {
+	std::ranges::copy(output_, task_data->outputs[0]);
+	return true;
+}
+\end{lstlisting}
+
+\subsection{tbb.cpp}
+
+\begin{lstlisting}[language=C++]
+#include "tbb/rams_s_vertical_gauss_3x3/include/main.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+#include "oneapi/tbb/parallel_for.h"
+#include "oneapi/tbb/task_arena.h"
+
+bool rams_s_vertical_gauss_3x3_tbb::TaskTbb::PreProcessingImpl() {
+	width_ = task_data->inputs_count[0];
+	height_ = task_data->inputs_count[1];
+	input_ = std::vector<uint8_t>(task_data->inputs[0], task_data->inputs[0] + (height_ * width_ * 3));
+	auto *k = reinterpret_cast<float *>(task_data->inputs[1]);
+	kernel_ = std::vector<float>(k, k + task_data->inputs_count[2]);
+	
+	output_ = std::vector<uint8_t>(input_);
+	
+	return true;
+}
+
+bool rams_s_vertical_gauss_3x3_tbb::TaskTbb::ValidationImpl() {
+	return task_data->inputs_count[2] == 9 &&
+	(task_data->inputs_count[0] * task_data->inputs_count[1] * 3) == task_data->outputs_count[0];
+}
+
+bool rams_s_vertical_gauss_3x3_tbb::TaskTbb::RunImpl() {
+	if (height_ == 0 || width_ == 0) {
+		return true;
+	}
+	oneapi::tbb::task_arena arena(ppc::util::GetPPCNumThreads());
+	arena.execute([&] {
+		oneapi::tbb::parallel_for(std::size_t(1), std::size_t(width_ - 1), [&](std::size_t x) {
+			for (std::size_t y = 1; y < height_ - 1; y++) {
+				for (std::size_t i = 0; i < 3; i++) {
+					output_[((y * width_ + x) * 3) + i] = std::clamp(static_cast<int>(std::round(
+#define INNER(Y_SHIFT, X_SHIFT) \
+					input_[((((y + (Y_SHIFT)) * width_) + x + (X_SHIFT)) * 3) + i] * kernel_[4 + (3 * (Y_SHIFT)) + (X_SHIFT)]
+#define OUTER(Y) (INNER(Y, -1) + INNER(Y, 0) + INNER(Y, 1))
+					(OUTER(-1) + OUTER(0) + OUTER(1))
+#undef OUTER
+#undef INNER
+					)),
+					0, 255);
+				}
+			}
+		});
+	});
+	return true;
+}
+
+bool rams_s_vertical_gauss_3x3_tbb::TaskTbb::PostProcessingImpl() {
+	std::ranges::copy(output_, task_data->outputs[0]);
+	return true;
+}
+\end{lstlisting}
+
+\subsection{stl.cpp}
+
+\begin{lstlisting}[language=C++]
+#include "stl/rams_s_vertical_gauss_3x3/include/main.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <thread>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+bool rams_s_vertical_gauss_3x3_stl::TaskStl::PreProcessingImpl() {
+	width_ = task_data->inputs_count[0];
+	height_ = task_data->inputs_count[1];
+	input_ = std::vector<uint8_t>(task_data->inputs[0], task_data->inputs[0] + (height_ * width_ * 3));
+	auto *k = reinterpret_cast<float *>(task_data->inputs[1]);
+	kernel_ = std::vector<float>(k, k + task_data->inputs_count[2]);
+	
+	output_ = std::vector<uint8_t>(input_);
+	
+	return true;
+}
+
+bool rams_s_vertical_gauss_3x3_stl::TaskStl::ValidationImpl() {
+	return task_data->inputs_count[2] == 9 &&
+	(task_data->inputs_count[0] * task_data->inputs_count[1] * 3) == task_data->outputs_count[0];
+}
+
+bool rams_s_vertical_gauss_3x3_stl::TaskStl::RunImpl() {
+	if (height_ == 0 || width_ == 0) {
+		return true;
+	}
+	const std::size_t num_threads = std::min(std::size_t(ppc::util::GetPPCNumThreads()), std::size_t(width_));
+	std::vector<std::thread> threads(num_threads);
+	for (std::size_t thread_i = 0; thread_i < num_threads; thread_i++) {
+		threads[thread_i] = std::thread([&, thread_i] {
+			std::size_t amount = (width_ / num_threads) + (thread_i < width_ % num_threads ? 1 : 0);
+			std::size_t left = ((width_ / num_threads) * thread_i) + std::min(width_ % num_threads, thread_i);
+			std::size_t right = std::min(left + amount, std::size_t(width_) - 1);
+			for (std::size_t x = std::max(left, std::size_t(1)); x < right; x++) {
+				for (std::size_t y = 1; y < height_ - 1; y++) {
+					for (std::size_t i = 0; i < 3; i++) {
+						output_[((y * width_ + x) * 3) + i] = std::clamp(static_cast<int>(std::round(
+#define INNER(Y_SHIFT, X_SHIFT) \
+						input_[((((y + (Y_SHIFT)) * width_) + x + (X_SHIFT)) * 3) + i] * kernel_[4 + (3 * (Y_SHIFT)) + (X_SHIFT)]
+#define OUTER(Y) (INNER(Y, -1) + INNER(Y, 0) + INNER(Y, 1))
+						(OUTER(-1) + OUTER(0) + OUTER(1))
+#undef OUTER
+#undef INNER
+						)),
+						0, 255);
+					}
+				}
+			}
+		});
+	}
+	for (std::size_t thread_i = 0; thread_i < num_threads; thread_i++) {
+		threads[thread_i].join();
+	}
+	return true;
+}
+
+bool rams_s_vertical_gauss_3x3_stl::TaskStl::PostProcessingImpl() {
+	std::ranges::copy(output_, task_data->outputs[0]);
+	return true;
+}
+\end{lstlisting}
+
+\subsection{mpi+stl.cpp}
+
+\begin{lstlisting}[language=C++]
+#include "all/rams_s_vertical_gauss_3x3/include/main.hpp"
+
+#include <algorithm>
+#include <boost/serialization/vector.hpp>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <thread>
+#include <vector>
+
+#include "boost/mpi/collectives/broadcast.hpp"
+#include "boost/mpi/collectives/gatherv.hpp"
+#include "boost/mpi/collectives/scatterv.hpp"
+#include "core/util/include/util.hpp"
+
+bool rams_s_vertical_gauss_3x3_all::TaskAll::PreProcessingImpl() {
+	if (world_.rank() == 0) {
+		width_ = task_data->inputs_count[0];
+		height_ = task_data->inputs_count[1];
+		input_ = std::vector<uint8_t>(task_data->inputs[0], task_data->inputs[0] + (height_ * width_ * 3));
+		auto *k = reinterpret_cast<float *>(task_data->inputs[1]);
+		kernel_ = std::vector<float>(k, k + task_data->inputs_count[2]);
+		
+		output_ = std::vector<uint8_t>(input_);
+	}
+	
+	return true;
+}
+
+bool rams_s_vertical_gauss_3x3_all::TaskAll::ValidationImpl() {
+	return world_.rank() != 0 ||
+	(task_data->inputs_count[2] == 9 &&
+	(task_data->inputs_count[0] * task_data->inputs_count[1] * 3) == task_data->outputs_count[0]);
+}
+
+bool rams_s_vertical_gauss_3x3_all::TaskAll::RunImpl() {
+	boost::mpi::broadcast(world_, height_, 0);
+	boost::mpi::broadcast(world_, width_, 0);
+	boost::mpi::broadcast(world_, kernel_, 0);
+	
+	if (height_ < 3 || width_ < 3) {
+		return true;
+	}
+	
+	std::size_t world_size = std::min(std::size_t(world_.size()), std::size_t(width_) - 2);
+	if (std::size_t(world_.rank()) >= world_size) {
+		world_.split(1);
+		return true;
+	}
+	auto group = world_.split(0);
+	std::size_t avg_to_send = width_ / world_size;
+	std::size_t extra_to_send = width_ % world_size;
+	std::vector<int> sendcounts(world_size);
+	std::vector<int> recvcounts(world_size);
+	std::vector<int> displs(world_size, 0);
+	for (std::size_t i = 0; i < world_size; i++) {
+		int padding = [&] {
+			if (i != 0 && i != world_size - 1) {
+				return 2;
+			}
+			return world_size == 1 ? 0 : 1;
+		}();
+		sendcounts[i] = static_cast<int>(avg_to_send + (i < extra_to_send ? 1 : 0) + padding) * 3;
+		recvcounts[i] = static_cast<int>(avg_to_send + (i < extra_to_send ? 1 : 0) + padding - 2) * 3;
+		if (i > 0) {
+			displs[i] = displs[i - 1] + sendcounts[i - 1] - 2 * 3;
+		}
+	}
+	
+	int local_width = sendcounts[group.rank()] / 3;
+	std::vector<uint8_t> local_input(local_width * height_ * 3);
+	std::vector<uint8_t> local_output(local_width * height_ * 3);
+	
+	for (std::size_t y = 0; y < height_; y++) {
+		boost::mpi::scatterv(group, input_.data() + (y * width_ * 3), sendcounts, displs,
+		local_input.data() + (y * local_width * 3), local_width * 3, 0);
+	}
+	
+	/////
+	
+	const std::size_t num_threads = std::min(ppc::util::GetPPCNumThreads(), local_width);
+	std::vector<std::thread> threads(num_threads);
+	for (std::size_t thread_i = 0; thread_i < num_threads; thread_i++) {
+		threads[thread_i] = std::thread([&, thread_i] {
+			std::size_t amount = (local_width / num_threads) + (thread_i < local_width % num_threads ? 1 : 0);
+			std::size_t left = ((local_width / num_threads) * thread_i) + std::min(local_width % num_threads, thread_i);
+			std::size_t right = std::min(left + amount, std::size_t(local_width) - 1);
+			for (std::size_t x = std::max(left, std::size_t(1)); x < right; x++) {
+				for (std::size_t y = 1; y < height_ - 1; y++) {
+					for (std::size_t i = 0; i < 3; i++) {
+						local_output[((y * local_width + x) * 3) + i] = std::clamp(static_cast<int>(std::round(
+#define INNER(Y_SHIFT, X_SHIFT) \
+						local_input[((((y + (Y_SHIFT)) * local_width) + x + (X_SHIFT)) * 3) + i] * kernel_[4 + (3 * (Y_SHIFT)) + (X_SHIFT)]
+#define OUTER(Y) (INNER(Y, -1) + INNER(Y, 0) + INNER(Y, 1))
+						(OUTER(-1) + OUTER(0) + OUTER(1))
+#undef OUTER
+#undef INNER
+						)),
+						0, 255);
+					}
+				}
+			}
+		});
+	}
+	for (std::size_t thread_i = 0; thread_i < num_threads; thread_i++) {
+		threads[thread_i].join();
+	}
+	
+	/////
+	
+	int local_out_width = recvcounts[group.rank()];
+	for (std::size_t y = 1; y < height_ - 1; y++) {
+		boost::mpi::gatherv(group, local_output.data() + ((y * local_width + 1) * 3), local_out_width,
+		output_.data() + ((y * width_ + 1) * 3), recvcounts, 0);
+	}
+	
+	return true;
+}
+
+bool rams_s_vertical_gauss_3x3_all::TaskAll::PostProcessingImpl() {
+	if (world_.rank() == 0) {
+		std::ranges::copy(output_, task_data->outputs[0]);
+	}
+	return true;
+}
+\end{lstlisting}
+
+\end{document}
