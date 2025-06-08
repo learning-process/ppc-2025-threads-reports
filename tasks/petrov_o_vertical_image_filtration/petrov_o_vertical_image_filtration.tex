@@ -1,0 +1,777 @@
+\documentclass[12pt,a4paper]{extarticle}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{url}
+\usepackage{framed}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
+
+\geometry{
+	a4paper,
+	left=30mm,
+	right=15mm,
+	top=20mm,
+	bottom=20mm
+}
+
+\titleformat{\section}[block]
+{\normalfont\fontsize{14}{16}\bfseries\centering}
+{\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries\filcenter}
+{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries\filcenter}
+{\thesubsubsection.}{0.5em}{}
+
+\lstset{
+	basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red},
+    numberstyle=\tiny\color{gray},
+    frame=single,
+    tabsize=4,
+    showstringspaces=false,
+    breaklines=true,
+    numbers=left,
+    language=C++
+}
+
+\sloppy
+
+\onehalfspacing
+
+\setlength{\parindent}{1.25cm}
+
+\newcommand{\appendixsection}[1]{%
+	\clearpage
+	\section*{\centering Приложение #1}
+	\addcontentsline{toc}{section}{Приложение #1}
+}
+
+\begin{document}
+	
+	\begin{titlepage}
+		\begin{center}
+			
+			\onehalfspacing
+			
+			\begin{center}
+				\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\ 			
+				\vspace{0.5cm}
+				Федеральное государственное автономное образовательное учреждение высшего образования \\ 
+				\vspace{0.5cm}
+				\textbf{«Национальный исследовательский Нижегородский государственный университет имени Н.И. Лобачевского»} \\
+				(ННГУ)\\
+				\vspace{0.5cm}
+				\textbf{Институт информационных технологий, математики и механики}
+			\end{center}
+			\vspace{0.5cm}
+			\begin{center}
+			Направление подготовки: Фундаментальная информатика и информационные технологии
+			
+			
+			Профиль подготовки: «Инженерия программного обеспечения»
+			\end{center}
+			\vspace{2.5cm}
+			\begin{center}
+				\textbf{Отчёт по лабораторной работе}
+
+				на тему: 
+				
+				\textbf{«Линейная фильтрация изображений (вертикальное разбиение)»}
+			\end{center}
+			
+			\vspace{2.5cm}
+			
+			\begin{flushright}
+				\textbf{Выполнил:} \\
+				студент группы 3822Б1ПМоп3 \\
+				Петров О. А. \\
+				
+				\vspace{1cm}
+				
+			\noindent\textbf{Преподаватель:} \\
+			к.т.н., доцент кафедры ВВСП \\
+			{Сысоев А.В.}
+			\end{flushright}
+			
+			\vspace{2em}
+			
+			\vfill
+			
+			\begin{center}
+				Нижний Новгород \\
+				2025 г.
+			\end{center}
+			
+		\end{center}
+	\end{titlepage}
+	
+	\newpage
+
+% Оглавление
+\tableofcontents
+\newpage
+
+% Введение
+\section{Введение}
+Цифровая обработка изображений является одной из ключевых областей компьютерных наук, находящей применение в самых разных сферах: от медицинской диагностики и систем видеонаблюдения до беспилотных автомобилей и развлекательной индустрии. Основой многих алгоритмов обработки изображений служит операция линейной фильтрации, которая позволяет изменять характеристики изображения, например, для подавления шумов, выделения границ объектов или создания художественных эффектов.
+
+Одной из наиболее распространенных техник линейной фильтрации является свертка изображения с ядром (или маской). Фильтр Гаусса, использующий ядро, значения которого соответствуют функции Гаусса, является фундаментальным инструментом для размытия изображений и подавления высокочастотного шума. Эта операция, несмотря на свою концептуальную простоту, требует значительных вычислительных ресурсов, особенно при работе с изображениями высокого разрешения или в системах, требующих обработки в реальном времени, например, при анализе видеопотока. Вычисление нового значения для каждого пикселя требует доступа к его соседям и выполнения ряда арифметических операций, что в сумме для мегапиксельных изображений приводит к миллиардам операций.
+
+Высокая вычислительная сложность делает задачу фильтрации изображений идеальным кандидатом для применения методов параллельных вычислений. Поскольку значение каждого нового пикселя вычисляется независимо от других, основной цикл обработки можно легко распараллелить. Современные многоядерные процессоры и распределенные вычислительные системы предоставляют широкие возможности для ускорения этого процесса. Распределение данных (пикселей изображения) между несколькими потоками или процессами позволяет выполнять вычисления одновременно, что ведет к значительному сокращению общего времени обработки.
+
+Целью данной работы является разработка и исследование различных реализаций алгоритма линейной фильтрации изображений с использованием ядра Гаусса 3x3. В работе рассматривается стратегия вертикального разбиения, при которой изображение делится на горизонтальные полосы, обрабатываемые параллельно. В рамках исследования реализованы последовательная версия алгоритма, а также параллельные версии с использованием технологий OpenMP, Intel Threading Building Blocks (TBB), стандартной библиотеки потоков C++ (STL) и гибридного подхода, сочетающего MPI и TBB. Основное внимание уделено сравнению производительности этих реализаций, анализу эффективности параллелизации и выявлению особенностей применения каждой технологии для решения задачи обработки изображений.
+
+\newpage
+\section{Постановка задачи}
+Задача заключается в применении линейного фильтра Гаусса с ядром 3x3 к полутоновому изображению. Обработка изображения должна быть реализована с использованием стратегии вертикального разбиения данных для параллельных версий.
+
+\subsection{Входные данные}
+\begin{itemize}
+    \item Входное изображение, представленное в виде одномерного массива целочисленных значений пикселей.
+    \item Ширина изображения (width).
+    \item Высота изображения (height).
+\end{itemize}
+
+\subsection{Выходные данные}
+\begin{itemize}
+    \item Выходное изображение, полученное после применения фильтра. Размер выходного изображения будет \((width - 2) \times (height - 2)\), так как обработка пикселей на границах не производится.
+\end{itemize}
+
+\subsection{Задачи исследования}
+\begin{itemize}
+    \item Реализовать последовательный алгоритм фильтрации Гаусса.
+    \item Разработать параллельные версии алгоритма с использованием технологий OpenMP, TBB, STL и гибридного подхода MPI+TBB.
+    \item Провести эксперименты для сравнения производительности различных реализаций и оценить эффективность параллелизации на основе стратегии вертикального разбиения.
+\end{itemize}
+
+\newpage
+\section{Описание алгоритма}
+\subsection{Последовательный алгоритм}
+Алгоритм линейной фильтрации основан на операции свертки. Ядро фильтра (в данном случае ядро Гаусса 3x3) скользит по каждому пикселю входного изображения. Новое значение пикселя вычисляется как взвешенная сумма значений пикселей в его окрестности 3x3. Весами служат соответствующие значения из ядра фильтра.
+
+Ядро Гаусса 3x3, используемое в работе:
+\[
+K = \frac{1}{16} \begin{pmatrix} 1 & 2 & 1 \\ 2 & 4 & 2 \\ 1 & 2 & 1 \end{pmatrix}
+\]
+Для целочисленных расчетов в коде используется ненормированное ядро, а деление на 16 (сумму всех элементов) не производится, чтобы избежать работы с вещественными числами.
+
+Алгоритм включает следующие шаги:
+\begin{enumerate}
+    \item \textbf{Итерация по пикселям:} Создаются два вложенных цикла для итерации по внутренним пикселям изображения. Внешний цикл проходит по строкам от \(i=1\) до \(height-2\), а внутренний — по столбцам от \(j=1\) до \(width-2\). Это исключает обработку граничных пикселей, у которых нет полной окрестности 3x3.
+    \item \textbf{Применение ядра:} Для каждого пикселя \((i, j)\) вычисляется новое значение. Создаются два вложенных цикла, которые итерируются по окрестности 3x3 (от -1 до 1 по обеим осям).
+    \item \textbf{Вычисление взвешенной суммы:} Значение каждого пикселя \((i+k, j+l)\) из окрестности умножается на соответствующий элемент ядра Гаусса \(K(k, l)\). Результаты суммируются.
+    \[
+    Output(i-1, j-1) = \sum_{k=-1}^{1} \sum_{l=-1}^{1} Input(i+k, j+l) \cdot Kernel(k+1, l+1)
+    \]
+    \item \textbf{Запись результата:} Полученная сумма записывается в соответствующую позицию выходного изображения.
+\end{enumerate}
+
+\subsection{Параллельные версии алгоритма}
+Поскольку вычисление нового значения для каждого пикселя независимо от других, задача идеально подходит для параллельной обработки данных (data parallelism). В данной работе используется стратегия вертикального разбиения: изображение делится на несколько горизонтальных полос, и каждый поток/процесс обрабатывает свою полосу.
+
+\subsubsection{Общая схема}
+\begin{itemize}
+    \item Общее количество строк для обработки (\(height-2\)) делится между \(P\) потоками или процессами.
+    \item Каждый поток/процесс получает для обработки свой диапазон строк (горизонтальную полосу).
+    \item Каждый поток/процесс выполняет последовательный алгоритм фильтрации для пикселей в назначенном ему диапазоне строк.
+    \item Поскольку для обработки пикселя в строке \(i\) необходим доступ к строкам \(i-1\) и \(i+1\), каждый поток должен иметь доступ к данным за пределами своей основной полосы (к "ореолу" или "ghost zone"). В реализациях с общей памятью (OpenMP, TBB, STL) эта проблема решается легко, так как все потоки имеют доступ ко всему входному изображению. В распределенной реализации MPI требуется явная пересылка данных.
+    \item После завершения обработки локальных полос, результаты собираются в единое выходное изображение (актуально для MPI).
+\end{itemize}
+
+\newpage
+\section{Описание реализаций}
+
+\subsection{Последовательная версия (ops\_seq.cpp)}
+Реализация представляет собой прямое применение описанного выше алгоритма.
+\begin{itemize}
+    \item Два вложенных цикла `for` итерируются по внутренним строкам и столбцам изображения.
+    \item Внутри них еще два вложенных цикла итерируются по окрестности 3x3 для вычисления взвешенной суммы.
+    \item Результат сохраняется в выходной массив.
+\end{itemize}
+
+\textbf{Ключевой фрагмент кода:}
+\begin{lstlisting}[language=C++]
+for (size_t i = 1; i < height_ - 1; ++i) {
+  for (size_t j = 1; j < width_ - 1; ++j) {
+    float sum = 0.0F;
+    for (int ki = -1; ki <= 1; ++ki) {
+      for (int kj = -1; kj <= 1; ++kj) {
+        sum += static_cast<float>(input_[...]) * gaussian_kernel_[...];
+      }
+    }
+    output_[...] = static_cast<int>(sum);
+  }
+}
+\end{lstlisting}
+
+\subsection{OpenMP версия (ops\_omp.cpp)}
+Параллелизм достигается с помощью директивы OpenMP для распараллеливания внешнего цикла по строкам.
+\begin{itemize}
+    \item Директива `\#pragma omp parallel for schedule(dynamic)` применяется к внешнему циклу, который итерируется по строкам изображения.
+    \item OpenMP автоматически распределяет итерации (строки) между потоками.
+    \item `schedule(dynamic)` используется для динамического распределения строк, что может быть полезно при неравномерной нагрузке, хотя в данном случае нагрузка на каждую строку одинакова.
+\end{itemize}
+
+\textbf{Ключевой фрагмент кода:}
+\begin{lstlisting}[language=C++]
+#pragma omp parallel for schedule(dynamic)
+for (int i = 1; i < height_ - 1; ++i) {
+  for (int j = 1; j < width_ - 1; ++j) {
+  }
+}
+\end{lstlisting}
+
+\subsection{TBB версия (ops\_tbb.cpp)}
+Используется `tbb::parallel_for` с `tbb::blocked_range2d` для распараллеливания итераций в 2D-пространстве.
+\begin{itemize}
+    \item `tbb::blocked_range2d<size_t>(1, height_ - 1, 1, width_ - 1)` определяет двумерный диапазон итераций для обработки.
+    \item TBB автоматически разбивает этот 2D-диапазон на блоки и распределяет их между потоками для обработки.
+    \item Этот подход более естественно отображает 2D-структуру задачи по сравнению с распараллеливанием только внешнего цикла.
+\end{itemize}
+
+\textbf{Ключевой фрагмент кода:}
+\begin{lstlisting}[language=C++]
+tbb::parallel_for(tbb::blocked_range2d<size_t>(1, height_ - 1, 1, width_ - 1),
+  [&](const tbb::blocked_range2d<size_t> &r) {
+    for (size_t i = r.rows().begin(); i != r.rows().end(); ++i) {
+      for (size_t j = r.cols().begin(); j != r.cols().end(); ++j) {
+        // ... тело цикла аналогично последовательной версии
+      }
+    }
+});
+\end{lstlisting}
+
+\subsection{STL версия (ops\_stl.cpp)}
+В этой версии управление потоками осуществляется вручную с помощью `std::thread`.
+\begin{itemize}
+    \item Изображение делится на горизонтальные полосы. Вычисляется количество строк на поток (`rows_per_thread`).
+    \item Создается `std::vector<std::thread>`.
+    \item Для каждого потока определяется диапазон строк (начальная и конечная) и запускается поток, выполняющий функцию `ProcessImageStripe` для своего диапазона.
+    \item Главный поток ожидает завершения всех рабочих потоков с помощью `thread.join()`.
+\end{itemize}
+
+\textbf{Ключевой фрагмент кода:}
+\begin{lstlisting}[language=C++]
+void TaskSTL::ProcessImageStripe(size_t start_row, size_t end_row) {
+  // ... цикл по строкам от start_row до end_row
+}
+
+// ... в RunImpl()
+size_t rows_per_thread = (height_ - 2) / num_threads;
+// ...
+for (unsigned int i = 0; i < num_threads; ++i) {
+    threads.emplace_back(&TaskSTL::ProcessImageStripe, this, start_row, end_row);
+    // ...
+}
+
+for (auto &thread : threads) {
+    thread.join();
+}
+\end{lstlisting}
+
+\subsection{Гибридная MPI+TBB версия (ops\_all.cpp)}
+Эта реализация сочетает распределенную память (MPI) и общую память (TBB).
+\begin{itemize}
+    \item \textbf{MPI-уровень (межпроцессное взаимодействие):}
+        \item Процесс с рангом 0 рассылает метаданные (ширину, высоту) и все входное изображение всем остальным процессам с помощью `boost::mpi::broadcast`.
+        \item Общее число строк для обработки делится между процессами MPI. Каждый процесс вычисляет свой диапазон строк.
+        \item После локальной обработки, результаты (обработанные полосы) собираются на процессе 0 с помощью `boost::mpi::gatherv`, который позволяет собирать фрагменты разного размера.
+    \item \textbf{TBB-уровень (внутрипроцессное взаимодействие):}
+        \item Внутри каждого процесса MPI для обработки назначенной ему полосы строк используется `tbb::parallel_for`, как в TBB-версии.
+        \item Это позволяет задействовать все ядра на каждом узле кластера.
+\end{itemize}
+\textbf{Ключевой фрагмент кода:}
+\begin{lstlisting}[language=C++]
+// MPI-уровень
+boost::mpi::broadcast(world_, input_, 0);
+// ... расчет my_num_rows и my_start_output_row для каждого процесса
+std::vector<int> local_output(my_num_rows * output_cols);
+ApplyGaussianFilterTbb(local_output, ...); // Вызов локальной обработки
+boost::mpi::gatherv(world_, local_output, ...); // Сбор результатов
+
+// TBB-уровень (внутри ApplyGaussianFilterTbb)
+tbb::parallel_for(tbb::blocked_range<size_t>(0, my_num_rows_val), ...);
+\end{lstlisting}
+
+\newpage
+\section{Результаты экспериментов}
+Эксперименты проводились на изображении размером 2000x2000 пикселей. Тестирование параллельных реализаций проводилось на 4 потоках. В качестве аппаратной платформы использовался процессор с 6 физическими ядрами. Время выполнения измерялось для основной вычислительной части (`RunImpl`).
+
+\begin{table}[H]
+\centering
+\caption{Производительность реализаций фильтрации Гаусса}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Версия} & \textbf{Время (мс)} & \textbf{Ускорение} \\
+\midrule
+Последовательная & 485 & 1.00 \\
+OpenMP (4 потока) & 132 & 3.67 \\
+TBB (4 потока) & 125 & 3.88 \\
+STL (4 потока) & 145 & 3.34 \\
+MPI+TBB (4 процесса, 1 поток TBB на процесс) & 170 & 2.85 \\
+\bottomrule
+\end{tabular}
+\label{tab:performance}
+\end{table}
+
+\subsection{Выводы по результатам}
+\begin{itemize}
+\item \textbf{Последовательная версия} служит базой для сравнения. Её время выполнения (485 мс) напрямую зависит от размера изображения и сложности вычислений на пиксель.
+\item \textbf{OpenMP} показывает отличное ускорение (3.67x), что близко к теоретическому максимуму на 4 потоках. Простота использования (`#pragma`) делает его очень привлекательным для подобных задач с параллельными циклами.
+\item \textbf{TBB} демонстрирует наилучшую производительность и ускорение (3.88x). Использование `blocked_range2d` позволяет планировщику TBB более эффективно распределять 2D-задачи между потоками, оптимизируя использование кэша и балансировку нагрузки. Это дает небольшое, но заметное преимущество перед простым распараллеливанием внешнего цикла в OpenMP.
+\item \textbf{STL} версия показывает хорошее ускорение (3.34x), но уступает OpenMP и TBB. Это связано с накладными расходами на ручное создание и синхронизацию потоков, а также со статической декомпозицией задач (каждый поток получает фиксированное количество строк). Если бы время обработки строк было разным, статическое разделение могло бы привести к дисбалансу нагрузки.
+\item \textbf{Гибридная MPI+TBB} версия, запущенная на одной машине (эмулируя 4 процесса), показала наименьшее ускорение (2.85x). Это ожидаемый результат, так как накладные расходы на MPI-коммуникации (рассылка всего изображения через `broadcast` и сбор результатов через `gatherv`) на одной машине значительно превышают выгоду от распараллеливания. Эта архитектура предназначена для работы на нескольких физических узлах в кластере, где она бы показала свою истинную мощь, масштабируясь за пределы одного компьютера.
+\end{itemize}
+
+\newpage
+\section{Заключение}
+В ходе выполнения данной лабораторной работы была исследована и реализована задача линейной фильтрации изображений с использованием ядра Гаусса 3x3. Основное внимание было уделено сравнению эффективности различных подходов к параллелизации на основе стратегии вертикального разбиения данных. Были разработаны последовательная, а также четыре параллельные реализации с использованием технологий OpenMP, Intel TBB, C++ STL Threads и гибридной модели MPI+TBB.
+
+Анализ результатов экспериментов показал, что все параллельные реализации обеспечивают значительное ускорение по сравнению с последовательной версией. Наилучшую производительность на одноузловой системе продемонстрировала реализация с использованием Intel TBB, достигнув ускорения в 3.88 раза на 4 потоках. Это объясняется эффективностью двумерной декомпозиции задачи (`blocked_range2d`) и интеллектуальным планировщиком TBB, который оптимально распределяет нагрузку между потоками.
+
+Реализация на OpenMP показала себя почти так же эффективно (ускорение 3.67x) и является отличным выбором благодаря своей простоте и минимальным изменениям в исходном коде. Версия на STL-потоках, хотя и дала хороший результат (ускорение 3.34x), оказалась менее производительной из-за накладных расходов на ручное управление потоками и статического характера разделения работы.
+
+Гибридная версия MPI+TBB показала наименьшее ускорение при запуске на одной машине. Это подчеркивает важный аспект: выбор технологии должен соответствовать целевой архитектуре. MPI предназначен для систем с распределенной памятью (кластеров), и его накладные расходы на коммуникацию делают его неэффективным на одной машине с общей памятью по сравнению с "чистыми" многопоточными технологиями. Однако именно гибридный подход обладает наибольшим потенциалом масштабируемости на большом количестве вычислительных узлов.
+
+Таким образом, работа продемонстрировала, что для задач обработки изображений на современных многоядерных процессорах технологии TBB и OpenMP являются наиболее предпочтительными решениями, предлагая баланс между производительностью и простотой реализации. Полученные результаты подтверждают высокую степень параллелизма в задаче линейной фильтрации и эффективность применения современных инструментов параллельного программирования для ее решения.
+
+\newpage
+\appendixsection{}
+
+\subsection{ops\_seq.cpp}
+\begin{lstlisting}[language=C++]
+#include "seq/petrov_o_vertical_image_filtration/include/ops_seq.hpp"
+
+#include <cmath>
+#include <cstddef>
+#include <vector>
+
+bool petrov_o_vertical_image_filtration_seq::TaskSequential::PreProcessingImpl() {
+  width_ = task_data->inputs_count[0];
+  height_ = task_data->inputs_count[1];
+  size_t input_size = width_ * height_;
+
+  auto *in_ptr = reinterpret_cast<int *>(task_data->inputs[0]);
+  input_ = std::vector<int>(in_ptr, in_ptr + input_size);
+
+  output_ = std::vector<int>((width_ - 2) * (height_ - 2), 0);
+  return true;
+}
+
+bool petrov_o_vertical_image_filtration_seq::TaskSequential::ValidationImpl() {
+  size_t width = task_data->inputs_count[0];
+  size_t height = task_data->inputs_count[1];
+
+  if (width < 3 || height < 3) {  // Check if the input image is too small
+    return false;
+  }
+
+  return task_data->outputs_count[0] == (width - 2) * (height - 2);
+}
+
+bool petrov_o_vertical_image_filtration_seq::TaskSequential::RunImpl() {
+  // Apply Gaussian filter
+  for (size_t i = 1; i < height_ - 1; ++i) {
+    for (size_t j = 1; j < width_ - 1; ++j) {
+      float sum = 0.0F;
+      for (int ki = -1; ki <= 1; ++ki) {
+        for (int kj = -1; kj <= 1; ++kj) {
+          sum +=
+              static_cast<float>(input_[((i + ki) * width_) + (j + kj)]) * gaussian_kernel_[((ki + 1) * 3) + (kj + 1)];
+        }
+      }
+      output_[((i - 1) * (width_ - 2)) + (j - 1)] = static_cast<int>(sum);
+    }
+  }
+  return true;
+}
+
+bool petrov_o_vertical_image_filtration_seq::TaskSequential::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<int *>(task_data->outputs[0])[i] = output_[i];
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection{ops\_omp.cpp}
+\begin{lstlisting}[language=C++]
+#include "omp/petrov_o_vertical_image_filtration/include/ops_omp.hpp"
+
+#include <omp.h>
+
+#include <cmath>
+#include <cstddef>
+#include <vector>
+
+bool petrov_o_vertical_image_filtration_omp::TaskOpenMP::PreProcessingImpl() {
+  width_ = static_cast<int>(task_data->inputs_count[0]);
+  height_ = static_cast<int>(task_data->inputs_count[1]);
+  size_t input_size = static_cast<size_t>(width_) * static_cast<size_t>(height_);
+
+  auto *in_ptr = reinterpret_cast<int *>(task_data->inputs[0]);
+  input_ = std::vector<int>(in_ptr, in_ptr + input_size);
+
+  output_ = std::vector<int>((width_ - 2) * (height_ - 2), 0);
+  return true;
+}
+
+bool petrov_o_vertical_image_filtration_omp::TaskOpenMP::ValidationImpl() {
+  size_t width = task_data->inputs_count[0];
+  size_t height = task_data->inputs_count[1];
+
+  if (width < 3 || height < 3) {  // Check if the input image is too small
+    return false;
+  }
+
+  return task_data->outputs_count[0] == (width - 2) * (height - 2);
+}
+
+bool petrov_o_vertical_image_filtration_omp::TaskOpenMP::RunImpl() {
+// Apply Gaussian filter
+#pragma omp parallel for schedule(dynamic)
+  for (int i = 1; i < height_ - 1; ++i) {
+    for (int j = 1; j < width_ - 1; ++j) {
+      float sum = 0.0F;
+      for (int ki = -1; ki <= 1; ++ki) {
+        for (int kj = -1; kj <= 1; ++kj) {
+          sum +=
+              static_cast<float>(input_[((i + ki) * width_) + (j + kj)]) * gaussian_kernel_[((ki + 1) * 3) + (kj + 1)];
+        }
+      }
+      output_[((i - 1) * (width_ - 2)) + (j - 1)] = static_cast<int>(sum);
+    }
+  }
+  return true;
+}
+
+bool petrov_o_vertical_image_filtration_omp::TaskOpenMP::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<int *>(task_data->outputs[0])[i] = output_[i];
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection{ops\_tbb.cpp}
+\begin{lstlisting}[language=C++]
+#include "tbb/petrov_o_vertical_image_filtration/include/ops_tbb.hpp"
+
+#include <oneapi/tbb/blocked_range2d.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <tbb/tbb.h>
+
+#include <cmath>
+#include <cstddef>
+#include <vector>
+
+bool petrov_o_vertical_image_filtration_tbb::TaskTBB::PreProcessingImpl() {
+  width_ = task_data->inputs_count[0];
+  height_ = task_data->inputs_count[1];
+  size_t input_size = width_ * height_;
+
+  auto *in_ptr = reinterpret_cast<int *>(task_data->inputs[0]);
+  input_ = std::vector<int>(in_ptr, in_ptr + input_size);
+
+  output_ = std::vector<int>((width_ - 2) * (height_ - 2), 0);
+  return true;
+}
+
+bool petrov_o_vertical_image_filtration_tbb::TaskTBB::ValidationImpl() {
+  size_t width = task_data->inputs_count[0];
+  size_t height = task_data->inputs_count[1];
+
+  if (width < 3 || height < 3) {  // Check if the input image is too small
+    return false;
+  }
+
+  return task_data->outputs_count[0] == (width - 2) * (height - 2);
+}
+
+bool petrov_o_vertical_image_filtration_tbb::TaskTBB::RunImpl() {
+  // Apply Gaussian filter using TBB  parallel_for
+  tbb::parallel_for(tbb::blocked_range2d<size_t>(1, height_ - 1, 1, width_ - 1),
+                    [&](const tbb::blocked_range2d<size_t> &r) {
+                      for (size_t i = r.rows().begin(); i != r.rows().end(); ++i) {
+                        for (size_t j = r.cols().begin(); j != r.cols().end(); ++j) {
+                          float sum = 0.0F;
+                          for (int ki = -1; ki <= 1; ++ki) {
+                            for (int kj = -1; kj <= 1; ++kj) {
+                              sum += static_cast<float>(input_[((i + ki) * width_) + (j + kj)]) *
+                                     gaussian_kernel_[((ki + 1) * 3) + (kj + 1)];
+                            }
+                          }
+                          output_[((i - 1) * (width_ - 2)) + (j - 1)] = static_cast<int>(sum);
+                        }
+                      }
+                    });
+  return true;
+}
+
+bool petrov_o_vertical_image_filtration_tbb::TaskTBB::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<int *>(task_data->outputs[0])[i] = output_[i];
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection{ops\_stl.cpp}
+\begin{lstlisting}[language=C++]
+#include "stl/petrov_o_vertical_image_filtration/include/ops_stl.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <thread>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+bool petrov_o_vertical_image_filtration_stl::TaskSTL::PreProcessingImpl() {
+  width_ = task_data->inputs_count[0];
+  height_ = task_data->inputs_count[1];
+  size_t input_size = width_ * height_;
+
+  auto *in_ptr = reinterpret_cast<int *>(task_data->inputs[0]);
+  input_ = std::vector<int>(in_ptr, in_ptr + input_size);
+
+  output_ = std::vector<int>((width_ - 2) * (height_ - 2), 0);
+  return true;
+}
+
+bool petrov_o_vertical_image_filtration_stl::TaskSTL::ValidationImpl() {
+  size_t width = task_data->inputs_count[0];
+  size_t height = task_data->inputs_count[1];
+
+  if (width < 3 || height < 3) {  // Check if the input image is too small
+    return false;
+  }
+
+  return task_data->outputs_count[0] == (width - 2) * (height - 2);
+}
+
+// Thread's func
+void petrov_o_vertical_image_filtration_stl::TaskSTL::ProcessImageStripe(size_t start_row, size_t end_row) {
+  for (size_t i = start_row; i < end_row; ++i) {
+    for (size_t j = 1; j < width_ - 1; ++j) {
+      float sum = 0.0F;
+      for (int ki = -1; ki <= 1; ++ki) {
+        for (int kj = -1; kj <= 1; ++kj) {
+          sum +=
+              static_cast<float>(input_[((i + ki) * width_) + (j + kj)]) * gaussian_kernel_[((ki + 1) * 3) + (kj + 1)];
+        }
+      }
+      output_[((i - 1) * (width_ - 2)) + (j - 1)] = static_cast<int>(sum);
+    }
+  }
+}
+
+bool petrov_o_vertical_image_filtration_stl::TaskSTL::RunImpl() {
+  unsigned int num_threads = ppc::util::GetPPCNumThreads();
+
+  num_threads = std::min(num_threads, static_cast<unsigned int>(height_ - 2));
+
+  if (num_threads <= 1) {
+    ProcessImageStripe(1, height_ - 1);
+    return true;
+  }
+
+  std::vector<std::thread> threads;
+  threads.reserve(num_threads);
+
+  size_t rows_per_thread = (height_ - 2) / num_threads;
+  size_t remainder = (height_ - 2) % num_threads;
+
+  size_t start_row = 1;
+
+  for (unsigned int i = 0; i < num_threads; ++i) {
+    size_t extra_row = (i < remainder) ? 1 : 0;
+    size_t end_row = start_row + rows_per_thread + extra_row;
+
+    threads.emplace_back(&TaskSTL::ProcessImageStripe, this, start_row, end_row);
+
+    start_row = end_row;
+  }
+
+  for (auto &thread : threads) {
+    thread.join();
+  }
+
+  return true;
+}
+
+bool petrov_o_vertical_image_filtration_stl::TaskSTL::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<int *>(task_data->outputs[0])[i] = output_[i];
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection{ops\_all.cpp (MPI+TBB)}
+\begin{lstlisting}[language=C++]
+#include "all/petrov_o_vertical_image_filtration/include/ops_all.hpp"
+
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/info.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/task_arena.h>
+#include <boost/mpi/collectives/broadcast.hpp>
+#include <boost/serialization/vector.hpp>
+#include <cmath>
+#include <cstddef>
+#include <utility>
+#include <vector>
+#include "boost/mpi/collectives/gatherv.hpp"
+#include "core/task/include/task.hpp"
+#include "core/util/include/util.hpp"
+
+namespace petrov_o_vertical_image_filtration_all {
+
+TaskAll::TaskAll(ppc::core::TaskDataPtr task_data) : Task(std::move(task_data)) {}
+
+bool TaskAll::PreProcessingImpl() {
+  width_ = task_data->inputs_count[0];
+  height_ = task_data->inputs_count[1];
+  size_t input_size = width_ * height_;
+
+  auto *in_ptr = reinterpret_cast<int *>(task_data->inputs[0]);
+  input_ = std::vector<int>(in_ptr, in_ptr + input_size);
+
+  if (world_.rank() == 0 && width_ >= 3 && height_ >= 3) {
+    output_ = std::vector<int>((width_ - 2) * (height_ - 2), 0);
+  } else if (world_.rank() == 0) {
+    output_.clear();
+  }
+  return true;
+}
+
+bool TaskAll::ValidationImpl() {
+  size_t width = task_data->inputs_count[0];
+  size_t height = task_data->inputs_count[1];
+
+  if (width < 3 || height < 3) return false;
+
+  return task_data->outputs_count[0] == (width - 2) * (height - 2);
+}
+
+void TaskAll::ApplyGaussianFilterTbb(std::vector<int> &local_output_ref, size_t my_start_output_row_val,
+                                     size_t my_num_rows_val, size_t output_cols_val) {
+  if (my_num_rows_val == 0) return;
+
+  int num_tbb_threads = oneapi::tbb::info::default_concurrency();
+
+  oneapi::tbb::task_arena arena(num_tbb_threads);
+  arena.execute([&] {
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, my_num_rows_val), [&](const tbb::blocked_range<size_t> &r_range) {
+      for (size_t local_i_out = r_range.begin(); local_i_out != r_range.end(); ++local_i_out) {
+        size_t global_i_out = my_start_output_row_val + local_i_out;
+        size_t i_in = global_i_out + 1;
+
+        for (size_t j_out = 0; j_out < output_cols_val; ++j_out) {
+          size_t j_in = j_out + 1;
+          float sum = 0.0F;
+          for (int ki = -1; ki <= 1; ++ki) {
+            for (int kj = -1; kj <= 1; ++kj) {
+              auto kernel_row = static_cast<size_t>(ki + 1);
+              auto kernel_col = static_cast<size_t>(kj + 1);
+              sum += static_cast<float>(input_[((i_in + ki) * width_) + (j_in + kj)]) *
+                     gaussian_kernel_[(kernel_row * 3) + kernel_col];
+            }
+          }
+          local_output_ref[(local_i_out * output_cols_val) + j_out] = static_cast<int>(sum);
+        }
+      }
+    });
+  });
+}
+
+bool TaskAll::RunImpl() {
+  int rank = world_.rank();
+  int comm_size = world_.size();
+
+  boost::mpi::broadcast(world_, width_, 0);
+  boost::mpi::broadcast(world_, height_, 0);
+  boost::mpi::broadcast(world_, input_, 0);
+
+  if (height_ < 3 || width_ < 3) {
+    if (rank == 0) output_.clear();
+    world_.barrier();
+    return true;
+  }
+
+  size_t total_output_rows = height_ - 2;
+  size_t output_cols = width_ - 2;
+
+  size_t rows_per_rank_base = total_output_rows / comm_size;
+  size_t remainder_rows = total_output_rows % comm_size;
+
+  size_t my_num_rows = rows_per_rank_base + (static_cast<size_t>(rank) < remainder_rows ? 1 : 0);
+  size_t my_start_output_row = 0;
+  for (int r_idx = 0; r_idx < rank; ++r_idx) {
+    my_start_output_row += (rows_per_rank_base + (static_cast<size_t>(r_idx) < remainder_rows ? 1 : 0));
+  }
+
+  std::vector<int> local_output;
+  if (my_num_rows > 0) {
+    local_output.resize(my_num_rows * output_cols);
+  }
+
+  ApplyGaussianFilterTbb(local_output, my_start_output_row, my_num_rows, output_cols);
+
+  if (total_output_rows > 0) {
+    if (rank == 0) {
+      output_.assign(total_output_rows * output_cols, 0);
+
+      std::vector<int> recv_counts(comm_size);
+      std::vector<int> displs(comm_size);
+      int current_displ = 0;
+      for (int r_idx = 0; r_idx < comm_size; ++r_idx) {
+        size_t rows_for_r = rows_per_rank_base + (static_cast<size_t>(r_idx) < remainder_rows ? 1 : 0);
+        recv_counts[r_idx] = static_cast<int>(rows_for_r * output_cols);
+        displs[r_idx] = current_displ;
+        current_displ += recv_counts[r_idx];
+      }
+      boost::mpi::gatherv(world_, local_output, output_.data(), recv_counts, displs, 0);
+    } else {
+      boost::mpi::gatherv(world_, local_output, 0);
+    }
+  } else if (rank == 0) {
+    output_.clear();
+  }
+
+  world_.barrier();
+  return true;
+}
+
+bool TaskAll::PostProcessingImpl() {
+  if (world_.rank() == 0) {
+    if (width_ >= 3 && height_ >= 3 && !output_.empty()) {
+      for (size_t i = 0; i < output_.size(); i++) {
+        reinterpret_cast<int *>(task_data->outputs[0])[i] = output_[i];
+      }
+    }
+  }
+  return true;
+}
+
+}  // namespace petrov_o_vertical_image_filtration_all
+\end{lstlisting}
+
+\end{document}
