@@ -182,7 +182,7 @@
 \newpage
 \section{Результаты экспериментов}
 Локальные эксперименты проводились на процессоре с AMD Ryzen 5 3600 c 6 ядрами и 12 потоками. Вычисления проводились на входных данных размером в 250000 точек.
-Результаты предоставлены в таблицах 1, 2, 3. Время выполнения представлено в миллисекундах.
+Результаты предоставлены в таблицах \ref{sec:testpipelinerunPerf}, \ref{sec:testtaskrunPerf} и \ref{sec:ciPerf}. Время выполнения представлено в миллисекундах.
 
 \begin{table}[H]
 \centering
@@ -203,6 +203,7 @@ mpi+tbb & 1513 & 1411 & 1351 & 1311 & 1437 & 1337 & 1323 \\
 \hline
 \end{tabular}
 \caption{Производительность test\_pipeline\_run (локально)}
+\label{sec:testpipelinerunPerf}
 \end{table}
 
 \begin{table}[H]
@@ -224,6 +225,7 @@ mpi+tbb & 545 & 400 & 371 & 464 & 422 & 460 & 440 \\
 \hline 
 \end{tabular}
 \caption{Производительность test\_task\_run (локально)}
+\label{sec:testtaskrunPerf}
 \end{table}
 
 \begin{table}[H]
@@ -244,6 +246,7 @@ mpi+tbb & 219 & 227 & 447 \\
 \hline
 \end{tabular}
 \caption{Производительность в GitHub CI}
+\label{sec:ciPerf}
 \end{table}
 
 \subsection{Выводы}
