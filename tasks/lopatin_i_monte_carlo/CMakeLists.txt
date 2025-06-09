@@ -40,4 +40,3 @@ if (USE_LATEX)
 else()
     message( STATUS "-- ${ProjectId} - NOT BUILD!"  )
 endif()
-
