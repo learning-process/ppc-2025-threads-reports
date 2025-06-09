@@ -1,0 +1,1425 @@
+\documentclass[12pt,a4paper]{extarticle}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{indentfirst}
+\usepackage{float}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xcolor}
+\usepackage{multirow}
+
+\geometry{
+  a4paper,
+  left=30mm,
+  right=15mm,
+  top=20mm,
+  bottom=20mm
+}
+
+\titleformat{\section}[block]
+{\normalfont\fontsize{14}{16}\bfseries\centering}
+{\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries\filcenter}
+{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries\filcenter}
+{\thesubsubsection.}{0.5em}{}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  commentstyle=\color{olive},
+  stringstyle=\color{red},
+  frame=single,
+  tabsize=4,
+  showstringspaces=false,
+  breaklines=true
+}
+
+\sloppy
+
+\onehalfspacing
+
+\setlength{\parindent}{1.25cm}
+
+\newcommand{\appendixsection}[1]{%
+  \clearpage
+  \section*{\centering Приложение #1}
+  \addcontentsline{toc}{section}{Приложение #1}
+}
+
+\begin{document}
+  
+  \begin{titlepage}
+    \begin{center}
+      
+      \onehalfspacing
+      
+      \begin{center}
+        \textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\          
+        \vspace{0.5cm}
+        Федеральное государственное автономное образовательное учреждение высшего образования \\ 
+        \vspace{0.5cm}
+        \textbf{«Национальный исследовательский Нижегородский государственный университет имени Н.И. Лобачевского»} \\
+                \textbf{(ННГУ)} \\
+        \vspace{0.5cm}
+        \textbf{Институт информационных технологий, математики и механики} \\
+        \vspace{0.5cm}
+        
+        \textbf{Кафедра математического обеспечения и суперкомпьютерных технологий} \\
+        \vspace{0.5cm}
+        Направление подготовки: «Программная инженерия» \\
+        Профиль подготовки: «Разработка программно-информационных систем» \\
+
+      \end{center}
+      \vspace{0.5cm}
+      \begin{center}
+      
+      \end{center}
+      \vspace{2.5cm}
+      \begin{center}
+        \textbf{Отчёт по лабораторной работе}
+
+        на тему: 
+        
+        \textbf{«Построение выпуклой оболочки – проход Джарвиса»}
+      \end{center}
+      
+      \vspace{2.5cm}
+      
+      \begin{flushright}
+        \textbf{Выполнил:} \\
+        студент 3 курса группы 3822Б1ПР3 \\
+                Отурин А.В. \\
+        
+        \vspace{1cm}
+        
+      \noindent\textbf{Преподаватель:} \\
+      к.т.н., доцент кафедры ВВСП \\
+      {Сысоев А.В.}
+      \end{flushright}
+      
+      \vspace{2em}
+      
+      \vfill
+      
+      \begin{center}
+        Нижний Новгород \\
+        2025 г.
+      \end{center}
+      
+    \end{center}
+  \end{titlepage}
+  
+  \newpage
+
+% Оглавление
+\tableofcontents
+\newpage
+
+% Введение
+\section{Введение}
+Алгоритмы вычислительной геометрии находят широкое применение в различных областях, таких как компьютерная графика, машинное обучение, робототехника и геоинформационные системы. Одной из ключевых задач в этой области является построение выпуклой оболочки множества точек на плоскости. Выпуклая оболочка — это минимальный выпуклый многоугольник, содержащий все заданные точки внутри себя.
+
+Среди множества алгоритмов для решения этой задачи выделяется метод Джарвиса, также известный как "алгоритм заворачивания подарка". Этот подход, предложенный Р. Джарвисом в 1973 году, отличается простотой реализации и наглядностью, хотя и не является самым эффективным для больших наборов данных.
+
+В данном отчёте рассматривается принцип работы алгоритма Джарвиса и его различные реализации: последовательная и параллельные.
+
+Целью данной работы является разработка и исследование различных параллельных реализаций алгоритма Джарвиса и их сравнение. В рамках исследования реализованы последовательная версия алгоритма и несколько параллельных версий с использованием технологий OpenMP, Intel Threading Building Blocks (TBB), стандартной библиотеки потоков C++ (STL) и смешанного варианта на основе MPI и TBB. 
+
+
+\newpage
+\section{Постановка задачи}
+Необходимо реализовать алгоритм построения выпуклой оболочки на плоскости из множества точек с использованием метода Джарвиса и провести исследование различных версий параллелизаций этого алгоритма.
+
+\subsection{Данные}
+\begin{itemize}
+    \item Входные данные - множество точек на плоскости.
+    \item Выходные данные - множество точек, составляющее выпуклую оболочку.
+\end{itemize}
+
+\subsection{Задачи исследования}
+\begin{itemize}
+    \item Разработать последовательный алгоритм Джарвиса.
+    \item Разработать параллельные версии алгоритма Джарвиса с использованием технологий OpenMP, TBB, STL и смешанного подхода MPI+TBB.
+    \item Провести сравнения производительности реализаций.
+\end{itemize}
+
+\newpage
+\section{Описания алгоритма и его реализаций}
+Алгоритм работает по принципу последовательного «обёртывания» точек, начиная с самой крайней (например, с минимальной x-координатой) и постепенно добавляя новые вершины оболочки.
+Начальная точка выбирается как точка с минимальной x-координатой (или любой другой крайней точкой, например, с минимальной y). Эта точка гарантированно входит в выпуклую оболочку.
+Поиск следующей точки выполняется путём выбора такой точки, чтобы все остальные точки лежали по одну сторону от линии, соединяющей текущую и следующую вершину (то есть следующая точка должна иметь минимальный полярный угол относительно предыдущей).
+Процесс повторяется, пока алгоритм не вернётся к начальной точке, завершая построение оболочки.
+Сложность алгоритма -- O($n\times h$), где n -- кол-во всех точек, а h -- кол-во точек, составляющих оболочку.
+Стоит отметить ограничение: каждая итерация зависит от предыдущей, поэтому каждый поток или процесс должны синхронизироваться каждую итерацию, что ограничивает выгоду от параллельности.
+
+\subsection{Последовательный алгоритм}
+Сначала отыскивается самая левая точка, если их несколько на одной горизонтальной координате, то берётся самая высокая. Эта точка добавляется в вывод. К этой точке создаётся отрезок с новой точкой, спущенный вертикально вниз относительно первой точки (этот отрезок не будет включён в вывод). Далее ищется наибольший угол этого отрезка и точек из вывода. Полученная точка добавляется в вывод. Затем начинается цикл до тех пор, пока алгоритм не дойдёт до стартовой точки и не замкнёт оболочку: тоже ищется наибольший угол между двумя последними точками и новой точкой, наилучшая точка добавляется в вывод. Если угол одинаковый, то берётся ближайшая точка.
+Получается, что в алгоритме два цикла друг в друге - цикл поиска отдельной точки, внутри цикла с проверкой вывода на замкнутость. За деталями см. приложения \ref{sec:seq.hpp} и \ref{sec:seq.cpp}.
+
+\subsection{OMP алгоритм}
+Отличается от последовательного алгоритма тем, что внутри итерации проверки на замкнутость создаются индивидуальные переменные для каждого потока, затем распараллеливается цикл поиска отдельной точки с помощью встроенной в OMP директивы omp for. Затем критически ищется наилучшая точка среди лучших найденных каждым потоком. За деталями см. приложения \ref{sec:omp.hpp} и \ref{sec:omp.cpp}.
+
+\subsection{TBB алгоритм}
+Отличается от последовательного алгоритма тем, что в этой версии создан отдельный класс для работы с функцией TBB parallel\_reduce, который используется для поиска лучшей точки. За деталями см. приложения \ref{sec:tbb.hpp} и \ref{sec:tbb.cpp}.
+
+\subsection{STL алгоритм}
+Отличается от последовательного алгоритма тем, что в этой версии ещё перед основным циклом создаются массив хранящий потоки, массив хранящий их результаты и переменная с размером блока, обрабатываемым одним потоком.
+Далее в каждом потоке вычисляется лучшая точка, результаты обрабатываются в основном потоке, где вычисляется лучшая точка из лучших.
+За деталями см. приложения \ref{sec:stl.hpp} и \ref{sec:stl.cpp}.
+
+\subsection{MPI+TBB алгоритм}
+Отличается от последовательного алгоритма тем, что в этой версии создан отдельный класс для работы с функцией tbb parallel\_reduce, который используется для поиска лучшей точки.
+Если процессов больше, чем точек, то исполнение функции у лишних досрочно завершается. Остальные же приступают к основному алгоритму: в каждом процессе выполняется parallel\_reduce из TBB, полученные результаты отбираются основным процессом. Каждый оставшийся процесс получает в ответ наилучшую точку для дальнейших вычислений или для решения о завершении вычислений.
+За деталями см. приложения \ref{sec:all.hpp} и \ref{sec:all.cpp}.
+
+\newpage
+\section{Результаты экспериментов}
+Локальные эксперименты проводились на процессоре с AMD Ryzen 5 3600 c 6 ядрами и 12 потоками. Вычисления проводились на входных данных размером в 250000 точек.
+Результаты предоставлены в таблицах 1, 2, 3. Время выполнения представлено в миллисекундах.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|c|c|c|c|c|c|c|} \hline
+ & \multicolumn{7}{|c|}{потоков (процессов для mpi+tbb)}\\
+\hline
+test\_pipeline\_run & 1 & 2 & 4 & 6 & 8 & 10 & 12 \\
+\hline
+seq & 631 &  -&-&-&-&-&-\\
+\hline
+omp & 632 & 511 & 463 & 458 & 472 & 460 & 463 \\
+\hline
+tbb & 633 & 527 & 488 & 481 & 486 & 480 & 489 \\
+\hline
+stl & 626 & 528 & 485 & 479 & 484 & 485 & 495 \\
+\hline
+mpi+tbb & 1513 & 1411 & 1351 & 1311 & 1437 & 1337 & 1323 \\
+\hline
+\end{tabular}
+\caption{Производительность test\_pipeline\_run (локально)}
+\end{table}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|c|c|c|c|c|c|c|} \hline
+ & \multicolumn{7}{|c|}{потоков (процессов для mpi+tbb)}\\
+\hline 
+test\_task\_run & 1 & 2 & 4 & 6 & 8 & 10 & 12 \\
+\hline 
+seq & 649 &  -&-&-&-&-&-\\
+\hline 
+omp & 643 & 525 & 463 & 477 & 477 & 478 & 481 \\
+\hline 
+tbb & 650 & 544 & 490 & 479 & 484 & 485 & 490 \\
+\hline 
+stl & 644 & 542 & 490 & 482 & 487 & 492 & 502 \\
+\hline 
+mpi+tbb & 545 & 400 & 371 & 464 & 422 & 460 & 440 \\
+\hline 
+\end{tabular}
+\caption{Производительность test\_task\_run (локально)}
+\end{table}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|c|c|c|}    
+\hline
+ & test\_pipeline\_run & test\_task\_run & total \\
+ \hline
+seq & 1375 & 1397 & 2773 \\
+\hline
+omp & 1301 & 1318 & 2620 \\
+\hline
+tbb & 1324 & 1336 & 2623 \\
+\hline
+stl & 1317 & 1305 & 2661 \\
+\hline
+mpi+tbb & 219 & 227 & 447 \\
+\hline
+\end{tabular}
+\caption{Производительность в GitHub CI}
+\end{table}
+
+\subsection{Выводы}
+\begin{itemize}
+\item Все тесты на одном потоке ожидаемо оказались самыми медленными. Причина этому, конечно, отсутствие всякого параллелизма.
+У всех параллельных реализаций (кроме MPI+TBB) скорость выполнения примерно одинакова.
+\item Пик производительности зафиксирован при шести потоках, что равно шести ядрам процессора, на котором проводились эксперименты.
+\item OpenMP реализация показала себя слегка лучше других многопоточных реализаций, возможно из-за её сравнительной простоты.
+\item STL реализация возможно могла бы показать себя слегка лучше других многопоточных реализаций, если бы использовался вариант без создания новых потоков каждую итерацию, но локальные тесты проводились на ОС Windows, где такое мной же не предусмотрено.
+\item MPI+TBB реализация имеет очень неоднозначные результаты. Локальные тесты test\_pipeline\_run показывают сильное замедление независимо от количества потоков. Тесты test\_task\_run показывают ускорение даже на одном потоке. Тесты производительности с помощью github CI показывают ускорение в 6,2 раза. Возможно, в GitHub CI используется машина с лучшей межпроцессной параллельной производительностью.
+\end{itemize}
+
+\newpage
+\section{Заключение}
+Проведённые тесты позволили сравнить производительность различных параллельных реализаций и выявить их особенности:
+\begin{itemize}
+    \item Однопоточные реализации закономерно оказались самыми медленными из-за отсутствия параллелизма, при этом их скорость выполнения была примерно одинаковой.
+    \item OpenMP показала себя немного лучше других многопоточных решений, вероятно, благодаря своей простоте и эффективному управлению потоками.
+    \item STL-реализация могла бы быть более производительной, если бы не создавала новые потоки на каждой итерации, однако данная оптимизация не была предусмотрена в тестовой среде (Windows).
+    \item Гибридная реализация MPI+TBB продемонстрировала неоднозначные результаты: локальные тесты выявили как значительное замедление, так и ускорение в зависимости от сценария, тогда как в GitHub CI наблюдалось заметное ускорение (в 6,2 раза), что может указывать на влияние аппаратных особенностей тестовых стендов.
+\end{itemize}
+Таким образом, выбор оптимальной реализации зависит от конкретных условий выполнения: TBB может быть предпочтительнее для простых сценариев, тогда как гибридные подходы (MPI+TBB) способны показывать высокую производительность в распределённых системах с эффективной межпроцессной коммуникацией. Для более точных выводов рекомендуется дополнительное тестирование на различных конфигурациях оборудования.
+
+ 
+
+\newpage
+\section{Литература}
+
+\newpage
+\section{Приложение}
+
+\subsection{ops\_seq.hpp}
+\label{sec:seq.hpp}
+\begin{lstlisting}[language=C++]
+#pragma once
+
+#include <utility>
+#include <vector>
+
+#include "core/task/include/task.hpp"
+
+namespace oturin_a_gift_wrapping_seq {
+
+struct Coord {
+  int x, y;
+  bool operator==(const Coord o) const { return (x == o.x && y == o.y); }
+  bool operator!=(const Coord o) const { return x != o.x || y != o.y; }
+};
+
+double Distance(Coord a, Coord b);
+
+// Angle Between Three Points
+double ABTP(Coord a, Coord b, Coord c);
+
+// Angle Between Three Points for leftmost point
+double ABTP(Coord a, Coord c);
+
+class TestTaskSequential : public ppc::core::Task {
+ public:
+  explicit TestTaskSequential(ppc::core::TaskDataPtr task_data) : Task(std::move(task_data)) {}
+  bool PreProcessingImpl() override;
+  bool ValidationImpl() override;
+  bool RunImpl() override;
+  bool PostProcessingImpl() override;
+
+ private:
+  std::vector<Coord> input_, output_;
+  int n_;
+
+  int FindMostLeft();
+  void PointSearch(double t, double &line_angle, int &search_index, int i);
+};
+
+}  // namespace oturin_a_gift_wrapping_seq
+\end{lstlisting}
+
+\subsection{ops\_seq.cpp}
+\label{sec:seq.cpp}
+\begin{lstlisting}[language=C++]
+#include "seq/oturin_a_gift_wrapping/include/ops_seq.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <vector>
+
+double oturin_a_gift_wrapping_seq::ABTP(Coord a, Coord b, Coord c) {
+  Coord ab = {.x = b.x - a.x, .y = b.y - a.y};
+  Coord cb = {.x = b.x - c.x, .y = b.y - c.y};
+  double dot = ((ab.x * cb.x) + (ab.y * cb.y));
+  double cross = ((ab.x * cb.y) - (ab.y * cb.x));
+  return fabs(atan2(cross, dot));
+}
+
+double oturin_a_gift_wrapping_seq::ABTP(Coord a, Coord c) {
+  Coord b{.x = a.x, .y = (a.y - 1)};
+  return ABTP(b, a, c);
+}
+
+double oturin_a_gift_wrapping_seq::Distance(Coord a, Coord b) {
+  int t1 = a.x - b.x;
+  int t2 = a.y - b.y;
+  return sqrt((t1 * t1) + (t2 * t2));
+}
+
+bool oturin_a_gift_wrapping_seq::TestTaskSequential::PreProcessingImpl() {
+  // Init value for input and output
+  unsigned int input_size = task_data->inputs_count[0];
+  auto *in_ptr = reinterpret_cast<Coord *>(task_data->inputs[0]);
+  input_ = std::vector<Coord>(in_ptr, in_ptr + input_size);
+  n_ = int(input_.size());
+  output_ = std::vector<Coord>(0);
+  output_.reserve(n_);
+
+  // check if all points are same
+  auto are_same = [&](const auto &p) { return p == input_[0]; };
+  return !std::ranges::all_of(input_.begin(), input_.end(), are_same);
+}
+
+bool oturin_a_gift_wrapping_seq::TestTaskSequential::ValidationImpl() {
+  return task_data->inputs_count[0] >= 3;  // task requires 3 or more points to wrap
+}
+
+bool oturin_a_gift_wrapping_seq::TestTaskSequential::RunImpl() {
+  if (!output_.empty()) {
+    output_.clear();
+  }
+  // this .clear() used ONLY for perftest TaskRun. for some reason output_ has something in it
+
+  // find most left point (priority to top)
+  int start_index = FindMostLeft();
+  output_.push_back(input_[start_index]);
+
+  // find second point
+  double line_angle = -5;
+  int search_index = 0;
+  for (int i = 0; i < n_; i++) {
+    double t = ABTP(input_[start_index], input_[i]);
+    if (t > line_angle && i != start_index) {
+      line_angle = t;
+      search_index = i;
+    } else if (t == line_angle) {
+      if (Distance(input_[start_index], input_[i]) < Distance(input_[start_index], input_[search_index]) &&
+          i != start_index) {
+        search_index = i;
+        line_angle = t;
+      }
+    }
+  }
+
+  // main loop
+  do {
+    output_.push_back(input_[search_index]);
+    line_angle = -5;
+    for (int i = 0; i < n_; i++) {
+      double t = ABTP(output_[output_.size() - 2], output_.back(), input_[i]);
+      PointSearch(t, line_angle, search_index, i);
+    }
+  } while (search_index != start_index);
+
+  return true;
+}
+
+bool oturin_a_gift_wrapping_seq::TestTaskSequential::PostProcessingImpl() {
+  auto *result_ptr = reinterpret_cast<Coord *>(task_data->outputs[0]);
+  std::ranges::copy(output_.begin(), output_.end(), result_ptr);
+  return true;
+}
+
+int oturin_a_gift_wrapping_seq::TestTaskSequential::FindMostLeft() {
+  Coord most_left = input_[0];
+  int start_index = 0;
+  for (int i = 1; i < n_; i++) {
+    if (input_[i].x < most_left.x || (input_[i].x == most_left.x && input_[i].y > most_left.y)) {
+      start_index = i;
+      most_left = input_[i];
+    }
+  }
+  return start_index;
+}
+
+void oturin_a_gift_wrapping_seq::TestTaskSequential::PointSearch(const double t, double &line_angle, int &search_index, const int i) {
+  if (t < line_angle) {
+    return;
+  }
+  if (output_.back() != input_[i] && output_[output_.size() - 2] != input_[i]) {
+    if (t == line_angle && Distance(output_.back(), input_[i]) >= Distance(output_.back(), input_[search_index])) {
+      return;
+    }
+    search_index = i;
+    line_angle = t;
+  }
+}
+\end{lstlisting}
+
+
+\subsection{ops\_omp.hpp}
+\label{sec:omp.hpp}
+\begin{lstlisting}[language=C++]
+#pragma once
+
+#include <utility>
+#include <vector>
+
+#include "core/task/include/task.hpp"
+
+namespace oturin_a_gift_wrapping_omp {
+
+struct Coord {
+  int x, y;
+  bool operator==(const Coord o) const { return (x == o.x && y == o.y); }
+  bool operator!=(const Coord o) const { return x != o.x || y != o.y; }
+};
+
+double Distance(Coord a, Coord b);
+
+// Angle Between Three Points
+double ABTP(Coord a, Coord b, Coord c);
+
+// Angle Between Three Points for leftmost point
+double ABTP(Coord a, Coord c);
+
+class TestTaskOMP : public ppc::core::Task {
+ public:
+  explicit TestTaskOMP(ppc::core::TaskDataPtr task_data) : Task(std::move(task_data)) {}
+  bool PreProcessingImpl() override;
+  bool ValidationImpl() override;
+  bool RunImpl() override;
+  bool PostProcessingImpl() override;
+
+ private:
+  std::vector<Coord> input_, output_;
+  int n_;
+
+  int FindMostLeft();
+  void PointSearch(double t, double &line_angle, int &search_index, int i);
+};
+
+}  // namespace oturin_a_gift_wrapping_omp
+\end{lstlisting}
+
+\subsection{ops\_omp.cpp}
+\label{sec:omp.cpp}
+\begin{lstlisting}[language=C++]
+#include "omp/oturin_a_gift_wrapping/include/ops_omp.hpp"
+
+#include <omp.h>
+
+#include <algorithm>
+#include <cmath>
+#include <vector>
+
+double oturin_a_gift_wrapping_omp::ABTP(Coord a, Coord b, Coord c) {
+  Coord ab = {.x = b.x - a.x, .y = b.y - a.y};
+  Coord cb = {.x = b.x - c.x, .y = b.y - c.y};
+  double dot = ((ab.x * cb.x) + (ab.y * cb.y));
+  double cross = ((ab.x * cb.y) - (ab.y * cb.x));
+  return fabs(atan2(cross, dot));
+}
+
+double oturin_a_gift_wrapping_omp::ABTP(Coord a, Coord c) {
+  Coord b{.x = a.x, .y = (a.y - 1)};
+  return ABTP(b, a, c);
+}
+
+double oturin_a_gift_wrapping_omp::Distance(Coord a, Coord b) {
+  int t1 = a.x - b.x;
+  int t2 = a.y - b.y;
+  return sqrt((t1 * t1) + (t2 * t2));
+}
+
+bool oturin_a_gift_wrapping_omp::TestTaskOMP::PreProcessingImpl() {
+  // Init value for input and output
+  unsigned int input_size = task_data->inputs_count[0];
+  auto *in_ptr = reinterpret_cast<Coord *>(task_data->inputs[0]);
+  input_ = std::vector<Coord>(in_ptr, in_ptr + input_size);
+  n_ = int(input_.size());
+  output_ = std::vector<Coord>(0);
+  output_.reserve(n_);
+
+  // check if all points are same
+  auto are_same = [&](const auto &p) { return p == input_[0]; };
+  return !std::ranges::all_of(input_.begin(), input_.end(), are_same);
+}
+
+bool oturin_a_gift_wrapping_omp::TestTaskOMP::ValidationImpl() {
+  return task_data->inputs_count[0] >= 3;  // task requires 3 or more points to wrap
+}
+
+bool oturin_a_gift_wrapping_omp::TestTaskOMP::RunImpl() {
+  if (!output_.empty()) {
+    output_.clear();
+  }
+  // this .clear() used ONLY for perftest TaskRun. for some reason output_ has something in it
+
+  // find most left point (priority to top)
+  int start_index = FindMostLeft();
+  output_.push_back(input_[start_index]);
+
+  // find second point
+  double line_angle = -5;
+  int search_index = 0;
+  for (int i = 0; i < n_; i++) {
+    double t = ABTP(input_[start_index], input_[i]);
+    if (t > line_angle && i != start_index) {
+      line_angle = t;
+      search_index = i;
+    } else if (t == line_angle) {
+      if (Distance(input_[start_index], input_[i]) < Distance(input_[start_index], input_[search_index]) &&
+          i != start_index) {
+        search_index = i;
+        line_angle = t;
+      }
+    }
+  }
+
+  // main loop
+  do {
+    output_.push_back(input_[search_index]);
+    line_angle = -4;
+#pragma omp parallel
+    {
+      int search_index_par = -1;
+      double line_angle_private = -5;
+
+      const Coord penultimate_element = output_[output_.size() - 2];
+      const Coord last_element = output_.back();
+
+#pragma omp for nowait
+      for (int i = 0; i < n_; i++) {
+        double t = ABTP(penultimate_element, last_element, input_[i]);
+        PointSearch(t, line_angle_private, search_index_par, i);
+      }
+
+#pragma omp critical
+      {
+        if (line_angle <= line_angle_private &&
+            (line_angle_private != line_angle ||
+             Distance(output_.back(), input_[search_index_par]) < Distance(output_.back(), input_[search_index]))) {
+          search_index = search_index_par;
+          line_angle = line_angle_private;  // NOLINT(clang-analyzer-deadcode.DeadStores): line_angle will be read in
+                                            // the next critical iteration
+        }
+      }
+    }
+  } while (search_index != start_index);
+
+  return true;
+}
+
+bool oturin_a_gift_wrapping_omp::TestTaskOMP::PostProcessingImpl() {
+  auto *result_ptr = reinterpret_cast<Coord *>(task_data->outputs[0]);
+  std::ranges::copy(output_.begin(), output_.end(), result_ptr);
+  return true;
+}
+
+int oturin_a_gift_wrapping_omp::TestTaskOMP::FindMostLeft() {
+  Coord most_left = input_[0];
+  int start_index = 0;
+  for (int i = 1; i < n_; i++) {
+    if (input_[i].x < most_left.x || (input_[i].x == most_left.x && input_[i].y > most_left.y)) {
+      start_index = i;
+      most_left = input_[i];
+    }
+  }
+  return start_index;
+}
+
+void oturin_a_gift_wrapping_omp::TestTaskOMP::PointSearch(const double t, double &line_angle, int &search_index, const int i) {
+  if (t < line_angle) {
+    return;
+  }
+  if (output_.back() != input_[i] && output_[output_.size() - 2] != input_[i]) {
+    if (t == line_angle && Distance(output_.back(), input_[i]) >= Distance(output_.back(), input_[search_index])) {
+      return;
+    }
+    search_index = i;
+    line_angle = t;
+  }
+}
+\end{lstlisting}
+
+
+\subsection{ops\_tbb.hpp}
+\label{sec:tbb.hpp}
+\begin{lstlisting}[language=C++]
+#pragma once
+
+#include <oneapi/tbb/blocked_range.h>
+#include <tbb/tbb.h>
+
+#include <utility>
+#include <vector>
+
+#include "core/task/include/task.hpp"
+
+namespace oturin_a_gift_wrapping_tbb {
+
+struct Coord {
+  int x, y;
+  bool operator==(const Coord o) const { return (x == o.x && y == o.y); }
+  bool operator!=(const Coord o) const { return x != o.x || y != o.y; }
+};
+
+double Distance(Coord a, Coord b);
+
+// Angle Between Three Points
+double ABTP(Coord a, Coord b, Coord c);
+
+// Angle Between Three Points for leftmost point
+double ABTP(Coord a, Coord c);
+
+class TestTaskTBB : public ppc::core::Task {
+ public:
+  explicit TestTaskTBB(ppc::core::TaskDataPtr task_data) : Task(std::move(task_data)) {}
+  bool PreProcessingImpl() override;
+  bool ValidationImpl() override;
+  bool RunImpl() override;
+  bool PostProcessingImpl() override;
+
+  class PointSearcher;
+
+ private:
+  std::vector<Coord> input_, output_;
+  int n_;
+
+  int FindMostLeft();
+  void PointSearch(double t, double &line_angle, int &search_index, int i);
+};
+
+class TestTaskTBB::PointSearcher {
+  TestTaskTBB *p_;
+  double line_angle_ = -5;
+
+ public:
+  int search_index;
+
+  PointSearcher(TestTaskTBB *parent, int search_index) : p_(parent), search_index(search_index) {}
+
+  PointSearcher(PointSearcher &x, tbb::split) : p_(x.p_), search_index(x.search_index) {}
+
+  void operator()(const tbb::blocked_range<int> &r);
+
+  void join(const PointSearcher &x);  // NOLINT(readability-identifier-naming): tbb using this name
+};
+
+}  // namespace oturin_a_gift_wrapping_tbb
+\end{lstlisting}
+
+\subsection{ops\_tbb.cpp}
+\label{sec:tbb.cpp}
+\begin{lstlisting}[language=C++]
+#include "tbb/oturin_a_gift_wrapping/include/ops_tbb.hpp"
+
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_reduce.h>
+
+#include <algorithm>
+#include <cmath>
+#include <vector>
+
+double oturin_a_gift_wrapping_tbb::ABTP(Coord a, Coord b, Coord c) {
+  Coord ab = {.x = b.x - a.x, .y = b.y - a.y};
+  Coord cb = {.x = b.x - c.x, .y = b.y - c.y};
+  double dot = ((ab.x * cb.x) + (ab.y * cb.y));
+  double cross = ((ab.x * cb.y) - (ab.y * cb.x));
+  return fabs(atan2(cross, dot));
+}
+
+double oturin_a_gift_wrapping_tbb::ABTP(Coord a, Coord c) {
+  Coord b{.x = a.x, .y = (a.y - 1)};
+  return ABTP(b, a, c);
+}
+
+double oturin_a_gift_wrapping_tbb::Distance(Coord a, Coord b) {
+  int t1 = a.x - b.x;
+  int t2 = a.y - b.y;
+  return sqrt((t1 * t1) + (t2 * t2));
+}
+
+bool oturin_a_gift_wrapping_tbb::TestTaskTBB::PreProcessingImpl() {
+  // Init value for input and output
+  unsigned int input_size = task_data->inputs_count[0];
+  auto *in_ptr = reinterpret_cast<Coord *>(task_data->inputs[0]);
+  input_ = std::vector<Coord>(in_ptr, in_ptr + input_size);
+  n_ = int(input_.size());
+  output_ = std::vector<Coord>();
+  output_.reserve(n_);
+
+  // check if all points are same
+  auto are_same = [&](const auto &p) { return p == input_[0]; };
+  return !std::ranges::all_of(input_.begin(), input_.end(), are_same);
+}
+
+bool oturin_a_gift_wrapping_tbb::TestTaskTBB::ValidationImpl() {
+  return task_data->inputs_count[0] >= 3;  // task requires 3 or more points to wrap
+}
+
+void oturin_a_gift_wrapping_tbb::TestTaskTBB::PointSearcher::operator()(const tbb::blocked_range<int> &r) {
+  int begin = r.begin();
+  int end = r.end();
+  const Coord penultimate_element = p_->output_[p_->output_.size() - 2];
+  const Coord last_element = p_->output_.back();
+
+  for (int i = begin; i < end; i++) {
+    double t = ABTP(penultimate_element, last_element, p_->input_[i]);
+    p_->PointSearch(t, line_angle_, search_index, i);
+  }
+}
+
+void oturin_a_gift_wrapping_tbb::TestTaskTBB::PointSearcher::join(const PointSearcher &x) {
+  if (line_angle_ <= x.line_angle_ &&
+      (line_angle_ != x.line_angle_ || Distance(p_->output_.back(), p_->input_[x.search_index]) < Distance(p_->output_.back(), p_->input_[search_index]))) {
+    search_index = x.search_index;
+    line_angle_ = x.line_angle_;
+  }
+}
+
+bool oturin_a_gift_wrapping_tbb::TestTaskTBB::RunImpl() {
+  if (!output_.empty()) {
+    output_.clear();
+  }
+  // this .clear() used ONLY for perftest TaskRun. for some reason output_ has something in it
+
+  // find most left point (priority to top)
+  int start_index = FindMostLeft();
+  output_.push_back(input_[start_index]);
+
+  // find second point
+  double line_angle = -5;
+  int search_index = 0;
+  for (int i = 0; i < n_; i++) {
+    if (i == start_index) {
+      continue;
+    }
+    double t = ABTP(input_[start_index], input_[i]);
+    if (t > line_angle) {
+      line_angle = t;
+      search_index = i;
+    } else if (t == line_angle) {
+      if (Distance(input_[start_index], input_[i]) < Distance(input_[start_index], input_[search_index])) {
+        search_index = i;
+        line_angle = t;
+      }
+    }
+  }
+
+  // main loop
+  do {
+    output_.push_back(input_[search_index]);
+
+    PointSearcher ps(this, search_index);
+    tbb::parallel_reduce(tbb::blocked_range<int>(0, n_), ps);
+    search_index = ps.search_index;
+
+  } while (search_index != start_index);
+
+  return true;
+}
+
+bool oturin_a_gift_wrapping_tbb::TestTaskTBB::PostProcessingImpl() {
+  auto *result_ptr = reinterpret_cast<Coord *>(task_data->outputs[0]);
+  std::ranges::copy(output_.begin(), output_.end(), result_ptr);
+  return true;
+}
+
+int oturin_a_gift_wrapping_tbb::TestTaskTBB::FindMostLeft() {
+  Coord most_left = input_[0];
+  int start_index = 0;
+  for (int i = 1; i < n_; i++) {
+    if (input_[i].x < most_left.x || (input_[i].x == most_left.x && input_[i].y > most_left.y)) {
+      start_index = i;
+      most_left = input_[i];
+    }
+  }
+  return start_index;
+}
+
+void oturin_a_gift_wrapping_tbb::TestTaskTBB::PointSearch(const double t, double &line_angle, int &search_index, const int i) {
+  if (t < line_angle) {
+    return;
+  }
+  if (output_.back() != input_[i] && output_[output_.size() - 2] != input_[i]) {
+    if (t == line_angle && Distance(output_.back(), input_[i]) >= Distance(output_.back(), input_[search_index])) {
+      return;
+    }
+    search_index = i;
+    line_angle = t;
+  }
+}
+\end{lstlisting}
+
+
+\subsection{ops\_stl.hpp}
+\label{sec:stl.hpp}
+\begin{lstlisting}[language=C++]
+#pragma once
+
+#include <cstddef>
+#include <utility>
+#include <vector>
+
+#include "core/task/include/task.hpp"
+
+namespace oturin_a_gift_wrapping_stl {
+
+struct Coord {
+  int x, y;
+  bool operator==(const Coord o) const { return (x == o.x && y == o.y); }
+  bool operator!=(const Coord o) const { return x != o.x || y != o.y; }
+};
+
+double Distance(Coord a, Coord b);
+
+// Angle Between Three Points
+double ABTP(Coord a, Coord b, Coord c);
+
+// Angle Between Three Points for leftmost point
+double ABTP(Coord a, Coord c);
+
+class TestTaskSTL : public ppc::core::Task {
+ public:
+  explicit TestTaskSTL(ppc::core::TaskDataPtr task_data) : Task(std::move(task_data)) {}
+  bool PreProcessingImpl() override;
+  bool ValidationImpl() override;
+  bool RunImpl() override;
+  bool PostProcessingImpl() override;
+
+#ifdef __linux__
+  void SearchThreadP(std::size_t start, std::size_t end, std::pair<int, double> &thread_result);
+#endif
+  std::pair<int, double> SearchThread(std::size_t start, std::size_t end);
+
+ private:
+  std::vector<Coord> input_, output_;
+  int n_;
+
+  int FindMostLeft();
+  void FindSecondPoint(int start_index, int &search_index);
+  void PointSearch(double t, double &line_angle, std::size_t &search_index, std::size_t i);
+};
+
+}  // namespace oturin_a_gift_wrapping_stl
+\end{lstlisting}
+
+\subsection{ops\_stl.cpp}
+\label{sec:stl.cpp}
+\begin{lstlisting}[language=C++]
+#include "stl/oturin_a_gift_wrapping/include/ops_stl.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <numbers>
+#include <thread>
+#include <utility>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+double oturin_a_gift_wrapping_stl::ABTP(Coord a, Coord b, Coord c) {
+  Coord ab = {.x = b.x - a.x, .y = b.y - a.y};
+  Coord cb = {.x = b.x - c.x, .y = b.y - c.y};
+  double dot = ((ab.x * cb.x) + (ab.y * cb.y));
+  double cross = ((ab.x * cb.y) - (ab.y * cb.x));
+  return fabs(atan2(cross, dot));
+}
+
+double oturin_a_gift_wrapping_stl::ABTP(Coord a, Coord c) {
+  Coord b{.x = a.x, .y = (a.y - 1)};
+  return ABTP(b, a, c);
+}
+
+double oturin_a_gift_wrapping_stl::Distance(Coord a, Coord b) {
+  int t1 = a.x - b.x;
+  int t2 = a.y - b.y;
+  return sqrt((t1 * t1) + (t2 * t2));
+}
+
+bool oturin_a_gift_wrapping_stl::TestTaskSTL::PreProcessingImpl() {
+  // Init value for input and output
+  unsigned int input_size = task_data->inputs_count[0];
+  auto *in_ptr = reinterpret_cast<Coord *>(task_data->inputs[0]);
+  input_ = std::vector<Coord>(in_ptr, in_ptr + input_size);
+  n_ = int(input_.size());
+  output_ = std::vector<Coord>();
+  output_.reserve(n_);
+
+  // check if all points are same
+  auto are_same = [&](const auto &p) { return p == input_[0]; };
+  return !std::ranges::all_of(input_.begin(), input_.end(), are_same);
+}
+
+bool oturin_a_gift_wrapping_stl::TestTaskSTL::ValidationImpl() {
+  return task_data->inputs_count[0] >= 3;  // task requires 3 or more points to wrap
+}
+
+#ifdef __linux__
+bool oturin_a_gift_wrapping_stl::TestTaskSTL::RunImpl() {
+  if (!output_.empty()) {
+    output_.clear();
+  }
+  // this .clear() used ONLY for perftest TaskRun. for some reason output_ has something in it
+
+  // find most left point (priority to top)
+  int start_index = FindMostLeft();
+  output_.push_back(input_[start_index]);
+
+  int search_index = 0;
+  FindSecondPoint(start_index, search_index);
+
+  std::vector<std::thread> threads(ppc::util::GetPPCNumThreads() - 1);  // -1 because main thread will not be here
+  std::vector<std::pair<int, double>> thread_results(threads.size());
+  std::size_t thread_block = 0;
+  if (!threads.empty()) {
+    thread_block = input_.size() / (threads.size() + 1);
+    for (int i = 0; i < (int)threads.size(); i++) {
+      thread_results[i].first = 10;
+      threads[i] = std::thread(
+          [&](const int i) { SearchThreadP(i * thread_block, (i + 1) * thread_block, thread_results[i]); }, i);
+    }
+  }
+
+  // main loop
+  do {
+    output_.push_back(input_[search_index]);
+
+    for (auto &i : thread_results) {
+      i.first = -1;  // start work
+    }
+
+    std::pair<int, double> main_thread_result = SearchThread(thread_block * threads.size(), input_.size());
+
+    double reference_abtp = main_thread_result.second;
+    double reference_distance = Distance(output_.back(), input_[main_thread_result.first]);
+    search_index = main_thread_result.first;
+
+    double secondary_abtp = NAN;
+    double secondary_distance = NAN;
+
+    while (true) {
+      if (std::ranges::all_of(thread_results.cbegin(), thread_results.cend(), [](auto &i) { return i.first >= 0; })) {
+        break;
+      }
+      std::this_thread::yield();
+    }
+
+    for (int i = 0; i < (int)threads.size(); i++) {
+      secondary_abtp = thread_results[i].second;
+      if (secondary_abtp > reference_abtp) {
+        reference_abtp = secondary_abtp;
+        reference_distance = Distance(output_.back(), input_[thread_results[i].first]);
+        search_index = thread_results[i].first;
+      } else if (reference_abtp == secondary_abtp) {
+        secondary_distance = Distance(output_.back(), input_[thread_results[i].first]);
+        if (reference_distance > secondary_distance) {
+          reference_abtp = secondary_abtp;
+          reference_distance = secondary_distance;
+          search_index = thread_results[i].first;
+        }
+      }
+    }
+
+  } while (search_index != start_index);
+
+  for (int i = 0; i < (int)threads.size(); i++) {
+    thread_results[i].first = -2;
+    threads[i].join();
+  }
+  return true;
+}
+
+#else
+bool oturin_a_gift_wrapping_stl::TestTaskSTL::RunImpl() {
+  if (!output_.empty()) {
+    output_.clear();
+  }
+  // this .clear() used ONLY for perftest TaskRun. for some reason output_ has something in it
+
+  // find most left point (priority to top)
+  int start_index = FindMostLeft();
+  output_.push_back(input_[start_index]);
+
+  int search_index = 0;
+  FindSecondPoint(start_index, search_index);
+
+  std::vector<std::thread> threads(ppc::util::GetPPCNumThreads() - 1);  // -1 because main thread will not be here
+  std::vector<std::pair<int, double>> thread_results(threads.size());
+  std::size_t thread_block = 0;
+  if (!threads.empty()) {
+    thread_block = input_.size() / (threads.size() + 1);
+  }
+
+  // main loop
+  do {
+    output_.push_back(input_[search_index]);
+
+    for (int i = 0; i < (int)threads.size(); i++) {
+      threads[i] = std::thread(
+          [&](const int i) { thread_results[i] = SearchThread(i * thread_block, (i + 1) * thread_block); }, i);
+    }
+
+    std::pair<int, double> main_thread_result = SearchThread(thread_block * threads.size(), input_.size());
+
+    double reference_abtp = main_thread_result.second;
+    double reference_distance = Distance(output_.back(), input_[main_thread_result.first]);
+    search_index = main_thread_result.first;
+
+    double secondary_abtp = NAN;
+    double secondary_distance = NAN;
+
+    for (int i = 0; i < (int)threads.size(); i++) {
+      threads[i].join();
+      secondary_abtp = thread_results[i].second;
+      if (secondary_abtp > reference_abtp) {
+        reference_abtp = secondary_abtp;
+        reference_distance = Distance(output_.back(), input_[thread_results[i].first]);
+        search_index = thread_results[i].first;
+      } else if (reference_abtp == secondary_abtp) {
+        secondary_distance = Distance(output_.back(), input_[thread_results[i].first]);
+        if (reference_distance > secondary_distance) {
+          reference_abtp = secondary_abtp;
+          reference_distance = secondary_distance;
+          search_index = thread_results[i].first;
+        }
+      }
+    }
+
+  } while (search_index != start_index);
+
+  return true;
+}
+#endif
+
+void oturin_a_gift_wrapping_stl::TestTaskSTL::FindSecondPoint(int start_index, int &search_index) {
+  double line_angle = -std::numbers::pi;
+  for (int i = 0; i < n_; i++) {
+    if (i == start_index) {
+      continue;
+    }
+    double t = ABTP(input_[start_index], input_[i]);
+    if (t > line_angle || (t == line_angle && Distance(input_[start_index], input_[i]) < Distance(input_[start_index], input_[search_index]))) {
+      search_index = i;
+      line_angle = t;
+    }
+  }
+}
+
+#ifdef __linux__
+void oturin_a_gift_wrapping_stl::TestTaskSTL::SearchThreadP(std::size_t start, std::size_t end, std::pair<int, double> &thread_result) {
+  while (thread_result.first != -2) {
+    std::this_thread::yield();
+    if (thread_result.first != -1) {
+      continue;
+    }
+    thread_result = SearchThread(start, end);
+  }
+}
+#endif
+
+std::pair<int, double> oturin_a_gift_wrapping_stl::TestTaskSTL::SearchThread(std::size_t start, std::size_t end) {
+  double line_angle = -std::numbers::pi;
+  std::size_t search_index = start;
+  for (std::size_t i = start; i < end; i++) {
+    double t = ABTP(output_[output_.size() - 2], output_.back(), input_[i]);
+    PointSearch(t, line_angle, search_index, i);
+  }
+
+  return {(int)search_index, line_angle};
+}
+
+bool oturin_a_gift_wrapping_stl::TestTaskSTL::PostProcessingImpl() {
+  auto *result_ptr = reinterpret_cast<Coord *>(task_data->outputs[0]);
+  std::ranges::copy(output_.begin(), output_.end(), result_ptr);
+  return true;
+}
+
+int oturin_a_gift_wrapping_stl::TestTaskSTL::FindMostLeft() {
+  Coord most_left = input_[0];
+  int start_index = 0;
+  for (int i = 1; i < n_; i++) {
+    if (input_[i].x < most_left.x || (input_[i].x == most_left.x && input_[i].y > most_left.y)) {
+      start_index = i;
+      most_left = input_[i];
+    }
+  }
+  return start_index;
+}
+
+void oturin_a_gift_wrapping_stl::TestTaskSTL::PointSearch(const double t, double &line_angle, std::size_t &search_index, const std::size_t i) {
+  if (t < line_angle) {
+    return;
+  }
+  if (output_.back() != input_[i] && output_[output_.size() - 2] != input_[i]) {
+    if (t == line_angle && Distance(output_.back(), input_[i]) >= Distance(output_.back(), input_[search_index])) {
+      return;
+    }
+    search_index = i;
+    line_angle = t;
+  }
+}
+\end{lstlisting}
+
+
+\subsection{ops\_all.hpp}
+\label{sec:all.hpp}
+\begin{lstlisting}[language=C++]
+#pragma once
+
+#include <oneapi/tbb/blocked_range.h>
+#include <tbb/tbb.h>
+
+#include <boost/mpi/collectives.hpp>
+#include <boost/mpi/communicator.hpp>
+#include <utility>
+#include <vector>
+
+#include "core/task/include/task.hpp"
+
+namespace oturin_a_gift_wrapping_all {
+
+struct Coord {
+  int x, y;
+  bool operator==(const Coord o) const { return (x == o.x && y == o.y); }
+  bool operator!=(const Coord o) const { return x != o.x || y != o.y; }
+
+  // NOLINTBEGIN(readability-identifier-naming): tbb using "serialize"
+  template <typename Archive>
+  void serialize(Archive &ar, const unsigned int version) {
+    ar & x;
+    ar & y;
+  }
+  // NOLINTEND(readability-identifier-naming)
+};
+
+double Distance(Coord a, Coord b);
+
+// Angle Between Three Points
+double ABTP(Coord a, Coord b, Coord c);
+
+// Angle Between Three Points for leftmost point
+double ABTP(Coord a, Coord c);
+
+class TestTaskALL : public ppc::core::Task {
+ public:
+  explicit TestTaskALL(ppc::core::TaskDataPtr task_data) : Task(std::move(task_data)) {}
+  bool PreProcessingImpl() override;
+  bool ValidationImpl() override;
+  bool RunImpl() override;
+  bool PostProcessingImpl() override;
+
+  class PointSearcher;
+
+ private:
+  std::vector<Coord> input_, output_;
+  int n_;
+
+  int FindMostLeft();
+  void PointSearch(double t, double &line_angle, int &search_index, int i);
+  void SearchSecondPoint(int start_index, int &search_index);
+
+  boost::mpi::communicator world_;
+};
+
+class TestTaskALL::PointSearcher {
+  TestTaskALL *p_;
+  double line_angle_ = -5;
+
+ public:
+  int search_index;
+
+  PointSearcher(TestTaskALL *parent, int search_index) : p_(parent), search_index(search_index) {}
+
+  PointSearcher(PointSearcher &x, tbb::split) : p_(x.p_), search_index(x.search_index) {}
+
+  void operator()(const tbb::blocked_range<int> &r);
+
+  void join(const PointSearcher &x);  // NOLINT(readability-identifier-naming): tbb using this name
+};
+
+}  // namespace oturin_a_gift_wrapping_all
+\end{lstlisting}
+
+\subsection{ops\_all.cpp}
+\label{sec:all.cpp}
+\begin{lstlisting}[language=C++]
+#include "all/oturin_a_gift_wrapping/include/ops_all.hpp"
+
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_reduce.h>
+
+#include <algorithm>
+#include <cmath>
+#include <vector>
+
+double oturin_a_gift_wrapping_all::ABTP(Coord a, Coord b, Coord c) {
+  Coord ab = {.x = b.x - a.x, .y = b.y - a.y};
+  Coord cb = {.x = b.x - c.x, .y = b.y - c.y};
+  double dot = ((ab.x * cb.x) + (ab.y * cb.y));
+  double cross = ((ab.x * cb.y) - (ab.y * cb.x));
+  return fabs(atan2(cross, dot));
+}
+
+double oturin_a_gift_wrapping_all::ABTP(Coord a, Coord c) {
+  Coord b{.x = a.x, .y = (a.y - 1)};
+  return ABTP(b, a, c);
+}
+
+double oturin_a_gift_wrapping_all::Distance(Coord a, Coord b) {
+  int t1 = a.x - b.x;
+  int t2 = a.y - b.y;
+  return double((t1 * t1) + (t2 * t2));
+}
+
+bool oturin_a_gift_wrapping_all::TestTaskALL::PreProcessingImpl() {
+  if (world_.rank() == 0) {
+    // Init value for input and output
+    unsigned int input_size = task_data->inputs_count[0];
+    auto *in_ptr = reinterpret_cast<Coord *>(task_data->inputs[0]);
+    input_ = std::vector<Coord>(in_ptr, in_ptr + input_size);
+
+    for (int i = 1; i < world_.size(); i++) {
+      world_.send(i, 1, input_.data(), (int)input_size);
+    }
+
+  } else {
+    input_ = std::vector<Coord>(task_data->inputs_count[0]);
+    world_.recv(0, 1, input_.data(), (int)input_.size());
+  }
+
+  n_ = int(input_.size());
+  output_ = std::vector<Coord>();
+  output_.reserve(n_);
+
+  // check if all points are same
+  auto are_same = [&](const auto &p) { return p == input_[0]; };
+  return !std::ranges::all_of(input_.begin(), input_.end(), are_same);
+}
+
+bool oturin_a_gift_wrapping_all::TestTaskALL::ValidationImpl() {
+  return task_data->inputs_count[0] >= 3;  // task requires 3 or more points to wrap
+}
+
+void oturin_a_gift_wrapping_all::TestTaskALL::PointSearcher::operator()(const tbb::blocked_range<int> &r) {
+  int begin = r.begin();
+  int end = r.end();
+  const Coord penultimate_element = p_->output_[p_->output_.size() - 2];
+  const Coord last_element = p_->output_.back();
+
+  for (int i = begin; i < end; i++) {
+    double t = ABTP(penultimate_element, last_element, p_->input_[i]);
+    p_->PointSearch(t, line_angle_, search_index, i);
+  }
+}
+
+void oturin_a_gift_wrapping_all::TestTaskALL::PointSearcher::join(const PointSearcher &x) {
+  if (line_angle_ <= x.line_angle_ &&
+      (line_angle_ != x.line_angle_ || Distance(p_->output_.back(), p_->input_[x.search_index]) < Distance(p_->output_.back(), p_->input_[search_index]))) {
+    search_index = x.search_index;
+    line_angle_ = x.line_angle_;
+  }
+}
+
+bool oturin_a_gift_wrapping_all::TestTaskALL::RunImpl() {
+  double line_angle = -5;
+  int search_index = 0;
+  int start_index = 0;
+
+  int world_size = world_.size();
+
+  if (world_size > (int)input_.size()) {
+    if (world_.rank() + 1 > (int)input_.size()) {
+      return true;
+    }
+    world_size = (int)input_.size();
+  }
+  int thread_block = (int)input_.size() / world_size;
+
+  if (!output_.empty()) {
+    output_.clear();
+  }
+  // this .clear() used ONLY for perftest TaskRun. for some reason output_ has something in it
+
+  // find most left point (priority to top)
+  start_index = FindMostLeft();
+  output_.push_back(input_[start_index]);
+
+  SearchSecondPoint(start_index, search_index);
+
+  // main loop
+  do {
+    output_.push_back(input_[search_index]);
+
+    PointSearcher ps(this, search_index);
+    if (world_.rank() == world_.size() - 1) {
+      tbb::parallel_reduce(tbb::blocked_range<int>(world_.rank() * thread_block, n_), ps);
+    } else {
+      tbb::parallel_reduce(tbb::blocked_range<int>(world_.rank() * thread_block, (world_.rank() + 1) * thread_block), ps);
+    }
+    search_index = ps.search_index;
+
+    if (world_.rank() == 0) {
+      line_angle = ABTP(output_[output_.size() - 2], output_.back(), input_[search_index]);
+
+      for (int i = 1; i < world_size; i++) {
+        int temp_index = 0;
+        world_.recv(i, 111, &temp_index, 1);
+
+        double t = ABTP(output_[output_.size() - 2], output_.back(), input_[temp_index]);
+        PointSearch(t, line_angle, search_index, temp_index);
+      }
+
+      for (int i = 1; i < world_size; i++) {
+        world_.send(i, 222, &search_index, 1);
+      }
+
+    } else {
+      world_.send(0, 111, &search_index, 1);
+      world_.recv(0, 222, &search_index, 1);
+    }
+
+  } while (search_index != start_index);
+
+  return true;
+}
+
+bool oturin_a_gift_wrapping_all::TestTaskALL::PostProcessingImpl() {
+  auto *result_ptr = reinterpret_cast<Coord *>(task_data->outputs[0]);
+  std::ranges::copy(output_.begin(), output_.end(), result_ptr);
+  world_.barrier();
+  return true;
+}
+
+int oturin_a_gift_wrapping_all::TestTaskALL::FindMostLeft() {
+  Coord most_left = input_[0];
+  int start_index = 0;
+  for (int i = 1; i < n_; i++) {
+    if (input_[i].x < most_left.x || (input_[i].x == most_left.x && input_[i].y > most_left.y)) {
+      start_index = i;
+      most_left = input_[i];
+    }
+  }
+  return start_index;
+}
+
+void oturin_a_gift_wrapping_all::TestTaskALL::PointSearch(const double t, double &line_angle, int &search_index, const int i) {
+  if (t < line_angle) {
+    return;
+  }
+  if (output_.back() != input_[i] && output_[output_.size() - 2] != input_[i]) {
+    if (t == line_angle && Distance(output_.back(), input_[i]) >= Distance(output_.back(), input_[search_index])) {
+      return;
+    }
+    search_index = i;
+    line_angle = t;
+  }
+}
+
+void oturin_a_gift_wrapping_all::TestTaskALL::SearchSecondPoint(int start_index, int &search_index) {
+  double line_angle = -5;
+  for (int i = 0; i < n_; i++) {
+    if (i == start_index) {
+      continue;
+    }
+    double t = ABTP(input_[start_index], input_[i]);
+    if (t > line_angle) {
+      line_angle = t;
+      search_index = i;
+    } else if (t == line_angle) {
+      if (Distance(input_[start_index], input_[i]) < Distance(input_[start_index], input_[search_index])) {
+        search_index = i;
+        line_angle = t;
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+
+\end{document}
