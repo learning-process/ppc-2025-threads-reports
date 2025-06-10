@@ -1,0 +1,728 @@
+\documentclass[12pt,a4paper]{extarticle}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{url}
+\usepackage{framed}
+\usepackage{listings}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{caption}
+
+\geometry{
+	a4paper,
+	left=30mm,
+	right=15mm,
+	top=20mm,
+	bottom=20mm
+}
+
+\titleformat{\section}[block]
+{\normalfont\fontsize{14}{16}\bfseries\centering}
+{\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries\filcenter}
+{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries\filcenter}
+{\thesubsubsection.}{0.5em}{}
+
+\lstset{
+	basicstyle=\ttfamily\small,
+	keywordstyle=\color{blue},
+	commentstyle=\color{green},
+	stringstyle=\color{red},
+	frame=single,
+	tabsize=4,
+	showstringspaces=false,
+	breaklines=true
+}
+\sloppy
+\onehalfspacing
+\setlength{\parindent}{1.25cm}
+
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+
+\onehalfspacing
+
+\begin{center}
+    \textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\ 			
+    \vspace{0.5cm}
+    Федеральное государственное автономное образовательное учреждение высшего образования \\ 
+    \vspace{0.5cm}
+    \textbf{«Национальный исследовательский Нижегородский государственный университет имени Н.И. Лобачевского»} \\
+    (ННГУ)\\
+    \vspace{0.5cm}
+    \textbf{Институт информационных технологий, математики и механики}
+\end{center}
+\vspace{2.5cm}
+\begin{center}
+    \textbf{Отчёт по лабораторной работе}
+
+    на тему: 
+
+    \textbf{"Вычисление многомерных интегралов с использованием многошаговой схемы (метод прямоугольников)"}
+\end{center}
+
+\vspace{2.5cm}
+
+\begin{flushright}
+    \textbf{Выполнил:} \\
+    студент 3 курса группы 3822Б1ПР2 \\
+    Мурадов М.М. \\
+
+    \vspace{1cm}
+
+\noindent\textbf{Преподаватель:} \\
+к.т.н., доцент кафедры ВВСП \\
+{Сысоев А.В.}
+\end{flushright}
+
+\vspace{2em}
+
+\vfill
+
+\begin{center}
+    Нижний Новгород \\
+    2025 г.
+\end{center}
+
+\end{center}
+\end{titlepage}
+
+\newpage
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+Вычисление многомерных интегралов — важная задача в вычислительной математике, физике, машинном обучении и других областях. Одним из базовых методов численного интегрирования является метод прямоугольников, который аппроксимирует интеграл суммой значений функции в узлах сетки, умноженных на объёмы соответствующих гиперпрямоугольников.
+
+Несмотря на простоту, метод требует значительных вычислительных ресурсов при работе с многомерными областями: даже для умеренной точности количество вычислений функции растёт как степенная функция от числа измерений. Это делает целесообразным применение параллельных вычислений, позволяющих распределить нагрузку между ядрами процессора или узлами кластера.
+
+В данной работе исследуется реализация метода прямоугольников для многомерных интегралов с использованием параллельных технологий. Основное внимание уделено эффективному распараллеливанию вычислений, минимизации накладных расходов и анализу достигнутого ускорения по сравнению с последовательным алгоритмом.
+
+\newpage
+\section{Постановка задачи}
+
+\noindent \textbf{Дано:}
+\begin{enumerate}
+    \item Интегрируемая функция \( f(\mathbf{x}) \), где \( \mathbf{x} = (x_1, x_2, \ldots, x_N) \) — \( N \)-мерный вектор, определённая в области интегрирования \( \Omega = [a_1, b_1] \times [a_2, b_2] \times \ldots \times [a_N, b_N] \).
+    
+    \item Число точек разбиения \( m_i \) по каждой координате \( x_i \), определяющее размер сетки \( \mathcal{G} = m_1 \times m_2 \times \ldots \times m_N \).
+    
+    \item Тип узла для метода прямоугольников (левый, правый или центральный).
+\end{enumerate}
+
+\noindent \textbf{Требуется:}\newline
+Реализовать \textbf{алгоритм} вычисления \( N \)-мерного интеграла:
+    \[
+    I \approx \sum_{k_1=0}^{m_1-1} \sum_{k_2=0}^{m_2-1} \cdots \sum_{k_N=0}^{m_N-1} f(\mathbf{p}_{\mathbf{k}}) \cdot \Delta V,
+    \]
+    где:
+    \begin{itemize}
+        \item \( \mathbf{p}_{\mathbf{k}} \) — координаты узла в гиперпрямоугольнике с индексами \( \mathbf{k} = (k_1, k_2, \ldots, k_N) \),
+        \item \( \Delta V = \prod_{i=1}^N \frac{b_i - a_i}{m_i} \) — объём элементарной ячейки.
+    \end{itemize}
+
+\newpage
+\section{Описание алгоритма}
+
+Основная идея алгоритма заключается в систематическом обходе всех точек $N$-мерной сетки и накоплении суммы значений функции. Процесс можно разделить на четыре логических этапа.
+
+Сначала происходит инициализация: результат интегрирования \texttt{res\_} обнуляется, а размерность задачи $N$ определяется из переданных границ интегрирования \texttt{bounds\_}, где каждая размерность задаётся парой чисел $[a_i, b_i]$.
+
+Далее вычисляются два ключевых параметра: объём элементарной гиперячейки $\Delta V$ и общее количество точек сетки. Объём рассчитывается как произведение длин сторон всех измерений:
+\[
+\Delta V = \prod_{i=1}^{N} \frac{b_i - a_i}{\texttt{grains\_}},
+\]
+где \texttt{grains\_} — количество разбиений по каждой координате. Общее число точек определяется возведением этого значения в степень размерности: $\texttt{pts} = (\texttt{grains\_})^N$.
+
+Сердце алгоритма — обход всех точек сетки в едином цикле. Для каждой точки с индексом $i \in [0, \texttt{pts}-1]$:
+\begin{enumerate}
+    \item Индекс преобразуется в $N$-мерные координаты через последовательное деление и взятие остатка от \texttt{grains\_}
+    \item Фактические координаты точки вычисляются по формуле: 
+    \[
+    p_k = a_k + (\text{локальный индекс}) \cdot \frac{b_k - a_k}{\texttt{grains\_}}
+    \]
+    \item Значение функции $f(\mathbf{p})$ добавляется к накапливаемой сумме
+\end{enumerate}
+
+В финале накопленная сумма умножается на объём ячейки, что даёт приближённое значение интеграла. Важно отметить, что координаты рассчитываются динамически без хранения всей сетки в памяти, что критично для больших размерностей.
+
+Алгоритм использует левые узлы для аппроксимации — значение берётся в начале каждого гиперпрямоугольника. Для перехода к центральным узлам потребовалась бы простая модификация: добавление смещения $0.5 \cdot h_k$ к координатам. 
+
+Интересно, что несмотря на $N$-мерность задачи, обход реализован через единый одномерный цикл. Такой подход упрощает логику кода, но требует дополнительных вычислений для декомпозиции индекса. При этом алгоритм остаётся экономичным по памяти, поскольку не хранит координатную сетку целиком.
+
+\newpage
+\section{Описание схемы распараллеливания}
+
+Распараллеливание алгоритма строится на концепции распределения вычислительной нагрузки между несколькими потоками. Основная идея заключается в разделении всего множества точек сетки на независимые блоки, каждый из которых обрабатывается отдельным потоком. 
+
+Перед началом параллельных вычислений выполняется подготовительный этап. Рассчитывается объём элементарной гиперячейки $\Delta V$ и предвычисляются шаги сетки по каждому измерению. Эти значения сохраняются в массиве \texttt{precomp}, чтобы избежать повторных вычислений внутри цикла. Также определяется общее количество точек $\texttt{pts} = (\texttt{grains\_})^N$.
+
+Сердце параллельной реализации — обработка точек сетки в цикле. Весь диапазон индексов $[0, \texttt{pts}-1]$ делится на примерно равные части, количество которых соответствует числу доступных вычислительных потоков. Каждый поток получает свой непрерывный блок индексов и работает с ним независимо. 
+
+Для каждой точки в своём блоке поток выполняет те же операции, что и в последовательной версии: преобразует одномерный индекс в $N$-мерные координаты, вычисляет значение функции и добавляет его в свою локальную сумму. Интересно отметить, что координаты рассчитываются динамически на основе предвычисленных шагов, что минимизирует вычислительные затраты.
+
+Важным аспектом является организация суммирования результатов. Каждый поток накапливает свою частичную сумму в отдельной переменной, что исключает необходимость синхронизации во время вычислений. После завершения работы всех потоков происходит объединение частичных сумм в общий результат. 
+
+Финальная операция — умножение накопленной суммы на объём ячейки — выполняется один раз после параллельной секции. Такой подход позволяет достичь практически линейного ускорения для задач с регулярной вычислительной нагрузкой, что характерно для интегрирования постоянных функций или функций с умеренными колебаниями.
+
+\newpage
+\section{Описание OpenMP-версии}
+
+OpenMP версия алгоритма использует директивы компилятора для эффективного распределения вычислительной нагрузки между ядрами процессора. Ключевым элементом реализации является параллельный цикл с явно заданными параметрами управления потоками.
+
+Перед входом в параллельную секцию выполняются подготовительные вычисления. Рассчитывается общий объём гиперячейки $\Delta V$ и создаётся массив \texttt{precomp}, содержащий шаги сетки по каждому измерению. Это исключает повторные вычисления шагов внутри цикла и снижает вычислительные накладные расходы.
+
+Центральный элемент реализации — директива OpenMP:
+\begin{verbatim}
+#pragma omp parallel for reduction(+:lres) firstprivate(args) 
+           schedule(static, pts / ppc::util::GetPPCNumThreads())
+\end{verbatim}
+Эта директива организует параллельное выполнение следующим образом:
+\begin{itemize}
+    \item \texttt{reduction(+:lres)} создаёт приватные копии переменной \texttt{lres} для каждого потока и автоматически суммирует их после завершения параллельной секции
+    \item \texttt{firstprivate(args)} инициализирует приватную копию вектора аргументов для каждого потока
+    \item \texttt{schedule(static, ...)} распределяет итерации блоками фиксированного размера, где размер блока равен общему числу точек, делённому на количество потоков
+\end{itemize}
+
+Каждый поток внутри параллельного цикла независимо обрабатывает свой блок итераций. Для каждой точки выполняются операции:
+\begin{enumerate}
+    \item Преобразование одномерного индекса в $N$-мерные координаты
+    \item Расчёт фактического положения точки с использованием предвычисленных шагов
+    \item Вычисление значения функции и добавление к локальной сумме
+\end{enumerate}
+
+После завершения параллельного цикла происходит финальная операция: накопленная сумма умножается на объём гиперячейки. Важно отметить, что размер блока вычисляется динамически через \texttt{ppc::util::GetPPCNumThreads()}, что обеспечивает оптимальное распределение нагрузки для текущего аппаратного окружения.
+
+Такая реализация обеспечивает минимальные накладные расходы на создание потоков и эффективно использует кэш-память процессора за счёт статического распределения блоков итераций.
+
+\newpage
+\section{Описание IntelTBB-версии}
+
+Реализация с использованием Intel Threading Building Blocks (TBB) применяет высокоуровневые примитивы параллелизма для эффективного распределения вычислительной нагрузки. Основой реализации является паттерн параллельной редукции, оптимизированный для итеративных вычислений.
+
+Перед параллельными вычислениями выполняется стандартная подготовка: рассчитывается объём гиперячейки $\Delta V$ и предвычисляются шаги сетки по каждому измерению, сохраняемые в массиве \texttt{precomp}. Эти значения используются всеми потоками без модификации.
+
+Ключевые компоненты реализации:
+
+\begin{enumerate}
+    \item \textbf{Инициализация окружения}:
+    \begin{verbatim}
+oneapi::tbb::task_arena arena(ppc::util::GetPPCNumThreads());
+    \end{verbatim}
+    Создаётся управляемая область выполнения (arena) с количеством потоков, соответствующим аппаратным возможностям системы.
+    
+    \item \textbf{Параллельная редукция}:
+    \begin{verbatim}
+res_ = arena.execute([&] {
+    return oneapi::tbb::parallel_reduce(...);
+});
+    \end{verbatim}
+    Внутри arena выполняется параллельная редукция, объединяющая результаты частичных вычислений.
+    
+    \item \textbf{Разбиение диапазона}:
+    \begin{verbatim}
+oneapi::tbb::blocked_range<std::size_t>(0, pts, pts / arena.max_concurrency())
+    \end{verbatim}
+    Весь диапазон точек [0, pts-1] разбивается на блоки, размер которых адаптируется под количество потоков.
+    
+    \item \textbf{Обработка поддиапазона}:
+    \begin{verbatim}
+[&](const tbb::blocked_range<std::size_t>& rng, double s) {
+    for (std::size_t i = rng.begin(); i < rng.end(); i++) {
+        // Вычисления для точки i
+    }
+    return s;
+}
+    \end{verbatim}
+    Каждый поток обрабатывает свой поддиапазон итераций, вычисляя локальную сумму значений функции.
+    
+    \item \textbf{Схема редукции}:
+    \begin{verbatim}
+std::plus<>()
+    \end{verbatim}
+    Частичные суммы объединяются с помощью стандартной операции сложения.
+\end{enumerate}
+
+Особенностью реализации является автоматическое управление гранулярностью: размер блока вычисляется как $\text{pts} / \text{max\_concurrency}$, что обеспечивает балансировку нагрузки. Для каждой точки в блоке поток выполняет преобразование индекса в координаты и вычисление значения функции, идентичное последовательной версии.
+
+После завершения параллельной редукции результат умножается на объём гиперячейки. Такая реализация эффективно использует кэш-память за счёт локализации данных в пределах обрабатываемых блоков и минимизирует накладные расходы на синхронизацию.
+
+\newpage
+\section{Описание STL-версии}
+В функции \texttt{RunImpl} сначала инициализируется результат \texttt{res\_} нулем. Затем вычисляется размерность области интегрирования \texttt{dims} и шаг интегрирования \texttt{hh}. Шаг интегрирования определяется как произведение разностей границ области интегрирования, деленное на количество разбиений \texttt{grains\_}. Также вычисляется вектор \texttt{precomp}, содержащий предварительно вычисленные значения шагов для каждой размерности.
+
+Далее определяется общее количество точек \texttt{pts}, которые необходимо обработать. Это количество равно \texttt{grains\_} в степени \texttt{dims}. Затем определяется количество потоков \texttt{threads}, которые будут использоваться для параллельных вычислений. Вектор \texttt{jobs} содержит количество точек, которые должен обработать каждый поток. Если количество точек не делится нацело на количество потоков, остаток добавляется к первому потоку.
+
+Для каждого потока создается задача, которая заключается в вычислении частичной суммы значений функции в заданных точках. Каждая задача выполняется в отдельном потоке, который создается с помощью \texttt{std::thread}. Внутри потока вычисляется сумма значений функции в заданных точках, и результат сохраняется в векторе \texttt{partial\_sums}.
+
+После завершения всех потоков вычисляется общая сумма \texttt{total\_sum} как сумма всех частичных сумм. Результат интегрирования \texttt{res\_} получается умножением общей суммы на шаг интегрирования \texttt{hh}.
+
+\newpage
+\section{Описание гибридной версии с MPI и STL}
+
+В функции \texttt{RunImpl} сначала инициализируется результат \texttt{res\_} нулем. Затем с помощью функций \texttt{boost::mpi::broadcast} передаются значения \texttt{grains\_} и \texttt{bounds\_} от корневого процесса ко всем остальным процессам в коммуникаторе \texttt{world\_}. Это обеспечивает синхронизацию данных между всеми узлами.
+
+Далее вычисляется размерность области интегрирования \texttt{dims} и шаг интегрирования \texttt{hh}. Шаг интегрирования определяется как произведение разностей границ области интегрирования, деленное на количество разбиений \texttt{grains\_}. Также вычисляется вектор \texttt{precomp}, содержащий предварительно вычисленные значения шагов для каждой размерности.
+
+Общее количество точек \texttt{pts}, которые необходимо обработать, равно \texttt{grains\_} в степени \texttt{dims}. Каждый процесс MPI получает свою долю точек \texttt{locpts} для обработки. Если общее количество точек не делится нацело на количество процессов, остаток добавляется к последнему процессу.
+
+Внутри каждого процесса MPI определяется количество потоков \texttt{threads}, которые будут использоваться для параллельных вычислений. Вектор \texttt{jobs} содержит количество точек, которые должен обработать каждый поток. Если количество точек не делится нацело на количество потоков, остаток добавляется к первому потоку.
+
+Для каждого потока создается задача, которая заключается в вычислении частичной суммы значений функции в заданных точках. Каждая задача выполняется в отдельном потоке, который создается с помощью \texttt{std::thread}. Внутри потока вычисляется сумма значений функции в заданных точках, и результат сохраняется в векторе \texttt{partial\_sums}.
+
+После завершения всех потоков вычисляется общая сумма \texttt{total\_sum} как сумма всех частичных сумм. Затем с помощью функции \texttt{boost::mpi::reduce} выполняется редукция всех локальных сумм в общую сумму \texttt{res\_} на корневом процессе. Результат интегрирования \texttt{res\_} получается умножением общей суммы на шаг интегрирования \texttt{hh}.
+
+\newpage
+\section{Результаты экспериментов}
+Для тестирования было произведено 475 итераций трехмерной функции суммирования.
+
+В таблице ниже представлены результаты времени 10 запусков для различных реализаций при использовании, время указано в секундах.
+
+В Pipeline входит валидация, предобработка, исполнение, и постобработка, в Task - только обработка.
+\newline
+
+\begin{center}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Конфигурация} & \textbf{Pipeline (ms)} & \textbf{Task (ms)} \\
+\hline
+SEQ       & 7.7342 & 7.3442 \\
+OMP(2)          & 3.2320 & 3.0018 \\
+TBB(2)          & 3.7542 & 3.7440 \\
+STL(2)          & 3.4032 & 3.4029 \\
+MPI(2)+STL(2)   & 2.2570 & 2.0114 \\
+\hline
+\end{tabular}
+\captionof{table}{Сравнение производительности}
+\end{center}
+
+\subsection*{Вывод}
+
+Анализ результатов показывает, что параллельные версии метода прямоугольников демонстрируют значительное ускорение по сравнению с последовательной версией. Наилучшие результаты по времени выполнения показала версия с использованием комбинации MPI и STL, что связано с эффективным распределением нагрузки как между процессами, так и между потоками внутри каждого процесса. Это позволяет максимально использовать доступные вычислительные ресурсы и минимизировать время выполнения.
+
+Версия с использованием OpenMP показала хорошие результаты, уступая лишь комбинации MPI+STL. Это свидетельствует о высокой эффективности OpenMP для параллельных вычислений на многопроцессорных системах с общей памятью.
+
+Версия с использованием TBB показала несколько худшие результаты по сравнению с OpenMP и MPI+STL, что может быть связано с особенностями реализации библиотеки и дополнительными накладными расходами. Версия с использованием STL показала результаты, близкие к версии с TBB, что свидетельствует о сравнимой эффективности этих подходов.
+
+Таким образом, использование параллельных технологий позволяет значительно ускорить процесс численного интегрирования. Комбинация MPI и STL показала хорошие результаты, что делает ее предпочтительным выбором для задач, требующих максимальной производительности на распределенных системах. Выбор конкретной технологии зависит от особенностей задачи и доступных вычислительных ресурсов.
+
+\newpage
+\section{Заключение}
+В данной работе была рассмотрена задача вычисления многомерных интегралов методом прямоугольников. Основной целью работы являлось исследование и сравнение различных подходов к параллельной реализации данного метода для повышения эффективности вычислений.
+
+В ходе работы были реализованы и исследованы несколько версий метода прямоугольников: последовательная версия, а также параллельные версии с использованием технологий OpenMP, TBB, STL и комбинации MPI+STL. Каждая из версий была протестирована на предмет производительности, и результаты были представлены в виде сравнительной таблицы.
+
+Анализ результатов показал, что параллельные версии метода прямоугольников демонстрируют значительное ускорение по сравнению с последовательной версией, что свидетельствует о широких возможностях для ускорения решения подобных задач.
+
+\newpage
+\section{Список литературы}
+\begin{enumerate}
+  \item В.П. Гергель. «Теория и практика параллельных вычислений». М.: Интернет-Университет, 2007.
+  \item OpenMP Architecture Review Board. OpenMP API Specification for Parallel Programming. \url{https://www.openmp.org/}
+  \item Intel. Threading Building Blocks. \url{https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html}
+  \item Boost C++ Libraries. Boost.MPI. \url{https://www.boost.org/doc/libs/release/doc/html/mpi.html}
+\end{enumerate}
+
+\newpage
+\appendix
+\section{Приложение}
+\subsection{ops\_seq.cpp}
+\begin{lstlisting}
+#include "seq/Muradov_m_rect_int/include/ops_seq.hpp"
+
+#include <cmath>
+#include <cstddef>
+#include <utility>
+#include <vector>
+
+bool muradov_m_rect_int_seq::RectIntTaskSequential::ValidationImpl() {
+  return task_data->inputs_count[0] == 1 && task_data->inputs_count[1] > 0 && task_data->outputs_count[0] == 1;
+}
+
+bool muradov_m_rect_int_seq::RectIntTaskSequential::PreProcessingImpl() {
+  auto* p_grains = reinterpret_cast<int*>(task_data->inputs[0]);
+  grains_ = *p_grains;
+
+  auto* p_bounds = reinterpret_cast<std::pair<double, double>*>(task_data->inputs[1]);
+  bounds_.assign(p_bounds, p_bounds + task_data->inputs_count[1]);
+
+  return true;
+}
+
+bool muradov_m_rect_int_seq::RectIntTaskSequential::RunImpl() {
+  res_ = 0;
+
+  const auto dims = static_cast<std::size_t>(bounds_.size());
+
+  std::size_t pts = 1;
+  double hh = 1.0;
+  for (std::size_t i = 0; i < dims; i++) {
+    hh *= (bounds_[i].second - bounds_[i].first) / grains_;
+    pts *= grains_;
+  }
+
+  FunArgs args(dims);
+  for (std::size_t i = 0; i < pts; i++) {
+    auto j = i;
+    for (size_t k = 0; k < dims; k++) {
+      args[k] = bounds_[k].first;
+      args[k] += double(j % grains_) * (bounds_[k].second - bounds_[k].first) / grains_;
+      j /= grains_;
+    }
+    res_ += fun_(args);
+  }
+
+  res_ *= hh;
+
+  return true;
+}
+
+bool muradov_m_rect_int_seq::RectIntTaskSequential::PostProcessingImpl() {
+  *reinterpret_cast<double*>(task_data->outputs[0]) = res_;
+  return true;
+}
+\end{lstlisting}
+\subsection{ops\_omp.cpp}
+\begin{lstlisting}
+#include "omp/Muradov_m_rect_int/include/ops_omp.hpp"
+
+#include <omp.h>
+
+#include <cmath>
+#include <cstddef>
+#include <utility>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+bool muradov_m_rect_int_omp::RectIntTaskOmp::ValidationImpl() {
+  return task_data->inputs_count[0] == 1 && task_data->inputs_count[1] > 0 && task_data->outputs_count[0] == 1;
+}
+
+bool muradov_m_rect_int_omp::RectIntTaskOmp::PreProcessingImpl() {
+  auto* p_grains = reinterpret_cast<int*>(task_data->inputs[0]);
+  grains_ = *p_grains;
+
+  auto* p_bounds = reinterpret_cast<std::pair<double, double>*>(task_data->inputs[1]);
+  bounds_.assign(p_bounds, p_bounds + task_data->inputs_count[1]);
+
+  return true;
+}
+
+bool muradov_m_rect_int_omp::RectIntTaskOmp::RunImpl() {
+  res_ = 0;
+
+  const auto dims = static_cast<std::size_t>(bounds_.size());
+
+  double hh = 1.0;
+  std::vector<double> precomp(dims);
+  for (std::size_t i = 0; i < dims; i++) {
+    hh *= (bounds_[i].second - bounds_[i].first) / grains_;
+    precomp[i] = (bounds_[i].second - bounds_[i].first) / grains_;
+  }
+  int pts = static_cast<int>(std::pow(grains_, dims));
+
+  FunArgs args(dims);
+  decltype(res_) lres{};
+#pragma omp parallel for reduction(+ : lres) firstprivate(args) schedule(static, pts / ppc::util::GetPPCNumThreads())
+  for (int i = 0; i < pts; i++) {
+    auto j = i;
+    for (size_t k = 0; k < dims; k++) {
+      args[k] = bounds_[k].first;
+      args[k] += (j % grains_) * precomp[k];
+      j /= grains_;
+    }
+    lres += fun_(args);
+  }
+
+  res_ = lres * hh;
+
+  return true;
+}
+
+bool muradov_m_rect_int_omp::RectIntTaskOmp::PostProcessingImpl() {
+  *reinterpret_cast<double*>(task_data->outputs[0]) = res_;
+  return true;
+}
+\end{lstlisting}
+\subsection{ops\_tbb.cpp}
+\begin{lstlisting}
+#include "tbb/Muradov_m_rect_int/include/ops_tbb.hpp"
+
+#include <oneapi/tbb/task_arena.h>
+#include <tbb/tbb.h>
+
+#include <cmath>
+#include <cstddef>
+#include <functional>
+#include <utility>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+#include "oneapi/tbb/blocked_range.h"
+#include "oneapi/tbb/parallel_reduce.h"
+
+bool muradov_m_rect_int_tbb::RectIntTaskTBBPar::ValidationImpl() {
+  return task_data->inputs_count[0] == 1 && task_data->inputs_count[1] > 0 && task_data->outputs_count[0] == 1;
+}
+
+bool muradov_m_rect_int_tbb::RectIntTaskTBBPar::PreProcessingImpl() {
+  auto* p_grains = reinterpret_cast<int*>(task_data->inputs[0]);
+  grains_ = *p_grains;
+
+  auto* p_bounds = reinterpret_cast<std::pair<double, double>*>(task_data->inputs[1]);
+  bounds_.assign(p_bounds, p_bounds + task_data->inputs_count[1]);
+
+  return true;
+}
+
+bool muradov_m_rect_int_tbb::RectIntTaskTBBPar::RunImpl() {
+  res_ = 0;
+
+  const auto dims = static_cast<std::size_t>(bounds_.size());
+
+  double hh = 1.0;
+  std::vector<double> precomp(dims);
+  for (std::size_t i = 0; i < dims; i++) {
+    hh *= (bounds_[i].second - bounds_[i].first) / grains_;
+    precomp[i] = (bounds_[i].second - bounds_[i].first) / grains_;
+  }
+  const auto pts = static_cast<std::size_t>(std::pow(grains_, dims));
+
+  oneapi::tbb::task_arena arena(ppc::util::GetPPCNumThreads());
+  res_ = arena.execute([&] {
+    return oneapi::tbb::parallel_reduce(
+        oneapi::tbb::blocked_range<std::size_t>(0, pts, pts / arena.max_concurrency()), 0.0,
+        [&](const tbb::blocked_range<std::size_t>& rng, double s) {
+          FunArgs args(dims);
+
+          for (std::size_t i = rng.begin(); i < rng.end(); i++) {
+            auto j = i;
+            for (size_t k = 0; k < dims; k++) {
+              args[k] = bounds_[k].first + (double(j % grains_) * precomp[k]);
+              j /= grains_;
+            }
+            s += fun_(args);
+          }
+          return s;
+        },
+        std::plus<>());
+  });
+
+  res_ *= hh;
+
+  return true;
+}
+
+bool muradov_m_rect_int_tbb::RectIntTaskTBBPar::PostProcessingImpl() {
+  *reinterpret_cast<double*>(task_data->outputs[0]) = res_;
+  return true;
+}
+\end{lstlisting}
+\subsection{ops\_stl.cpp}
+\begin{lstlisting}
+#include "stl/Muradov_m_rect_int/include/ops_stl.hpp"
+
+#include <cmath>
+#include <cstddef>
+#include <functional>
+#include <thread>
+#include <utility>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+bool muradov_m_rect_int_stl::RectIntTaskSTLPar::ValidationImpl() {
+  return task_data->inputs_count[0] == 1 && task_data->inputs_count[1] > 0 && task_data->outputs_count[0] == 1;
+}
+
+bool muradov_m_rect_int_stl::RectIntTaskSTLPar::PreProcessingImpl() {
+  auto* p_grains = reinterpret_cast<int*>(task_data->inputs[0]);
+  grains_ = *p_grains;
+
+  auto* p_bounds = reinterpret_cast<std::pair<double, double>*>(task_data->inputs[1]);
+  bounds_.assign(p_bounds, p_bounds + task_data->inputs_count[1]);
+
+  return true;
+}
+
+bool muradov_m_rect_int_stl::RectIntTaskSTLPar::RunImpl() {
+  res_ = 0;
+
+  const auto dims = static_cast<std::size_t>(bounds_.size());
+
+  double hh = 1.0;
+  std::vector<double> precomp(dims);
+  for (std::size_t i = 0; i < dims; i++) {
+    hh *= (bounds_[i].second - bounds_[i].first) / grains_;
+    precomp[i] = (bounds_[i].second - bounds_[i].first) / grains_;
+  }
+  int pts = static_cast<int>(std::pow(grains_, dims));
+
+  int threads = ppc::util::GetPPCNumThreads();
+  std::vector<int> jobs(threads, pts / threads);
+  if (threads > 0) {
+    jobs[0] += pts % threads;
+  }
+
+  std::vector<double> partial_sums(threads, 0.0);
+  std::vector<std::thread> ts(threads);
+  int left = 0;
+  for (int id = 0; id < threads; id++) {
+    ts[id] = std::thread(
+        [&](int start_pt, int end_pt, double& partial_sum) {  // NOLINT(bugprone-easily-swappable-parameters)
+          double sum = 0.0;
+          FunArgs args(dims);
+          for (int i = start_pt; i < end_pt; i++) {
+            auto j = i;
+            for (size_t k = 0; k < dims; k++) {
+              args[k] = bounds_[k].first;
+              args[k] += (j % grains_) * precomp[k];
+              j /= grains_;
+            }
+            sum += fun_(args);
+          }
+          partial_sum = sum;
+        },
+        left, left + jobs[id], std::ref(partial_sums[id]));
+    left += jobs[id];
+  }
+
+  double total_sum = 0.0;
+  for (int i = 0; i < threads; i++) {
+    ts[i].join();
+    total_sum += partial_sums[i];
+  }
+  res_ = total_sum * hh;
+
+  return true;
+}
+
+bool muradov_m_rect_int_stl::RectIntTaskSTLPar::PostProcessingImpl() {
+  *reinterpret_cast<double*>(task_data->outputs[0]) = res_;
+  return true;
+}
+\end{lstlisting}
+\subsection{ops\_all.cpp}
+\begin{lstlisting}
+#include "all/Muradov_m_rect_int/include/ops_all.hpp"
+
+#include <cmath>
+#include <cstddef>
+#include <functional>
+#include <thread>
+#include <utility>
+#include <vector>
+
+#include "boost/mpi/collectives/broadcast.hpp"
+#include "boost/mpi/collectives/reduce.hpp"
+#include "boost/serialization/utility.hpp"  // NOLINT
+#include "boost/serialization/vector.hpp"   // NOLINT
+#include "core/util/include/util.hpp"
+
+bool muradov_m_rect_int_all::RectIntTaskMpiStlPar::ValidationImpl() {
+  return world_.rank() != 0 ||
+         (task_data->inputs_count[0] == 1 && task_data->inputs_count[1] > 0 && task_data->outputs_count[0] == 1);
+}
+
+bool muradov_m_rect_int_all::RectIntTaskMpiStlPar::PreProcessingImpl() {
+  if (world_.rank() == 0) {
+    auto* p_grains = reinterpret_cast<int*>(task_data->inputs[0]);
+    grains_ = *p_grains;
+
+    auto* p_bounds = reinterpret_cast<std::pair<double, double>*>(task_data->inputs[1]);
+    bounds_.assign(p_bounds, p_bounds + task_data->inputs_count[1]);
+  }
+
+  return true;
+}
+
+bool muradov_m_rect_int_all::RectIntTaskMpiStlPar::RunImpl() {
+  res_ = 0;
+
+  boost::mpi::broadcast(world_, grains_, 0);
+  boost::mpi::broadcast(world_, bounds_, 0);
+
+  const auto dims = static_cast<std::size_t>(bounds_.size());
+
+  double hh = 1.0;
+  std::vector<double> precomp(dims);
+  for (std::size_t i = 0; i < dims; i++) {
+    hh *= (bounds_[i].second - bounds_[i].first) / grains_;
+    precomp[i] = (bounds_[i].second - bounds_[i].first) / grains_;
+  }
+  int pts = static_cast<int>(std::pow(grains_, dims));
+
+  int locpts = pts / world_.size();
+  if (world_.rank() == (world_.size() - 1)) {
+    locpts += pts % world_.size();
+  }
+
+  const int threads = ppc::util::GetPPCNumThreads();
+  std::vector<int> jobs(threads, locpts / threads);
+  if (threads > 0) {
+    jobs[0] += locpts % threads;
+  }
+
+  std::vector<double> partial_sums(threads, 0.0);
+  std::vector<std::thread> ts(threads);
+  int left = world_.rank() * (pts / world_.size());
+  for (int id = 0; id < threads; id++) {
+    ts[id] = std::thread(
+        [&](int start_pt, int end_pt, double& partial_sum) {
+          double sum = 0.0;
+          FunArgs args(dims);
+          for (int i = start_pt; i < end_pt; i++) {
+            auto j = i;
+            for (size_t k = 0; k < dims; k++) {
+              args[k] = bounds_[k].first;
+              args[k] += (j % grains_) * precomp[k];
+              j /= grains_;
+            }
+            sum += fun_(args);
+          }
+          partial_sum = sum;
+        },
+        left, left + jobs[id], std::ref(partial_sums[id]));
+    left += jobs[id];
+  }
+
+  double total_sum = 0.0;
+  for (int i = 0; i < threads; i++) {
+    ts[i].join();
+    total_sum += partial_sums[i];
+  }
+
+  boost::mpi::reduce(world_, total_sum, res_, std::plus{}, 0);
+
+  res_ *= hh;
+
+  return true;
+}
+
+bool muradov_m_rect_int_all::RectIntTaskMpiStlPar::PostProcessingImpl() {
+  if (world_.rank() == 0) {
+    *reinterpret_cast<double*>(task_data->outputs[0]) = res_;
+  }
+  return true;
+}
+\end{lstlisting}
+\end{document}
