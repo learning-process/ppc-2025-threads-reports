@@ -1,0 +1,790 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage[T2A]{fontenc}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{geometry}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{noto}
+\setlength{\parindent}{1em}
+
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  columns=fullflexible,
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=true,
+  postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
+  numbers=left,
+  numberstyle=\tiny,
+  language=C++,
+  keywordstyle=\color{blue},
+  commentstyle=\color{green!50!black},
+  stringstyle=\color{red},
+  tabsize=2,
+  keepspaces=true
+}
+
+\begin{document}
+\begin{titlepage}
+\centering
+{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ\\
+РОССИЙСКОЙ ФЕДЕРАЦИИ}
+
+\vspace{1em}
+
+Федеральное государственное автономное образовательное учреждение высшего образования\\
+\textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»}\\
+\textbf{(ННГУ)}
+
+\vspace{2em}
+
+\textbf{Институт информационных технологий, математики и механики}
+
+\vspace{1em}
+
+\textbf{Кафедра высокопроизводительных вычислений и системного программирования}
+
+\vspace{2em}
+
+Направление подготовки: "Прикладная математика и информатика"\\
+Профиль подготовки: "общий профиль" \\
+
+\vspace{4em}
+
+\textbf{\Large ОТЧЕТ}\\
+по третьей лабораторной работе:\\
+\vspace{1em}
+\textbf{«Умножение разреженных матриц. Элементы типа double. Формат хранения матрицы – строковый (CRS).»}
+
+\begin{flushright}
+\textbf{Выполнил}:\\[5pt]
+студент группы {3822Б1ПМоп3} \\[1em]
+{Коротин Егор Вадимович}
+\end{flushright}
+
+\vspace{1em}
+
+\begin{flushright}
+\noindent\textbf{Проверил:} \\[5pt]
+к. т. н., доцент кафедры ВВСП \\[5pt]
+{Сысоев Александр Владимирович}
+\end{flushright}
+
+\vspace{1em}
+
+\vfill
+\textbf{Нижний Новгород}\\
+2025
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+Умножение разреженных матриц является одной из ключевых операций в вычислительной математике, особенно в задачах с большими матрицами, где большинство элементов равны нулю. Формат хранения Compressed Row Storage (CRS) позволяет эффективно хранить такие матрицы, минимизируя использование памяти за счёт сохранения только ненулевых элементов. Это делает CRS популярным выбором для высокопроизводительных вычислений (HPC), машинного обучения, моделирования физических процессов и других областей.
+
+В отличие от умножения плотных матриц, где алгоритмы, такие как алгоритм Кэннона, оптимизированы для равномерного распределения вычислений, умножение разреженных матриц требует подходов, учитывающих структуру ненулевых элементов. В данной работе реализован алгоритм умножения разреженных матриц, использующий транспонирование матрицы \( B \) для выполнения операции "строка на строку". Цель работы — разработка и сравнение различных реализаций алгоритма умножения разреженных матриц в формате CRS, включая последовательную версию и параллельные версии с использованием OpenMP, Intel TBB, STL (на \texttt{std::thread}) и гибридного подхода MPI+STL. Каждая реализация тестируется на корректность и производительность для различных размеров матриц и плотности ненулевых элементов.
+
+Применение разреженных матриц в формате CRS актуально в следующих областях:
+\begin{enumerate}
+    \item \textit{Высокопроизводительные вычисления (HPC):} решение систем линейных уравнений, численные методы для уравнений в частных производных.
+    \item \textit{Машинное обучение:} обработка графов, вычисление градиентов в нейросетях.
+    \item \textit{Компьютерная графика:} рендеринг сцен с использованием разреженных структур данных.
+    \item \textit{Финансовая аналитика:} моделирование сложных систем с разреженными матрицами корреляций.
+    \item \textit{Криптография:} алгоритмы с использованием разреженных матриц для оптимизации вычислений.
+\end{enumerate}
+
+\section{Постановка задачи и цель работы}
+Даны две разреженные матрицы \( A \) и \( B \) размера \( N \times N \), хранящиеся в формате CRS. Необходимо вычислить их произведение \( C = A \times B \), также хранящееся в формате CRS. Цель работы заключается в разработке и сравнении пяти реализаций:
+\begin{itemize}
+    \item Последовательная версия (Seq),
+    \item Параллельная версия с OpenMP,
+    \item Параллельная версия с TBB,
+    \item Параллельная версия с STL,
+    \item Гибридная версия с MPI+STL.
+\end{itemize}
+Каждая реализация должна быть протестирована на корректность и производительность для различных размеров матриц и плотности ненулевых элементов. Для корректной работы алгоритма предполагается, что входные матрицы могут быть прямоугольными, но в случае необходимости их можно дополнить нулями до квадратных матриц.
+
+\section{Описание формата CRS}
+Формат Compressed Row Storage (CRS) хранит разреженную матрицу \( A \) размера \( N \times M \) с \( NNZ \) ненулевыми элементами в трёх массивах:
+\begin{itemize}
+    \item \texttt{val} — массив ненулевых элементов матрицы, хранящихся построчно.
+    \item \texttt{col} — массив индексов столбцов для каждого ненулевого элемента, того же размера, что и \texttt{val}.
+    \item \texttt{rI} — массив префиксных сумм, где \texttt{rI[i+1]} указывает количество ненулевых элементов в \( i \)-й строке матрицы, а \texttt{rI[0] = 0} и \texttt{rI[N] = NNZ}.
+\end{itemize}
+Этот формат позволяет эффективно обращаться к ненулевым элементам строки, минимизируя затраты памяти и ускоряя вычисления за счёт исключения операций с нулевыми элементами.
+
+\section{Описание последовательной версии алгоритма}
+Алгоритм умножения разреженных матриц в формате CRS включает следующие этапы:
+\begin{enumerate}
+    \item \textbf{Транспонирование матрицы \( B \).}
+    \begin{itemize}
+        \item Создаётся массив \texttt{tr\_i} для хранения префиксных сумм ненулевых элементов по столбцам матрицы \( B \).
+        \item Формируются массивы \texttt{tval} и \texttt{tcol} для хранения ненулевых элементов и индексов строк транспонированной матрицы \( B^T \).
+    \end{itemize}
+    \item \textbf{Умножение строк.} Для каждой строки \( i \) матрицы \( A \):
+    \begin{itemize}
+        \item Извлекаются ненулевые элементы строки \( A_i \) из \texttt{A\_val} и их индексы столбцов из \texttt{A\_col}.
+        \item Для каждого столбца \( j \) транспонированной матрицы \( B^T \), выполняется умножение "строка на строку" с использованием двух указателей (\texttt{ai} и \texttt{bt}) для сравнения индексов.
+        \item Ненулевые результаты (\texttt{sum}) добавляются в массивы \texttt{output\_val} и \texttt{output\_col}, а \texttt{output\_rI} обновляется.
+    \end{itemize}
+    \item \textbf{Финализация.} Массив \texttt{output\_rI} обновляется путём накопления префиксных сумм для корректного представления результирующей матрицы \( C \).
+\end{enumerate}
+
+\section{Описание OpenMP версии алгоритма}
+Параллелизация достигается с использованием директив OpenMP, таких как \texttt{\#pragma omp parallel for}, для распределения обработки строк матрицы \( A \) между потоками.
+
+\subsection{Этапы работы алгоритма}
+\begin{enumerate}
+    \item \textbf{Транспонирование матрицы \( B \).} Аналогично последовательной версии, матрица \( B \) транспонируется для упрощения умножения.
+    \item \textbf{Параллельное умножение строк.} 
+    \begin{itemize}
+        \item Директива \texttt{\#pragma omp parallel for} распределяет строки матрицы \( A \) между потоками.
+        \item Каждый поток обрабатывает подмножество строк, выполняя умножение "строка на строку" с использованием локальных буферов \texttt{local\_val}, \texttt{local\_col} и \texttt{temp\_r\_i}.
+        \item Ненулевые результаты накапливаются в локальных буферах потока.
+    \end{itemize}
+    \item \textbf{Объединение результатов.} Локальные буферы всех потоков объединяются в глобальные массивы \texttt{output\_val}, \texttt{output\_col} и \texttt{output\_rI}.
+    \item \textbf{Финализация.} Массив \texttt{output\_rI} обновляется путём накопления префиксных сумм.
+\end{enumerate}
+
+\subsection{Особенности параллелизации}
+\begin{itemize}
+    \item \textbf{Простота:} Директивы OpenMP упрощают распределение задач между потоками.
+    \item \textbf{Локальные буферы:} Использование локальных массивов для каждого потока минимизирует конфликты записи.
+    \item \textbf{Масштабируемость:} OpenMP автоматически адаптируется к числу доступных ядер.
+\end{itemize}
+
+\section{Описание TBB версии алгоритма}
+Intel TBB использует \texttt{task\_group} для параллельной обработки строк матрицы \( A \), обеспечивая динамическое распределение задач.
+
+\subsection{Этапы работы алгоритма}
+\begin{enumerate}
+    \item \textbf{Транспонирование матрицы \( B \).} Аналогично последовательной версии.
+    \item \textbf{Параллельное умножение строк.} 
+    \begin{itemize}
+        \item Строки матрицы \( A \) делятся на диапазоны с использованием константы \texttt{magic\_const} (число потоков).
+        \item Метод \texttt{MulTask} выполняет умножение "строка на строку" для заданного диапазона строк, сохраняя результаты в локальных буферах \texttt{local\_val}, \texttt{local\_col} и \texttt{temp\_r\_i}.
+        \item Задачи выполняются в \texttt{tbb::task\_group} для параллельного выполнения.
+    \end{itemize}
+    \item \textbf{Объединение результатов.} Локальные буферы объединяются в глобальные массивы.
+    \item \textbf{Финализация.} Массив \texttt{output\_rI} обновляется.
+\end{enumerate}
+
+\subsection{Особенности параллелизации}
+\begin{itemize}
+    \item \textbf{Динамическое распределение:} TBB распределяет задачи между потоками динамически.
+    \item \textbf{Эффективность:} Использование \texttt{task\_group} минимизирует накладные расходы.
+    \item \textbf{Масштабируемость:} TBB адаптируется к числу доступных ядер.
+\end{itemize}
+
+\section{Описание STL версии алгоритма}
+Параллелизация достигается с использованием \texttt{std::thread}, где каждый поток обрабатывает подмножество строк матрицы \( A \). Реализация схожа с TBB, но использует явное управление потоками.
+
+\subsection{Этапы работы алгоритма}
+\begin{enumerate}
+    \item \textbf{Транспонирование матрицы \( B \).} Аналогично последовательной версии.
+    \item \textbf{Параллельное умножение строк.}
+    \begin{itemize}
+        \item Строки матрицы \( A \) делятся между потоками (\texttt{std::thread}).
+        \item Каждый поток выполняет умножение "строка на строку" для своего диапазона, сохраняя результаты в локальных буферах.
+    \end{itemize}
+    \item \textbf{Синхронизация.} Потоки объединяются (\texttt{thread.join()}), и локальные результаты сливаются в глобальные массивы.
+    \item \textbf{Финализация.} Массив \texttt{output\_rI} обновляется.
+\end{enumerate}
+
+\subsection{Особенности параллелизации}
+\begin{itemize}
+    \item \textbf{Ручное управление:} Потоки создаются и синхронизируются вручную.
+    \item \textbf{Гибкость:} Возможность точной настройки распределения задач.
+    \item \textbf{Локальные буферы:} Использование локальных буферов предотвращает конфликты доступа.
+\end{itemize}
+
+\section{Описание гибридной MPI+STL версии алгоритма}
+Гибридный подход комбинирует MPI для распределения данных между процессами и STL для многопоточной обработки внутри каждого процесса.
+
+\subsection{Этапы работы алгоритма}
+\begin{enumerate}
+    \item \textbf{Подготовка данных.} 
+    \begin{itemize}
+        \item На процессе с рангом 0 матрица \( B \) транспонируется, а данные матриц \( A \) и \( B^T \) транслируются всем процессам с помощью \texttt{boost::mpi::broadcast}.
+        \item Строки матрицы \( A \) делятся между процессами.
+    \end{itemize}
+    \item \textbf{Параллельное умножение.} Каждый процесс MPI обрабатывает свои локальные строки:
+    \begin{itemize}
+        \item Внутри процесса строки распределяются между потоками (\texttt{std::thread}) с использованием метода \texttt{MulTask}.
+        \item Каждый поток выполняет умножение "строка на строку".
+    \end{itemize}
+    \item \textbf{Сбор результатов.} Локальные результаты собираются на процессе с рангом 0 с помощью \texttt{boost::mpi::gather} и \texttt{boost::mpi::reduce} и объединяются в глобальную матрицу \( C \).
+    \item \textbf{Финализация.} Массив \texttt{output\_rI} обновляется.
+\end{enumerate}
+
+\subsection{Особенности параллелизации}
+\begin{itemize}
+    \item \textbf{Распределённые вычисления:} MPI распределяет строки между процессами.
+    \item \textbf{Многопоточность:} STL-потоки используются для параллелизации внутри процессов.
+    \item \textbf{Масштабируемость:} Подход эффективен для кластерных систем.
+\end{itemize}
+
+\section{Результаты экспериментов}
+Эксперименты проводились с использованием тестов на основе Google Test для плотных матриц размером \( 900 \times 900 \). Использовались 2 потока и 2 процесса для параллельных реализаций.
+
+\subsection{Корректность}
+Все реализации успешно прошли функциональные тесты, включая:
+\begin{itemize}
+    \item Умножение случайных матриц с погрешностью \( 10^{-6} \).
+    \item Сравнение с эталонным умножением.
+    \item Обработка единичных и нулевых матриц.
+    \item Проверка корректной обработки входных данных.
+\end{itemize}
+\newpage
+\subsection{Производительность}
+Результаты производительности представлены в таблице:
+
+\begin{table}[h]
+\centering
+\caption{Время выполнения (в секундах) для различных реализаций умножения разреженных матриц}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Реализация} & \textbf{Тест pipeline (с)} & \textbf{Тест task\_run (с)} \\
+\midrule
+Последовательная (Seq) & 7.039935917 & 6.997288832 \\
+MPI+STL & 8.511468337 & 7.995586843 \\
+OpenMP & 4.512761418 & 4.483964280 \\
+Intel TBB & 4.276448843 & 4.262802478 \\
+STL & 4.245027108 & 4.247979979 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Анализ результатов}
+\begin{itemize}
+    \item \textbf{STL} показала наилучшую производительность, обеспечивая минимальное время выполнения благодаря эффективному ручному управлению потоками.
+    \item \textbf{TBB} незначительно уступает STL, но превосходит OpenMP за счёт динамического распределения задач.
+    \item \textbf{OpenMP} демонстрирует хорошую производительность, но уступает STL и TBB из-за накладных расходов на управление потоками.
+    \item \textbf{Последовательная версия} ожидаемо показала наихудшие результаты.
+    \item \textbf{MPI+STL} оказалась медленнее последовательной версии, что связано с высокими накладными расходами на коммуникации между процессами при малом числе процессов.
+\end{itemize}
+
+\subsection{Сравнение ускорения}
+Ускорение (\( S \)) относительно последовательной реализации для теста \texttt{pipeline}:
+\begin{itemize}
+    \item STL: \( S = \frac{7.039935917}{4.245027108} \approx 1.6588 \)
+    \item TBB: \( S = \frac{7.039935917}{4.276448843} \approx 1.6465 \)
+    \item OpenMP: \( S = \frac{7.039935917}{4.512761418} \approx 1.5601 \)
+    \item MPI+STL: \( S = \frac{7.039935917}{8.511468337} \approx 0.8272 \)
+\end{itemize}
+
+\section{Заключение}
+В ходе работы были реализованы и протестированы пять вариантов алгоритма умножения разреженных матриц в формате CRS с использованием транспонирования матрицы \( B \). Все реализации показали корректные результаты. Параллельные версии (STL, TBB, OpenMP) обеспечили значительное ускорение по сравнению с последовательной реализацией, с STL как наиболее эффективной. Гибридная версия MPI+STL требует оптимизации для малых конфигураций, но имеет потенциал для масштабирования на больших кластерах.
+
+\section{Список литературы}
+\begin{enumerate}
+    \item OpenMP Architecture Review Board. "OpenMP Application Programming Interface." (2021).
+    \item Quinn M.J. Parallel Programming in C with MPI and OpenMP. – New York, NY: McGraw-Hill, 2004.
+    \item Гергель В.П. Теория и практика параллельных вычислений. М.: Интернет-Университет Информационных технологий; БИНОМ. Лаборатория знаний, 2007.
+    \item Intel. "Threading Building Blocks Documentation." (2023).
+    \item ISO/IEC 14882:2017. "Programming languages — C++."
+    \item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks}. — Нижний Новгород, 2007.
+\end{enumerate}
+
+\section{Приложение}
+\subsection{Seq}
+\begin{lstlisting}[language=C++]
+bool korotin_e_crs_seq::CrsMultiplicationSeq::RunImpl() {
+  std::vector<unsigned int> tr_i(*std::ranges::max_element(B_col_.begin(), B_col_.end()) + 2, 0);
+  unsigned int i = 0;
+  unsigned int j = 0;
+  for (i = 0; i < B_Nz_; i++) {
+    tr_i[B_col_[i] + 1]++;
+  }
+  for (i = 1; i < tr_i.size(); i++) {
+    tr_i[i] += tr_i[i - 1];
+  }
+
+  std::vector<unsigned int> tcol(B_Nz_, 0);
+  std::vector<double> tval(B_Nz_, 0);
+  for (i = 0; i < B_N_ - 1; i++) {
+    for (j = B_rI_[i]; j < B_rI_[i + 1]; j++) {
+      tval[tr_i[B_col_[j]]] = B_val_[j];
+      tcol[tr_i[B_col_[j]]] = i;
+      tr_i[B_col_[j]]++;
+    }
+  }
+  for (i = tr_i.size() - 1; i > 0; i--) {
+    tr_i[i] = tr_i[i - 1];
+  }
+  tr_i[0] = 0;
+
+  unsigned int ai = 0;
+  unsigned int bt = 0;
+  double sum = 0;
+  for (i = 0; i < A_N_ - 1; i++) {
+    for (j = 0; j < tr_i.size() - 1; j++) {
+      sum = 0;
+      ai = A_rI_[i];
+      bt = tr_i[j];
+      while (ai < A_rI_[i + 1] && bt < tr_i[j + 1]) {
+        if (A_col_[ai] == tcol[bt]) {
+          sum += A_val_[ai] * tval[bt];
+          ai++;
+          bt++;
+        } else if (A_col_[ai] < tcol[bt]) {
+          ai++;
+        } else {
+          bt++;
+        }
+      }
+      if (sum != 0) {
+        output_val_.push_back(sum);
+        output_col_.push_back(j);
+        output_rI_[i + 1]++;
+      }
+    }
+  }
+  for (i = 1; i < A_N_; i++) {
+    output_rI_[i] += output_rI_[i - 1];
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection{OpenMP}
+\begin{lstlisting}[language=C++]
+bool korotin_e_crs_omp::CrsMultiplicationOMP::RunImpl() {
+  std::vector<unsigned int> tr_i(*std::ranges::max_element(B_col_.begin(), B_col_.end()) + 2, 0);
+  unsigned int i = 0;
+  unsigned int j = 0;
+  for (i = 0; i < B_Nz_; i++) {
+    tr_i[B_col_[i] + 1]++;
+  }
+  for (i = 1; i < tr_i.size(); i++) {
+    tr_i[i] += tr_i[i - 1];
+  }
+
+  std::vector<unsigned int> tcol(B_Nz_, 0);
+  std::vector<double> tval(B_Nz_, 0);
+  for (i = 0; i < B_N_ - 1; i++) {
+    for (j = B_rI_[i]; j < B_rI_[i + 1]; j++) {
+      tval[tr_i[B_col_[j]]] = B_val_[j];
+      tcol[tr_i[B_col_[j]]] = i;
+      tr_i[B_col_[j]]++;
+    }
+  }
+  for (i = tr_i.size() - 1; i > 0; i--) {
+    tr_i[i] = tr_i[i - 1];
+  }
+  tr_i[0] = 0;
+
+  unsigned int ai = 0;
+  unsigned int bt = 0;
+  double sum = 0;
+  std::ranges::fill(output_rI_.begin(), output_rI_.end(), 0);
+  output_col_.clear();
+  output_val_.clear();
+  std::vector<std::vector<double>> local_val(omp_get_max_threads());
+  std::vector<std::vector<unsigned int>> local_col(omp_get_max_threads());
+  std::vector<int> temp_r_i(A_N_, 0);
+
+#pragma omp parallel for private(j, sum, ai, bt)
+  for (int k = 0; k < static_cast<int>(A_N_ - 1); k++) {
+    int thread_id = omp_get_thread_num();
+    for (j = 0; j < tr_i.size() - 1; j++) {
+      sum = 0;
+      ai = A_rI_[k];
+      bt = tr_i[j];
+      while (ai < A_rI_[k + 1] && bt < tr_i[j + 1]) {
+        if (A_col_[ai] == tcol[bt]) {
+          sum += A_val_[ai] * tval[bt];
+          ai++;
+          bt++;
+        } else if (A_col_[ai] < tcol[bt]) {
+          ai++;
+        } else {
+          bt++;
+        }
+      }
+      if (sum != 0) {
+        local_val[thread_id].push_back(sum);
+        local_col[thread_id].push_back(j);
+        temp_r_i[k + 1]++;
+      }
+    }
+  }
+
+  for (int t = 0; t < omp_get_max_threads(); t++) {
+    output_val_.insert(output_val_.end(), local_val[t].begin(), local_val[t].end());
+    output_col_.insert(output_col_.end(), local_col[t].begin(), local_col[t].end());
+  }
+
+  for (i = 1; i < A_N_; i++) {
+    output_rI_[i] += output_rI_[i - 1] + temp_r_i[i];
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection{TBB}
+\begin{lstlisting}[language=C++]
+bool korotin_e_crs_tbb::CrsMultiplicationTBB::RunImpl() {
+  std::vector<unsigned int> tr_i(*std::ranges::max_element(B_col_.begin(), B_col_.end()) + 2, 0);
+  unsigned int i = 0;
+  unsigned int j = 0;
+  for (i = 0; i < B_Nz_; i++) {
+    tr_i[B_col_[i] + 1]++;
+  }
+  for (i = 1; i < tr_i.size(); i++) {
+    tr_i[i] += tr_i[i - 1];
+  }
+
+  std::vector<unsigned int> tcol(B_Nz_, 0);
+  std::vector<double> tval(B_Nz_, 0);
+  for (i = 0; i < B_N_ - 1; i++) {
+    for (j = B_rI_[i]; j < B_rI_[i + 1]; j++) {
+      tval[tr_i[B_col_[j]]] = B_val_[j];
+      tcol[tr_i[B_col_[j]]] = i;
+      tr_i[B_col_[j]]++;
+    }
+  }
+  for (i = tr_i.size() - 1; i > 0; i--) {
+    tr_i[i] = tr_i[i - 1];
+  }
+  tr_i[0] = 0;
+
+  std::ranges::fill(output_rI_.begin(), output_rI_.end(), 0);
+  output_col_.clear();
+  output_val_.clear();
+  unsigned int magic_const = 4;
+  std::vector<std::vector<double>> local_val(magic_const);
+  std::vector<std::vector<unsigned int>> local_col(magic_const);
+  std::vector<unsigned int> temp_r_i(A_N_, 0);
+  tbb::task_group tg;
+
+  std::vector<size_t> delta(magic_const, A_N_ / magic_const);
+  for (i = 0; i < (A_N_ - 1) % magic_const; ++i) {
+    delta[i]++;
+  }
+  for (i = 1; i < magic_const; ++i) {
+    delta[i] += delta[i - 1];
+  }
+
+  tg.run([this, &delta, &local_val, &local_col, &temp_r_i, &tr_i, &tcol, &tval] {
+    MulTask(0, delta[0], local_val[0], local_col[0], temp_r_i, tr_i, tcol, tval);
+  });
+  for (i = 1; i < magic_const; ++i) {
+    tg.run([this, &delta, &local_val, &local_col, &temp_r_i, &tr_i, &tcol, &tval, i] {
+      MulTask(delta[i - 1], delta[i], local_val[i], local_col[i], temp_r_i, tr_i, tcol, tval);
+    });
+  }
+
+  tg.wait();
+
+  for (unsigned int t = 0; t < magic_const; ++t) {
+    output_val_.insert(output_val_.end(), local_val[t].begin(), local_val[t].end());
+    output_col_.insert(output_col_.end(), local_col[t].begin(), local_col[t].end());
+  }
+
+  for (i = 1; i < A_N_; ++i) {
+    output_rI_[i] += output_rI_[i - 1] + temp_r_i[i];
+  }
+  return true;
+}
+
+void korotin_e_crs_tbb::CrsMultiplicationTBB::MulTask(size_t l, size_t r, std::vector<double> &local_val,
+                                                      std::vector<unsigned int> &local_col,
+                                                      std::vector<unsigned int> &temp_r_i,
+                                                      const std::vector<unsigned int> &tr_i,
+                                                      const std::vector<unsigned int> &tcol,
+                                                      const std::vector<double> &tval) {
+  for (size_t k = l; k < r; ++k) {
+    for (size_t s = 0; s < tr_i.size() - 1; ++s) {
+      double sum = 0;
+      unsigned int ai = A_rI_[k];
+      unsigned int bt = tr_i[s];
+      while (ai < A_rI_[k + 1] && bt < tr_i[s + 1]) {
+        if (A_col_[ai] == tcol[bt]) {
+          sum += A_val_[ai] * tval[bt];
+          ai++;
+          bt++;
+        } else if (A_col_[ai] < tcol[bt]) {
+          ai++;
+        } else {
+          bt++;
+        }
+      }
+      if (sum != 0) {
+        local_val.push_back(sum);
+        local_col.push_back(s);
+        temp_r_i[k + 1]++;
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+\subsection{STL}
+\begin{lstlisting}[language=C++]
+bool korotin_e_crs_stl::CrsMultiplicationSTL::RunImpl() {
+  std::vector<unsigned int> tr_i(*std::ranges::max_element(B_col_.begin(), B_col_.end()) + 2, 0);
+  unsigned int i = 0;
+  unsigned int j = 0;
+  for (i = 0; i < B_Nz_; i++) {
+    tr_i[B_col_[i] + 1]++;
+  }
+  for (i = 1; i < tr_i.size(); i++) {
+    tr_i[i] += tr_i[i - 1];
+  }
+
+  std::vector<unsigned int> tcol(B_Nz_, 0);
+  std::vector<double> tval(B_Nz_, 0);
+  for (i = 0; i < B_N_ - 1; i++) {
+    for (j = B_rI_[i]; j < B_rI_[i + 1]; j++) {
+      tval[tr_i[B_col_[j]]] = B_val_[j];
+      tcol[tr_i[B_col_[j]]] = i;
+      tr_i[B_col_[j]]++;
+    }
+  }
+  for (i = tr_i.size() - 1; i > 0; i--) {
+    tr_i[i] = tr_i[i - 1];
+  }
+  tr_i[0] = 0;
+
+  std::ranges::fill(output_rI_.begin(), output_rI_.end(), 0);
+  output_col_.clear();
+  output_val_.clear();
+  unsigned int num_threads = std::min(ppc::util::GetPPCNumThreads(), A_N_ - 1);
+  std::vector<std::vector<double>> local_val(num_threads);
+  std::vector<std::vector<unsigned int>> local_col(num_threads);
+  std::vector<unsigned int> temp_r_i(A_N_, 0);
+  std::vector<std::thread> threads;
+
+  std::vector<size_t> delta(num_threads, (A_N_ - 1) / num_threads);
+  for (i = 0; i < (A_N_ - 1) % num_threads; ++i) {
+    delta[i]++;
+  }
+  for (i = 1; i < num_threads; ++i) {
+    delta[i] += delta[i - 1];
+  }
+
+  threads.emplace_back([this, &delta, &local_val, &local_col, &temp_r_i, &tr_i, &tcol, &tval] {
+    MulTask(0, delta[0], local_val[0], local_col[0], temp_r_i, tr_i, tcol, tval);
+  });
+  for (i = 1; i < num_threads; ++i) {
+    threads.emplace_back([this, &delta, &local_val, &local_col, &temp_r_i, &tr_i, &tcol, &tval, i] {
+      MulTask(delta[i - 1], delta[i], local_val[i], local_col[i], temp_r_i, tr_i, tcol, tval);
+    });
+  }
+
+  for (auto &thread : threads) {
+    thread.join();
+  }
+
+  for (unsigned int t = 0; t < num_threads; ++t) {
+    output_val_.insert(output_val_.end(), local_val[t].begin(), local_val[t].end());
+    output_col_.insert(output_col_.end(), local_col[t].begin(), local_col[t].end());
+  }
+
+  for (i = 1; i < A_N_; ++i) {
+    output_rI_[i] += output_rI_[i - 1] + temp_r_i[i];
+  }
+  return true;
+}
+
+void korotin_e_crs_stl::CrsMultiplicationSTL::MulTask(size_t l, size_t r, std::vector<double> &local_val,
+                                                      std::vector<unsigned int> &local_col,
+                                                      std::vector<unsigned int> &temp_r_i,
+                                                      const std::vector<unsigned int> &tr_i,
+                                                      const std::vector<unsigned int> &tcol,
+                                                      const std::vector<double> &tval) {
+  for (size_t k = l; k < r; ++k) {
+    for (size_t s = 0; s < tr_i.size() - 1; ++s) {
+      double sum = 0;
+      unsigned int ai = A_rI_[k];
+      unsigned int bt = tr_i[s];
+      while (ai < A_rI_[k + 1] && bt < tr_i[s + 1]) {
+        if (A_col_[ai] == tcol[bt]) {
+          sum += A_val_[ai] * tval[bt];
+          ai++;
+          bt++;
+        } else if (A_col_[ai] < tcol[bt]) {
+          ai++;
+        } else {
+          bt++;
+        }
+      }
+      if (sum != 0) {
+        local_val.push_back(sum);
+        local_col.push_back(s);
+        temp_r_i[k + 1]++;
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+\subsection{MPI + STL}
+\begin{lstlisting}[language=C++]
+bool korotin_e_crs_all::CrsMultiplicationALL::RunImpl() {
+  unsigned int i = 0;
+  unsigned int tr_i_sz = 0;
+
+  if (world_.rank() == 0) {
+    tr_i_sz = *std::ranges::max_element(B_col_.begin(), B_col_.end());
+  }
+
+  boost::mpi::broadcast(world_, tr_i_sz, 0);
+  boost::mpi::broadcast(world_, A_N_, 0);
+  boost::mpi::broadcast(world_, A_Nz_, 0);
+  boost::mpi::broadcast(world_, B_Nz_, 0);
+  boost::mpi::broadcast(world_, output_size_, 0);
+
+  std::vector<unsigned int> tr_i(tr_i_sz + 2, 0);
+  std::vector<unsigned int> tcol(B_Nz_, 0);
+  std::vector<double> tval(B_Nz_, 0);
+
+  if (world_.rank() == 0) {
+    TrpB(tr_i, tcol, tval);
+  } else {
+    A_rI_ = std::vector<unsigned int>(A_N_);
+    A_col_ = std::vector<unsigned int>(A_Nz_);
+    A_val_ = std::vector<double>(A_Nz_);
+  }
+
+  boost::mpi::broadcast(world_, A_rI_.data(), static_cast<int>(A_rI_.size()), 0);
+  boost::mpi::broadcast(world_, A_col_.data(), static_cast<int>(A_col_.size()), 0);
+  boost::mpi::broadcast(world_, A_val_.data(), static_cast<int>(A_val_.size()), 0);
+  boost::mpi::broadcast(world_, tr_i.data(), static_cast<int>(tr_i.size()), 0);
+  boost::mpi::broadcast(world_, tcol.data(), static_cast<int>(tcol.size()), 0);
+  boost::mpi::broadcast(world_, tval.data(), static_cast<int>(tval.size()), 0);
+
+  unsigned int local_a_n = (A_N_ - 1) / world_.size();
+  size_t start = 0;
+  if (world_.rank() < static_cast<int>((A_N_ - 1) % world_.size())) {
+    local_a_n++;
+    start = local_a_n * world_.rank();
+  } else {
+    start = (local_a_n * world_.rank()) + ((A_N_ - 1) % world_.size());
+  }
+
+  output_rI_ = std::vector<unsigned int>(output_size_, 0);
+  output_col_.clear();
+  output_val_.clear();
+  unsigned int magic_const = ppc::util::GetPPCNumThreads();
+  std::vector<std::vector<double>> local_val(magic_const);
+  std::vector<std::vector<unsigned int>> local_col(magic_const);
+  std::vector<unsigned int> temp_r_i(A_N_, 0);
+  std::vector<std::thread> threads;
+
+  std::vector<size_t> delta(magic_const, local_a_n / magic_const);
+  for (i = 0; i < local_a_n % magic_const; ++i) {
+    delta[i]++;
+  }
+  delta[0] += start;
+  for (i = 1; i < magic_const; ++i) {
+    delta[i] += delta[i - 1];
+  }
+
+  threads.emplace_back(&CrsMultiplicationALL::MulTask, this, start, delta[0], std::ref(local_val[0]),
+                       std::ref(local_col[0]), std::ref(temp_r_i), std::ref(tr_i), std::ref(tcol), std::ref(tval));
+  for (i = 1; i < magic_const; ++i) {
+    threads.emplace_back(&CrsMultiplicationALL::MulTask, this, delta[i - 1], delta[i], std::ref(local_val[i]),
+                         std::ref(local_col[i]), std::ref(temp_r_i), std::ref(tr_i), std::ref(tcol), std::ref(tval));
+  }
+
+  for (auto &thread : threads) {
+    thread.join();
+  }
+
+  for (unsigned int t = 0; t < magic_const; ++t) {
+    output_val_.insert(output_val_.end(), local_val[t].begin(), local_val[t].end());
+    output_col_.insert(output_col_.end(), local_col[t].begin(), local_col[t].end());
+  }
+
+  std::vector<std::vector<double>> gathered_val;
+  std::vector<std::vector<unsigned int>> gathered_col;
+  std::vector<unsigned int> temp_r_i_all(A_N_, 0);
+  boost::mpi::gather(world_, output_col_, gathered_col, 0);
+  boost::mpi::gather(world_, output_val_, gathered_val, 0);
+  boost::mpi::reduce(world_, temp_r_i, temp_r_i_all, std::plus<>(), 0);
+
+  if (world_.rank() == 0) {
+    output_val_.clear();
+    output_col_.clear();
+    for (int t = 0; t < world_.size(); ++t) {
+      output_val_.insert(output_val_.end(), gathered_val[t].begin(), gathered_val[t].end());
+      output_col_.insert(output_col_.end(), gathered_col[t].begin(), gathered_col[t].end());
+    }
+
+    for (i = 1; i < A_N_; ++i) {
+      output_rI_[i] += output_rI_[i - 1] + temp_r_i_all[i];
+    }
+  }
+
+  return true;
+}
+
+void korotin_e_crs_all::CrsMultiplicationALL::MulTask(size_t l, size_t r, std::vector<double> &local_val,
+                                                      std::vector<unsigned int> &local_col,
+                                                      std::vector<unsigned int> &temp_r_i,
+                                                      const std::vector<unsigned int> &tr_i,
+                                                      const std::vector<unsigned int> &tcol,
+                                                      const std::vector<double> &tval) {
+  for (size_t k = l; k < r; ++k) {
+    for (size_t s = 0; s < tr_i.size() - 1; ++s) {
+      double sum = 0;
+      unsigned int ai = A_rI_[k];
+      unsigned int bt = tr_i[s];
+      while (ai < A_rI_[k + 1] && bt < tr_i[s + 1]) {
+        if (A_col_[ai] == tcol[bt]) {
+          sum += A_val_[ai] * tval[bt];
+          ai++;
+          bt++;
+        } else if (A_col_[ai] < tcol[bt]) {
+          ai++;
+        } else {
+          bt++;
+        }
+      }
+      if (sum != 0) {
+        local_val.push_back(sum);
+        local_col.push_back(s);
+        temp_r_i[k + 1]++;
+      }
+    }
+  }
+}
+
+void korotin_e_crs_all::CrsMultiplicationALL::TrpB(std::vector<unsigned int> &tr_i,
+                                                    std::vector<unsigned int> &tcol,
+                                                    std::vector<double> &tval) {
+  unsigned int k = 0;
+  unsigned int s = 0;
+  for (k = 0; k < B_Nz_; k++) {
+    tr_i[B_col_[k] + 1]++;
+  }
+
+  for (k = 1; k < tr_i.size(); k++) {
+    tr_i[k] += tr_i[k - 1];
+  }
+
+  for (k = 0; k < B_N_ - 1; k++) {
+    for (s = B_rI_[k]; s < B_rI_[k + 1]; s++) {
+      tval[tr_i[B_col_[s]]] = B_val_[s];
+      tcol[tr_i[B_col_[s]]] = k;
+      tr_i[B_col_[s]]++;
+    }
+  }
+
+  for (k = tr_i.size() - 1; k > 0; k--) {
+    tr_i[k] = tr_i[k - 1];
+  }
+  tr_i[0] = 0;
+}
+\end{lstlisting}
+
+\end{document}
