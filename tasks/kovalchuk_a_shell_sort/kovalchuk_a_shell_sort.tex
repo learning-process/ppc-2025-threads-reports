@@ -1,0 +1,428 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{geometry}
+\usepackage[breaklinks=true]{hyperref}
+\usepackage{listings}
+\usepackage[expansion=false]{microtype}
+\usepackage{multirow}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{xcolor} 
+
+\geometry{a4paper, margin=1in}
+
+\lstset{
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{blue},
+  commentstyle=\itshape\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=8pt,
+  backgroundcolor=\color{gray!10},
+  showspaces=false,
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  captionpos=b
+}
+
+\title{Отчет по практическим работам по курсу параллельного программирования на тему:\\[20pt]
+«Параллельная реализация алгоритма сортировки Шелла с простым слиянием с использованием технологий MPI и TBB»}
+\author{Ковальчук А.Д., студент группы 3822Б1ПР4}
+\date{2025}
+
+\begin{document}
+\sloppy
+
+\begin{titlepage}
+    \centering
+    \textbf{Министерство образования и науки Российской Федерации\\[5pt]
+    Федеральное государственное автономное образовательное\\
+    учреждение высшего образования\\
+    Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского\\[10pt]
+    Институт информационных технологий, математики и механики}\\[30pt]
+
+    \vfill
+
+    \textbf{\Large Отчет по практическим работам по курсу параллельного программирования на тему:\\[20pt]
+    «Параллельная реализация алгоритма сортировки Шелла с простым слиянием с использованием технологий MPI и TBB»}\\[70pt]
+
+    \hfill\parbox{0.35\textwidth}{
+        \textbf{Выполнил:}\\
+        студент группы 3822Б1ПР4,\\
+        Ковальчук А.Д.\\[10pt]
+        \textbf{Проверил:}\\
+        доцент кафедры ВВиСП,\\
+        к.т.н., Сысоев А.В.\\
+    }
+
+    \vfill
+
+    Нижний Новгород\\
+    2025
+\end{titlepage}
+
+\clearpage
+\tableofcontents
+\clearpage
+
+\section*{Введение}
+Сортировка данных — одна из фундаментальных задач в компьютерных науках, имеющая широкое применение в базах данных, анализе данных и научных вычислениях. Среди множества алгоритмов сортировки алгоритм Шелла выделяется своей эффективностью на практике, особенно для массивов среднего размера. 
+
+Параллельные вычисления позволяют значительно ускорить процесс сортировки больших массивов данных. Гибридный подход с использованием MPI (Message Passing Interface) для межпроцессного взаимодействия и TBB (Threading Building Blocks) для внутрипроцессного параллелизма обеспечивает высокую производительность на современных многопроцессорных и кластерных системах.
+
+Цель данной работы — разработка и исследование гибридной реализации алгоритма сортировки Шелла с простым слиянием с использованием технологий MPI и TBB, анализ её производительности и масштабируемости.
+
+\section*{Постановка задачи}
+Требуется реализовать алгоритм сортировки Шелла для больших массивов данных с использованием гибридного подхода MPI + TBB. Основные задачи:
+
+\begin{itemize}
+    \item Реализовать последовательную версию сортировки Шелла
+    \item Разработать гибридную параллельную реализацию:
+    \begin{itemize}
+        \item Распределение данных между процессами MPI
+        \item Локальная сортировка блоков с использованием TBB
+        \item Слияние отсортированных блоков на корневом процессе
+    \end{itemize}
+    \item Провести функциональное тестирование реализации
+    \item Исследовать производительность на различных конфигурациях
+    \item Сравнить эффективность с последовательной версией
+\end{itemize}
+
+\section*{Описание алгоритма сортировки Шелла}
+Алгоритм Шелла — улучшенный вариант сортировки вставками, который сортирует элементы на определённых расстояниях (gap), постепенно уменьшая это расстояние до 1. Основные этапы:
+
+\begin{lstlisting}
+function shell_sort(array):
+    n = length(array)
+    gap = n // 2
+    
+    while gap > 0:
+        for i from gap to n-1:
+            temp = array[i]
+            j = i
+            while j >= gap and array[j-gap] > temp:
+                array[j] = array[j-gap]
+                j -= gap
+            array[j] = temp
+        gap //= 2
+\end{lstlisting}
+
+\textbf{Особенности реализации:}
+\begin{itemize}
+    \item Используется последовательность gap = n/2, n/4, ..., 1
+    \item Внутренний цикл эффективно сортирует подмассивы
+    \item Параллелизуется по разным значениям gap
+\end{itemize}
+
+\section*{Описание общей идеи параллелизации}
+Параллелизация задачи строится на следующих принципах:
+\begin{enumerate}
+    \item Распределение элементов массива между процессами MPI с использованием декомпозиции данных
+    \item Дальнейшее распределение работы внутри каждого процесса между потоками TBB
+    \item Каждый процесс независимо сортирует свой блок данных с помощью TBB
+    \item Сбор отсортированных блоков на корневом процессе
+    \item K-way слияние блоков с использованием min-heap
+\end{enumerate}
+
+\section*{Схема реализации MPI + TBB алгоритма}
+Реализация использует гибридный подход с сочетанием MPI и TBB:
+
+\begin{itemize}
+    \item \textbf{Инициализация}: 
+    \begin{itemize}
+        \item Создание коммуникатора MPI с помощью \texttt{boost::mpi::environment}
+        \item Определение ранга процесса и общего числа процессов
+        \item Разделение коммуникатора для рабочих процессов
+    \end{itemize}
+
+    \item \textbf{Распределение данных}:
+    \begin{itemize}
+        \item Корневой процесс (rank 0) читает входные данные
+        \item Определение размеров блоков для каждого процесса
+        \item Распределение блоков с помощью \texttt{boost::mpi::scatterv}
+    \end{itemize}
+
+    \item \textbf{Параллельная сортировка}:
+    \begin{itemize}
+        \item Каждый процесс сортирует свой блок алгоритмом Шелла
+        \item Использование TBB для параллелизации внутренних циклов:
+        \begin{lstlisting}
+tbb::parallel_for(0, gap, [&](int k) {
+    for (int i = k + gap; i < n; i += gap) {
+        int temp = buffer[i];
+        int j = i;
+        while (j >= gap && buffer[j - gap] > temp) {
+            buffer[j] = buffer[j - gap];
+            j -= gap;
+        }
+        buffer[j] = temp;
+    }
+});
+        \end{lstlisting}
+    \end{itemize}
+
+    \item \textbf{Сбор и слияние результатов}:
+    \begin{itemize}
+        \item Сбор отсортированных блоков с помощью \texttt{boost::mpi::gatherv}
+        \item K-way слияние блоков с использованием min-heap
+        \item Обработка граничных случаев (размеры блоков, пустые массивы)
+    \end{itemize}
+\end{itemize}
+
+\section*{Результаты экспериментов}
+Эксперименты проводились для сортировки массива из $10^6$ элементов на системе с характеристиками:
+\begin{itemize}
+    \item Процессор: Intel Core i5-12600KF (12 ядер)
+    \item Память: 32 ГБ DDR4
+    \item Сеть: Ethernet 1 Гбит/с
+\end{itemize}
+
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Конфигурация} & \textbf{Процессы} & \textbf{Потоки} & \textbf{Время (с)} & \textbf{Ускорение} \\
+\hline
+SEQ & 1 & 1 & 0.101 & 1.00 \\
+\hline
+MPI+TBB & 1 & 2 & 0.086 & 1.17 \\
+MPI+TBB & 1 & 4 & 0.085 & 1.18 \\
+MPI+TBB & 1 & 8 & 0.080 & 1.19 \\
+\hline
+MPI+TBB & 2 & 2 & 0.059 & 1.71 \\
+MPI+TBB & 2 & 4 & 0.056 & 1.80 \\
+MPI+TBB & 2 & 8 & 0.055 & 1.83 \\
+\hline
+MPI+TBB & 4 & 2 & 0.048 & 2.10 \\
+MPI+TBB & 4 & 4 & 0.047 & 2.15 \\
+MPI+TBB & 4 & 8 & 0.047 & 2.15 \\
+\hline
+\end{tabular}
+\end{center}
+
+\section*{Анализ результатов}
+Анализ результатов демонстрирует преимущество гибридного подхода MPI+TBB по сравнению с последовательной реализацией. Ключевые наблюдения:
+
+\begin{itemize}
+    \item Добавление потоков TBB ускоряет выполнение на 17-19\%
+    \item Использование нескольких процессов MPI даёт значительное ускорение
+    \item Максимальное ускорение 2.15x достигнуто на 4 процессах с 8 потоками
+    \item Коммуникационные затраты минимальны благодаря декомпозиции данных
+    \item Балансировка нагрузки эффективна при кратном распределении данных
+\end{itemize}
+
+Корректность реализации подтверждена тестами:
+\begin{itemize}
+    \item Сортировка пустого массива (валидация)
+    \item Сортировка уже отсортированного массива
+    \item Сортировка массива в обратном порядке
+    \item Обработка дубликатов и отрицательных чисел
+    \item Сортировка массивов с экстремальными значениями
+    \item Обработка массивов разного размера (включая размер < числа процессов)
+\end{itemize}
+
+\section*{Заключение}
+В ходе работы разработана и исследована гибридная реализация алгоритма сортировки Шелла с использованием технологий MPI и TBB. Основные результаты:
+
+\begin{itemize}
+    \item Реализована эффективная параллельная версия сортировки Шелла
+    \item Достигнуто ускорение до 2.15x по сравнению с последовательной версией
+    \item Разработан механизм слияния отсортированных блоков с использованием min-heap
+    \item Реализована обработка граничных случаев и валидация входных данных
+    \item Проведено комплексное тестирование, подтверждающее корректность реализации
+\end{itemize}
+
+Перспективы развития:
+\begin{itemize}
+    \item Реализация асинхронного слияния блоков
+    \item Оптимизация балансировки нагрузки для некратных размеров
+    \item Поддержка гетерогенных вычислительных систем
+    \item Интеграция с GPU для ускорения сортировки
+\end{itemize}
+
+\section*{Список литературы}
+\begin{enumerate}
+    \item Кнут Д. Искусство программирования. Том 3. Сортировка и поиск. М.: Вильямс, 2007.
+    \item Седжвик Р. Алгоритмы на C++. М.: Вильямс, 2011.
+    \item Грот П., Шульц М. Высокопроизводительные вычисления. М.: Бином, 2014.
+    \item Gropp W., Lusk E., Skjellum A. Using MPI: Portable Parallel Programming with the Message Passing Interface. MIT Press, 2014.
+    \item Reinders J. Intel Threading Building Blocks. O'Reilly Media, 2007.
+    \item Boost.MPI Documentation. \url{https://www.boost.org/doc/libs/release/doc/html/mpi.html}
+\end{enumerate}
+
+\section*{Приложение: Код программы}
+
+\subsection*{Файл ops\_all.hpp}
+\begin{lstlisting}
+#ifndef OPS_ALL_HPP
+#define OPS_ALL_HPP
+
+#include <vector>
+
+#include "boost/mpi/communicator.hpp"
+#include "core/task/include/task.hpp"
+
+namespace kovalchuk_a_shell_sort_all {
+
+class ShellSortAll : public ppc::core::Task {
+ public:
+  explicit ShellSortAll(ppc::core::TaskDataPtr task_data);
+  bool PreProcessingImpl() override;
+  bool ValidationImpl() override;
+  bool RunImpl() override;
+  bool PostProcessingImpl() override;
+
+ private:
+  void SimpleMerge(int num_procs, const std::vector<int>& gathered, 
+                   const std::vector<int>& displs, int total_size);
+  std::vector<int> input_, counts_, result_;
+  boost::mpi::communicator world_, group_;
+};
+
+}  // namespace kovalchuk_a_shell_sort_all
+
+#endif  // OPS_ALL_HPP
+\end{lstlisting}
+
+\subsection*{Файл ops\_all.cpp}
+\begin{lstlisting}
+#include "../include/ops_all.hpp"
+
+#include <tbb/parallel_for.h>
+
+#include <algorithm>
+#include <queue>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include "boost/mpi/collectives/broadcast.hpp"
+#include "boost/mpi/collectives/gatherv.hpp"
+#include "boost/mpi/collectives/scatterv.hpp"
+#include "core/task/include/task.hpp"
+#include "oneapi/tbb/parallel_for.h"
+
+namespace kovalchuk_a_shell_sort_all {
+
+ShellSortAll::ShellSortAll(ppc::core::TaskDataPtr task_data) : Task(std::move(task_data)) {}
+
+bool ShellSortAll::PreProcessingImpl() {
+  if (world_.rank() == 0) {
+    auto* input_ptr = reinterpret_cast<int*>(task_data->inputs[0]);
+    input_.assign(input_ptr, input_ptr + task_data->inputs_count[0]);
+  }
+  return true;
+}
+
+bool ShellSortAll::ValidationImpl() {
+  return world_.rank() != 0 ||
+         (!task_data->inputs_count.empty() && task_data->inputs_count[0] != 0 && !task_data->inputs.empty());
+}
+
+bool ShellSortAll::RunImpl() {
+  const int rank = world_.rank();
+  int total_size = rank == 0 ? static_cast<int>(input_.size()) : 0;
+
+  boost::mpi::broadcast(world_, total_size, 0);
+
+  if (rank >= total_size) {
+    world_.split(1);
+    return true;
+  }
+
+  group_ = world_.split(0);
+
+  int num_procs = group_.size();
+  counts_ = std::vector<int>(num_procs, total_size / num_procs);
+  std::vector<int> displs(num_procs, 0);
+  for (int i = 0; i < total_size % num_procs; ++i) {
+    counts_[i]++;
+  }
+  for (int i = 1; i < num_procs; ++i) {
+    displs[i] = displs[i - 1] + counts_[i - 1];
+  }
+
+  const int n = counts_[rank];
+
+  std::vector<int> buffer(n);
+  boost::mpi::scatterv(group_, input_.data(), counts_, displs, buffer.data(), n, 0);
+
+  for (int gap = n / 2; gap > 0; gap /= 2) {
+    tbb::parallel_for(0, gap, [&](int k) {
+      for (int i = k + gap; i < n; i += gap) {
+        int temp = buffer[i];
+        int j = i;
+        while (j >= gap && buffer[j - gap] > temp) {
+          buffer[j] = buffer[j - gap];
+          j -= gap;
+        }
+        buffer[j] = temp;
+      }
+    });
+  }
+  input_ = buffer;
+
+  std::vector<int> gathered;
+  if (group_.rank() == 0) {
+    gathered.resize(task_data->inputs_count[0]);
+  }
+
+  boost::mpi::gatherv(group_, input_, gathered.data(), counts_, 0);
+
+  if (group_.rank() == 0) {
+    SimpleMerge(num_procs, gathered, displs, total_size);
+  }
+
+  return true;
+}
+
+void ShellSortAll::SimpleMerge(int num_procs, const std::vector<int>& gathered, const std::vector<int>& displs,
+                               int total_size) {
+  using Element = std::tuple<int, int, int>;
+  auto comp = [](const Element& a, const Element& b) { return std::get<0>(a) > std::get<0>(b); };
+  std::priority_queue<Element, std::vector<Element>, decltype(comp)> min_heap(comp);
+
+  for (int i = 0; i < num_procs; ++i) {
+    if (counts_[i] > 0) {
+      min_heap.emplace(gathered[displs[i]], i, 0);
+    }
+  }
+
+  result_.clear();
+  result_.reserve(total_size);
+
+  while (!min_heap.empty()) {
+    auto [val, proc_idx, idx_in_block] = min_heap.top();
+    min_heap.pop();
+    result_.push_back(val);
+
+    if (idx_in_block + 1 < counts_[proc_idx]) {
+      int next_idx = idx_in_block + 1;
+      int next_val = gathered[displs[proc_idx] + next_idx];
+      min_heap.emplace(next_val, proc_idx, next_idx);
+    }
+  }
+}
+
+bool ShellSortAll::PostProcessingImpl() {
+  if (group_.rank() == 0) {
+    auto* output_ptr = reinterpret_cast<int*>(task_data->outputs[0]);
+    std::ranges::copy(result_.begin(), result_.end(), output_ptr);
+  }
+  return true;
+}
+
+}  // namespace kovalchuk_a_shell_sort_all
+\end{lstlisting}
+
+\end{document}
