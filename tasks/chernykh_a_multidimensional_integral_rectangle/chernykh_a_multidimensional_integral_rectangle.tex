@@ -1,0 +1,930 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{indentfirst}
+\usepackage{titlesec}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage[autostyle=true]{csquotes}
+\usepackage{url}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[unicode,hidelinks]{hyperref}
+
+\geometry{left=30mm,right=15mm,top=20mm,bottom=20mm}
+
+\titleformat{\section}[block]{\normalfont\fontsize{14}{16}\bfseries\centering}{\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]{\normalfont\fontsize{14}{16}\bfseries\centering}{\thesubsection.}{0.5em}{}
+
+\lstset{
+  language=C++,
+  basicstyle=\ttfamily\fontsize{10}{12}\selectfont,
+  keywordstyle=\color{blue},
+  commentstyle=\color{green},
+  stringstyle=\color{red},
+  frame=single,
+  tabsize=4,
+  showstringspaces=false,
+  breaklines=true
+}
+
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0pt}
+
+\sloppy
+\onehalfspacing
+
+\begin{document}
+  \begin{titlepage}
+    \begin{center}
+      \textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\
+      \vspace{0.5cm}
+      Федеральное государственное автономное образовательное учреждение высшего образования \\
+      \vspace{0.5cm}
+      \textbf{\enquote{Национальный исследовательский Нижегородский государственный университет имени Н.И. Лобачевского}} \\
+      \vspace{0.5cm}
+      \textbf{Институт информационных технологий, математики и механики}
+      \vfill
+
+      \textbf{Отчёт по лабораторной работе} \\
+      на тему: \\
+      \textbf{\enquote{Вычисление многомерных интегралов с использованием многошаговой схемы (метод прямоугольников)}} \\
+      \vfill
+
+      \begin{flushright}
+        Выполнил: \\
+        студент 3 курса группы 3822Б1ПР3 \\
+        Черных А.А. \\
+        \vspace{1cm}
+        Преподаватель: \\
+        к.т.н., доцент кафедры ВВСП \\
+        Сысоев А.В.
+      \end{flushright}
+      \vfill
+
+      Нижний Новгород \\
+      2025 г.
+    \end{center}
+  \end{titlepage}
+
+  \newpage
+
+  \tableofcontents
+
+  \newpage
+
+
+  \section{Введение}\label{sec:introduction}
+
+  В современных научных и инженерных задачах часто возникает необходимость вычисления многомерных интегралов.
+  Эта математическая операция встречается при моделировании сложных физических систем, расчете вероятностей, обработке изображений и во многих других областях.
+
+  Многомерные интегралы редко удается вычислить аналитически.
+  Даже для относительно простых функций точное решение может быть недоступно, поэтому на практике применяются численные методы.
+  Метод правых прямоугольников выделяется простотой реализации и высокой способностью к параллелизации поскольку область интегрирования разбивается на сетку дискретных узлов (точек), а вычисления значений функции в различных узлах сетки могут выполняться независимо друг от друга.
+
+  Серьезным препятствием при работе с многомерными интегралами становится вычислительная сложность.
+  При увеличении размерности задачи вычислительная сложность экспоненциально возрастает, что требует использования параллельных вычислений.
+  В данной работе исследуются особенности и производительность параллельных версий метода правых прямоугольников с помощью технологий OpenMP (Open Multi-Processing), Intel TBB (Threading Building Blocks), стандартных потоков C++ (std::threads), а также гибридного подхода MPI (Message Passing Interface) + OpenMP\@.
+
+  \newpage
+
+
+  \section{Постановка задачи}\label{sec:problem}
+
+  Целью данной работы является разработка и сравнительный анализ различных подходов к параллелизации вычисления многомерных интегралов методом правых прямоугольников.
+
+  Требуется численно вычислить многомерный определённый интеграл по области $[a_1,b_1] \times \ldots \times [a_D,b_D]$:
+  \[
+    I = \int_{[a_1,b_1] \times \ldots \times [a_D,b_D]} f(\vec{x}) \, d\vec{x},
+  \]
+  где $\vec{x} = (x_1, x_2, \ldots, x_D)$ — точка в $D$-мерном пространстве, $f(\vec{x})$ — непрерывная функция нескольких переменных.
+
+  Для решения поставленной задачи разрабатывается последовательная версия метода.
+  Она будет служить базовой для дальнейшего сравнения эффективности параллельных версий.
+  Затем разрабатываются параллельные версии с использованием OpenMP, TBB, std::threads и гибридного MPI+OpenMP\@.
+  Экспериментальная часть работы заключается в сравнении производительности различных параллельных версий.
+
+  \newpage
+
+
+  \section{Описание алгоритма}\label{sec:algorithm}
+
+  \subsection{Общий принцип}\label{subsec:general_principle}
+
+  Метод правых прямоугольников --- это численный метод интегрирования, основанный на аппроксимации интеграла суммой площадей прямоугольников.
+  Суть метода заключается в разбиении области интегрирования на элементарные подобласти, в каждой из которых подынтегральная функция приближается константой --- значением функции в правой точке подобласти.
+
+  \subsection{Входные и выходные данные}\label{subsec:input_output}
+
+  Входными данными являются набор измерений и подынтегральная функция.
+  Каждое измерение характеризуется нижней и верхней границами интегрирования и количеством шагов разбиения по данному измерению.
+  В коде измерения представлены объектами типа \texttt{Dimension} (описан в  \autoref{lst:types}), что обеспечивает инкапсуляцию логически связанных параметров каждого измерения в единой структуре.
+  Такой подход позволяет централизованно выполнять валидацию параметров каждого измерения, проверяя корректность задания параметров интегрирования.
+
+  Подынтегральная функция представлена объектом типа \texttt{std::function<double(const Point\&)>} (описан в \autoref{lst:types}), что обеспечивает гибкость в определении различных математических функций.
+
+  Результатом вычислений является приближённое значение интеграла, представленое числом двойной точности типа \texttt{double}.
+
+  \subsection{Ограничения на входные данные}\label{subsec:constraints}
+
+  Для корректной работы алгоритма входные данные должны удовлетворять следующим требованиям:
+  \begin{itemize}
+    \item Размерность задачи (количество измерений) должна быть положительной
+    \item Для каждого измерения нижняя граница должна быть строго меньше верхней границы: $a_j < b_j$
+    \item Для каждого измерения количество шагов разбиения должно быть положительным: $n_j > 0$
+    \item Подынтегральная функция должна быть определена во всей области интегрирования
+  \end{itemize}
+
+  \subsection{Описание последовательного алгоритма}\label{subsec:seq_algorithm}
+
+  Последовательная реализация метода правых прямоугольников для вычисления многомерного интеграла включает следующие основные этапы:
+
+  \begin{enumerate}
+    \item \textbf{Валидация и подготовка данных}:
+    \begin{itemize}
+      \item Проверка корректности входных данных
+      \item Подготовка структур данных для вычислений
+    \end{itemize}
+
+    \item \textbf{Основное вычисление}:
+    \begin{itemize}
+      \item Определение общего количества точек сетки (произведение количества шагов по всем измерениям)
+      \item Создание вектора для хранения координат текущей точки
+      \item Итерация по всем индексам точек сетки от 0 до общего количества точек:
+      \begin{itemize}
+        \item Преобразование линейного индекса в координаты точки в многомерном пространстве
+        \item Вычисление значения подынтегральной функции в данной точке
+        \item Добавление полученного значения к накапливаемой сумме
+      \end{itemize}
+      \item Умножение суммы на масштабирующий коэффициент (произведение размеров шагов по всем измерениям)
+    \end{itemize}
+
+    \item \textbf{Возвращение результата}:
+    \begin{itemize}
+      \item Передача вычисленного значения интеграла через выходные параметры
+    \end{itemize}
+  \end{enumerate}
+
+  \subsection{Концепция параллелизации алгоритма}\label{subsec:parallel_concept}
+
+  Основные принципы параллелизации, общие для всех параллельных версий:
+
+  \begin{itemize}
+    \item \textbf{Стратегия декомпозиции} --- разбиение множества точек на независимые подмножества, которые могут обрабатываться параллельно.
+
+    \item \textbf{Распределение данных} --- каждый параллельный исполнитель (поток или процесс) получает свой диапазон индексов точек сетки.
+
+    \item \textbf{Локальные вычисления} --- каждый исполнитель независимо вычисляет частичную сумму для своего подмножества точек.
+
+    \item \textbf{Редукция результатов} --- после завершения параллельных вычислений частичные суммы объединяются в окончательный результат.
+
+    \item \textbf{Масштабирование} --- финальная сумма умножается на масштабирующий коэффициент.
+  \end{itemize}
+
+  Такая схема параллелизации является примером идеального параллелизма по данным, так как вычисления в разных точках сетки полностью независимы друг от друга.
+
+  \subsection{Описание схемы параллельного алгоритма}\label{subsec:parallel_scheme}
+
+  Конкретная реализация параллельного алгоритма включает следующие этапы:
+
+  \begin{enumerate}
+    \item \textbf{Валидация и подготовка данных} (последовательный этап):
+    \begin{itemize}
+      \item Проверка корректности входных данных
+      \item Инициализация структур данных
+    \end{itemize}
+
+    \item \textbf{Распределение работы} между параллельными исполнителями:
+    \begin{itemize}
+      \item Вычисление общего числа точек сетки \texttt{total\_points}
+      \item Определение количества точек для каждого исполнителя
+      \item Назначение каждому исполнителю диапазона индексов \texttt{[start\_point, end\_point)}
+    \end{itemize}
+
+    \item \textbf{Параллельное вычисление} (выполняется каждым исполнителем):
+    \begin{itemize}
+      \item Создание локальной копии вектора для координат точки
+      \item Итерация по назначенному диапазону индексов точек
+      \item Преобразование линейного индекса в координаты точки (метод \texttt{FillPoint})
+      \item Вычисление значения функции в точке и добавление к локальной сумме
+    \end{itemize}
+
+    \item \textbf{Сбор и объединение результатов}:
+    \begin{itemize}
+      \item Объединение частичных сумм с использованием операции редукции
+      \item Умножение итоговой суммы на масштабирующий коэффициент
+    \end{itemize}
+  \end{enumerate}
+
+  Различные технологии параллельного программирования (OpenMP, TBB, STL, MPI) реализуют эти этапы своими специфическими средствами, сохраняя при этом общую логику алгоритма.
+
+  \newpage
+
+
+  \section{Описание программных реализаций}\label{sec:implementations}
+
+  \subsection{Описание SEQ-версии}\label{subsec:seq_impl}
+
+  Последовательная версия реализует базовый метод прямоугольников для вычисления многомерного интеграла с использованием одного потока выполнения.
+
+  Алгоритм вычисляет общее количество точек сетки через метод \texttt{GetTotalPoints()} и создаёт вектор \texttt{point} для хранения координат текущей точки.
+  Затем в цикле последовательно обрабатывается каждая точка сетки: вызывается метод \texttt{FillPoint()} для преобразования линейного индекса в многомерные координаты, вычисляется значение функции и добавляется к накапливаемой сумме.
+
+  \begin{lstlisting}[language=C++, caption=Ключевой фрагмент SEQ-версии,label={lst:seq-fragment}]
+int total_points = GetTotalPoints();
+auto point = Point(dims_.size());
+for (int i = 0; i < total_points; i++) {
+  FillPoint(i, point);
+  result_ += func_(point);
+}
+result_ *= GetScalingFactor();
+  \end{lstlisting}
+
+  Полный исходный код SEQ-версии представлен в \autoref{lst:seq}.
+
+  \subsection{Описание OpenMP-версии}\label{subsec:openmp_impl}
+
+  OpenMP-версия использует директиву \texttt{\#pragma omp parallel} для создания пула потоков.
+  Каждый поток создаёт локальную копию вектора координат \texttt{thread\_point}, что устраняет необходимость синхронизации при параллельном доступе к данным, так как каждый поток работает с собственной копией данных.
+
+  Директива \texttt{\#pragma omp for reduction(+ : sum)} делит итерации цикла между потоками и автоматически агрегирует частичные суммы через механизм редукции.
+  Это упрощает код, поскольку синхронизация и агрегация результатов суммирования выполняются автоматически, без необходимости вручную управлять доступом к разделяемой переменной.
+
+  \begin{lstlisting}[language=C++, caption=Ключевой фрагмент OpenMP-версии,label={lst:openmp-fragment}]
+double sum = 0.0;
+int total_points = GetTotalPoints();
+#pragma omp parallel
+{
+  auto thread_point = Point(dims_.size());
+#pragma omp for reduction(+ : sum)
+  for (int i = 0; i < total_points; i++) {
+    FillPoint(i, thread_point);
+    sum += func_(thread_point);
+  }
+}
+result_ = sum * GetScalingFactor();
+  \end{lstlisting}
+
+  Полный исходный код OpenMP-версии представлен в \autoref{lst:openmp}.
+
+  \subsection{Описание TBB-версии}\label{subsec:tbb_impl}
+
+  TBB-версия использует функцию \texttt{oneapi::tbb::parallel\_reduce}, которая реализует параллельный алгоритм редукции.
+
+  Для разделения диапазона итераций используется класс \texttt{oneapi::tbb::blocked\_range}, который автоматически разбивает общий диапазон индексов точек на блоки подходящего размера.
+  Каждый блок обрабатывается как отдельная задача.
+
+  Алгоритм использует лямбда-функцию, которая создаёт локальный вектор координат \texttt{point} для каждого блока и вычисляет частичную сумму для всех точек в этом блоке.
+  Локальность векторов гарантирует отсутствие конфликтов между параллельными задачами, так как каждый блок работает с независимыми данными.
+
+  Объединение частичных сумм выполняется через оператор \texttt{std::plus()}, переданный в качестве последнего аргумента в \texttt{parallel\_reduce}.
+  TBB автоматически обрабатывает агрегацию результатов, избавляя от необходимости явной синхронизации.
+
+  \begin{lstlisting}[language=C++, caption=Ключевой фрагмент TBB-версии,label={lst:tbb-fragment}]
+int total_points = GetTotalPoints();
+result_ = oneapi::tbb::parallel_reduce(
+    oneapi::tbb::blocked_range(0, total_points), 0.0,
+    [&](const oneapi::tbb::blocked_range<int> &range, double accum) -> double {
+      auto point = Point(dims_.size());
+      for (int i = range.begin(); i < range.end(); i++) {
+        FillPoint(i, point);
+        accum += func_(point);
+      }
+      return accum;
+    },
+    std::plus());
+result_ *= GetScalingFactor();
+  \end{lstlisting}
+
+  Полный исходный код TBB-версии представлен в \autoref{lst:tbb}.
+
+  \subsection{Описание STL-версии}\label{subsec:stl_impl}
+
+  STL-версия использует низкоуровневый подход к параллелизму, основанный на стандартной библиотеке C++ и классе \texttt{std::thread}.
+
+  Алгоритм начинается с расчёта оптимального распределения нагрузки: общее количество точек \texttt{total\_points} равномерно делится между потоками.
+
+  Для каждого потока определяются начальная (\texttt{start\_point}) и конечная (\texttt{end\_point}) точки диапазона.
+  Затем для каждого потока создаётся объект \texttt{std::thread}, который выполняет лямбда-функцию \texttt{calculate\_partial\_sum}.
+  Каждый поток сохраняет свою частичную сумму в соответствующий элемент вектора \texttt{partial\_sums}
+
+  Для каждого потока вызывается метод \texttt{join()}, который гарантирует, что основной поток не продолжит выполнение, пока каждый из созданных потоков не закончит свою работу.
+  Результаты частичных сумм затем агрегируются с помощью \texttt{std::accumulate} для получения итоговой суммы.
+
+  \begin{lstlisting}[language=C++, caption=Ключевой фрагмент STL-версии,label={lst:stl-fragment}]
+int total_points = GetTotalPoints();
+int num_threads = ppc::util::GetPPCNumThreads();
+int points_per_thread = total_points / num_threads;
+int extra_points = total_points % num_threads;
+
+auto threads = std::vector<std::thread>();
+auto partial_sums = std::vector<double>(num_threads, 0.0);
+
+auto calculate_partial_sum = [&](int start_point, int end_point, int thread_index) -> void {
+  auto thread_point = Point(dims_.size());
+  for (int i = start_point; i < end_point; i++) {
+    FillPoint(i, thread_point);
+    partial_sums[thread_index] += func_(thread_point);
+  }
+};
+
+for (int i = 0; i < num_threads; i++) {
+  int start_point = (i * points_per_thread) + std::min(i, extra_points);
+  int end_point = start_point + points_per_thread + (i < extra_points ? 1 : 0);
+  threads.emplace_back(calculate_partial_sum, start_point, end_point, i);
+}
+std::ranges::for_each(threads, [](std::thread &thread) -> void { thread.join(); });
+
+result_ = std::accumulate(partial_sums.begin(), partial_sums.end(), 0.0) * GetScalingFactor();
+  \end{lstlisting}
+
+  Полный исходный код STL-версии представлен в \autoref{lst:stl}.
+
+  \subsection{Описание MPI+OpenMP-версии}\label{subsec:mpi_openmp_impl}
+
+  MPI+OpenMP-версия комбинирует два подхода для распараллеливания: использование распределённых вычислений с помощью MPI для работы на нескольких узлах и OpenMP для многопоточной обработки внутри каждого узла.
+  В этой версии задача вычисления многомерного интеграла распределяется между несколькими процессами, при этом каждый процесс выполняет параллельную обработку с использованием нескольких потоков.
+
+  Алгоритм начинается с передачи данных о размерности задачи через MPI. На главном процессе (с рангом 0) данные о границах интегрирования и количестве шагов по каждому измерению передаются всем процессам с помощью функции \texttt{boost::mpi::broadcast}.
+  Это гарантирует, что каждый процесс получит необходимые данные для выполнения своей части вычислений.
+
+  Затем, каждый процесс делит диапазон итераций на равные части с учётом возможного остатка от деления, который распределяется между процессами.
+
+  Внутри каждого процесса параллельная обработка реализована с использованием OpenMP. Для каждого процесса создаются несколько потоков с помощью директивы \texttt{\#pragma omp parallel}, и каждый поток работает над определённым диапазоном точек.
+  Частичные суммы для каждого потока вычисляются с помощью механизма редукции \texttt{\#pragma omp for reduction(+ : sum)}, что позволяет избежать синхронизации доступа к данным между потоками.
+  После выполнения всех вычислений на локальном уровне, частичные суммы агрегаируются через MPI с использованием функции \texttt{boost::mpi::reduce}, которая суммирует результаты с разных процессов и передаёт итоговый результат процессу с рангом 0.
+
+  \begin{lstlisting}[language=C++, caption=Ключевой фрагмент MPI+OpenMP-версии,label={lst:mpi+openmp-fragment}]
+boost::mpi::broadcast(world_, dims_, 0);
+
+int total_points = GetTotalPoints();
+int points_per_process = total_points / world_.size();
+int extra_points = total_points % world_.size();
+int start_point = (world_.rank() * points_per_process) + std::min(world_.rank(), extra_points);
+int end_point = start_point + points_per_process + (world_.rank() < extra_points ? 1 : 0);
+
+double partial_sum = 0.0;
+#pragma omp parallel
+{
+  auto thread_point = Point(dims_.size());
+#pragma omp for reduction(+ : partial_sum)
+  for (int i = start_point; i < end_point; i++) {
+    FillPoint(i, thread_point);
+    partial_sum += func_(thread_point);
+  }
+}
+
+boost::mpi::reduce(world_, partial_sum, result_, std::plus(), 0);
+
+if (world_.rank() == 0) {
+  result_ *= GetScalingFactor();
+}
+  \end{lstlisting}
+
+  Полный исходный код MPI+OpenMP-версии представлен в \autoref{lst:mpi+openmp}.
+
+  \newpage
+
+
+  \section{Результаты экспериментов}\label{sec:results}
+
+  \subsection{Подтверждение корректности}\label{subsec:correctness}
+
+  Для проверки математической точности алгоритма были использованы следующие подходы:
+
+  \begin{itemize}
+    \item Сравнение результатов с заранее известными значениями интегралов
+    \item Использование одинаковой точности сравнения ($10^{-8}$) для всех тестов
+    \item Проверка работы алгоритма на различных типах функций и областей интегрирования
+  \end{itemize}
+
+  \textbf{Разнообразие тестовых функций:}
+  \begin{itemize}
+    \item Функции с корнями: $\sqrt{x_0} + \sqrt{x_1}$
+    \item Функции с модулями: $|x_0| + |x_1|$
+    \item Тригонометрические функции: $\sin(x_0) \cdot \cos(x_1)$
+    \item Полиномиальные функции: $x_0 \cdot x_1 + x_1 \cdot x_2 + x_0 \cdot x_2$
+    \item Степенные функции: $x_0^3 + x_1^3$
+    \item Экспоненциальные функции: $e^{x_0}$, $e^{x_0 + x_1 + x_2}$
+    \item Комбинированные функции: $e^{-x_0 - x_1 - x_2} \cdot \sin(x_0) \cdot \sin(x_1) \cdot \sin(x_2)$
+  \end{itemize}
+
+  \textbf{Параметры тестирования:}
+  \begin{itemize}
+    \item Размерность пространства: от 1D до 4D
+    \item Границы интегрирования: положительные и отрицательные диапазоны
+    \item Количество шагов разбиения: от 1 до 150 шагов на измерение
+    \item Экстремальные случаи: граничные условия, некорректные входные данные
+  \end{itemize}
+
+  Во всех тестах все реализации показали идентичные результаты в пределах заданной точности, что подтверждает корректность параллельной декомпозиции задачи.
+
+  \subsection{Сравнение производительности}\label{subsec:performance}
+
+  Для тестирования использовалась функция комбинированного типа:
+  \[
+    f(\vec{x}) = e^{-x_0 - x_1 - x_2} \cdot \sin(x_0) \cdot \sin(x_1) \cdot \sin(x_2)
+  \]
+
+  Область интегрирования представляла собой куб с границами от $0$ до $\pi$ по каждому измерению, с разбиением на 150 шагов по каждой оси.
+  Таким образом, полное количество точек интегрирования составило $150^3 = 3\,375\,000$.
+
+  Для оценки эффективности параллельных реализаций использовался модуль \texttt{ppc::core::Perf}, который позволил измерить время выполнения.
+  Тестирование проводилось в двух режимах:
+  \begin{itemize}
+    \item \textbf{TaskRun} --- только вычислительное ядро алгоритма, без подготовки данных
+    \item \textbf{PipelineRun} --- полный цикл обработки, включая подготовку данных
+  \end{itemize}
+
+  \begin{table}[H]
+    \centering
+    \begin{tabular}{lrrr}
+      \toprule
+      \textbf{Версия}                           & \textbf{PipelineRun (с)} & \textbf{TaskRun (с)} & \textbf{Ускорение} \\
+      \midrule
+      SEQ                                       & 1.5234                   & 1.5223               & 1.00               \\
+      OpenMP (2 потока)                         & 0.7689                   & 0.7696               & 1.98               \\
+      TBB (2 потока)                            & 0.7743                   & 0.7748               & 1.96               \\
+      STL (2 потока)                            & 1.0791                   & 1.0910               & 1.40               \\
+      MPI+OpenMP (2 процесса $\times$ 2 потока) & 1.1593                   & 1.1531               & 1.32               \\
+      \bottomrule
+    \end{tabular}
+    \caption{Сравнение производительности различных версий}\label{tab:performance}
+  \end{table}
+
+  \textbf{Ключевые наблюдения:}
+  \begin{itemize}
+    \item OpenMP и TBB демонстрируют практически идеальное ускорение для 2 потоков (1.98 и 1.96 соответственно), что очень близко к теоретическому максимуму 2.0. Это свидетельствует о высокой эффективности данных технологий и минимальных накладных расходах на управление потоками.
+    \item Реализация на STL (std::thread) показывает значительно меньшее ускорение (1.40), что говорит о более высоких накладных расходах на создание и управление потоками вручную по сравнению со специализированными библиотеками параллельного программирования.
+    \item Комбинированный подход MPI+OpenMP демонстрирует наименьшее ускорение (1.32) среди тестируемых реализаций, несмотря на использование большего количества вычислительных ресурсов (2 процесса $\times$ 2 потока). Это указывает на значительные накладные расходы, связанные с межпроцессным взаимодействием и синхронизацией.
+    \item Практически одинаковые значения для режимов PipelineRun и TaskRun указывают на то, что основное время выполнения приходится на вычислительное ядро алгоритма, а операции предобработки и постобработки данных вносят минимальный вклад в общее время выполнения.
+    \item Для задачи численного интегрирования методом прямоугольников оптимальным выбором является использование OpenMP или TBB, которые обеспечивают наилучшую производительность при минимальных изменениях в коде.
+  \end{itemize}
+
+  \newpage
+
+
+  \section{Заключение}\label{sec:conclusion}
+
+  В ходе данной работы был реализован и проанализирован метод правых прямоугольников для вычисления многомерных интегралов с использованием различных технологий параллельного программирования: OpenMP, Intel TBB, стандартных потоков C++ (std::threads) и гибридного подхода MPI+OpenMP.
+
+  Проведенное исследование позволяет сделать следующие выводы:
+
+  \begin{enumerate}
+    \item Задача вычисления многомерных интегралов методом прямоугольников обладает высоким потенциалом для параллелизации благодаря независимости вычислений в отдельных точках сетки, что подтверждается полученными показателями ускорения.
+    \item Высокоуровневые библиотеки параллельного программирования (OpenMP и TBB) продемонстрировали почти идеальное ускорение близкое к теоретическому максимуму для двух потоков, что свидетельствует об их эффективности для данного класса задач.
+    \item Реализация с использованием стандартных потоков C++ (std::threads) показала более низкую эффективность по сравнению с OpenMP и TBB, что связано с дополнительными накладными расходами на создание и управление потоками.
+    \item Гибридный подход MPI+OpenMP оказался наименее эффективным среди протестированных реализаций, несмотря на использование большего количества вычислительных ресурсов. Это указывает на то, что для данной задачи затраты на межпроцессное взаимодействие превышают выигрыш от дополнительного параллелизма.
+    \item Малое различие между временем выполнения в режимах TaskRun и PipelineRun показывает, что основные временные затраты приходятся непосредственно на вычислительное ядро алгоритма, а не на операции подготовки и обработки данных.
+  \end{enumerate}
+
+  Практическая значимость работы заключается в выявлении наиболее эффективных подходов к параллелизации для задачи численного интегрирования.
+  Полученные результаты показывают, что для многомерного интегрирования методом прямоугольников оптимальным выбором являются технологии OpenMP и TBB, которые обеспечивают максимальную производительность при минимальных затратах на модификацию кода.
+
+  Результаты работы демонстрируют, что даже для относительно простых алгоритмов выбор технологии параллелизма может существенно влиять на итоговую производительность системы, и этот выбор должен основываться на тщательном анализе характеристик конкретной задачи и доступных вычислительных ресурсов.
+  \newpage
+
+  \addcontentsline{toc}{section}{Список литературы}
+  \begin{thebibliography}{99}
+    \bibitem{sysoev} Сысоев А.В., Мееров И.Б., Сиднев А.А. Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks. — ННГУ им. Н.И. Лобачевского, 2007.
+    \bibitem{bahvalov} Бахвалов Н.С., Жидков Н.П., Кобельков Г.М. Численные методы. — М.: БИНОМ. Лаборатория знаний, 2015.
+    \bibitem{gergel} Гергель В.П. Теория и практика параллельных вычислений. — М.: Интернет-Университет Информационных Технологий; БИНОМ. Лаборатория знаний, 2012.
+    \bibitem{reinders} Reinders J. Intel Threading Building Blocks: Outfitting C++ for Multi-core Processor Parallelism. — O'Reilly Media, 2010.
+    \bibitem{gropp} Gropp W., Lusk E., Skjellum A. Using MPI: Portable Parallel Programming with the Message-Passing Interface. — MIT Press, 2014.
+    \bibitem{cormen} Кормен Т., Лейзерсон Ч., Ривест Р., Штайн К. Алгоритмы: построение и анализ. — М.: Вильямс, 2013.
+  \end{thebibliography}
+
+  \newpage
+
+  \appendix
+
+
+  \section{Приложение}\label{sec:appendix}
+
+  \subsection{Основные типы данных для представления многомерного интеграла}\label{subsec:types}
+
+  \begin{lstlisting}[language=C++,label={lst:types}]
+using Point = std::vector<double>;
+using Function = std::function<double(const Point &)>;
+
+class Dimension {
+ public:
+  explicit Dimension(double lower_bound, double upper_bound, int steps_count)
+      : lower_bound_(lower_bound), upper_bound_(upper_bound), steps_count_(steps_count) {}
+
+  [[nodiscard]] double GetLowerBound() const { return lower_bound_; }
+
+  [[nodiscard]] double GetUpperBound() const { return upper_bound_; }
+
+  [[nodiscard]] int GetStepsCount() const { return steps_count_; }
+
+  [[nodiscard]] double GetStepSize() const { return (upper_bound_ - lower_bound_) / steps_count_; }
+
+  [[nodiscard]] bool IsValid() const { return lower_bound_ < upper_bound_ && steps_count_ > 0; }
+
+ private:
+  double lower_bound_{};
+  double upper_bound_{};
+  int steps_count_{};
+};
+  \end{lstlisting}
+
+  \subsection{Исходный код SEQ-версии}\label{subsec:seq}
+
+  \begin{lstlisting}[language=C++,label={lst:seq}]
+#include "seq/chernykh_a_multidimensional_integral_rectangle/include/ops_seq.hpp"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <numeric>
+#include <vector>
+
+namespace chernykh_a_multidimensional_integral_rectangle_seq {
+
+bool SequentialTask::ValidationImpl() {
+  auto *dims_ptr = reinterpret_cast<Dimension *>(task_data->inputs[0]);
+  uint32_t dims_size = task_data->inputs_count[0];
+  return dims_size > 0 &&
+         std::all_of(dims_ptr, dims_ptr + dims_size, [](const Dimension &dim) -> bool { return dim.IsValid(); });
+}
+
+bool SequentialTask::PreProcessingImpl() {
+  auto *dims_ptr = reinterpret_cast<Dimension *>(task_data->inputs[0]);
+  uint32_t dims_size = task_data->inputs_count[0];
+  dims_.assign(dims_ptr, dims_ptr + dims_size);
+  return true;
+}
+
+bool SequentialTask::RunImpl() {
+  int total_points = GetTotalPoints();
+  auto point = Point(dims_.size());
+  for (int i = 0; i < total_points; i++) {
+    FillPoint(i, point);
+    result_ += func_(point);
+  }
+  result_ *= GetScalingFactor();
+  return true;
+}
+
+bool SequentialTask::PostProcessingImpl() {
+  *reinterpret_cast<double *>(task_data->outputs[0]) = result_;
+  return true;
+}
+
+void SequentialTask::FillPoint(int index, Point &point) const {
+  for (size_t i = 0; i < dims_.size(); i++) {
+    int coordinate_index = index % dims_[i].GetStepsCount();
+    point[i] = dims_[i].GetLowerBound() + (coordinate_index + 1) * dims_[i].GetStepSize();
+    index /= dims_[i].GetStepsCount();
+  }
+}
+
+int SequentialTask::GetTotalPoints() const {
+  return std::accumulate(dims_.begin(), dims_.end(), 1,
+                         [](int accum, const Dimension &dim) -> int { return accum * dim.GetStepsCount(); });
+}
+
+double SequentialTask::GetScalingFactor() const {
+  return std::accumulate(dims_.begin(), dims_.end(), 1.0,
+                         [](double accum, const Dimension &dim) -> double { return accum * dim.GetStepSize(); });
+}
+
+}  // namespace chernykh_a_multidimensional_integral_rectangle_seq
+  \end{lstlisting}
+
+  \subsection{Исходный код OpenMP-версии}\label{subsec:openmp}
+
+  \begin{lstlisting}[language=C++,label={lst:openmp}]
+#include "omp/chernykh_a_multidimensional_integral_rectangle/include/ops_omp.hpp"
+
+#include <omp.h>
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <numeric>
+#include <vector>
+
+namespace chernykh_a_multidimensional_integral_rectangle_omp {
+
+bool OMPTask::ValidationImpl() {
+  auto *dims_ptr = reinterpret_cast<Dimension *>(task_data->inputs[0]);
+  uint32_t dims_size = task_data->inputs_count[0];
+  return dims_size > 0 &&
+         std::all_of(dims_ptr, dims_ptr + dims_size, [](const Dimension &dim) -> bool { return dim.IsValid(); });
+}
+
+bool OMPTask::PreProcessingImpl() {
+  auto *dims_ptr = reinterpret_cast<Dimension *>(task_data->inputs[0]);
+  uint32_t dims_size = task_data->inputs_count[0];
+  dims_.assign(dims_ptr, dims_ptr + dims_size);
+  return true;
+}
+
+bool OMPTask::RunImpl() {
+  double sum = 0.0;
+  int total_points = GetTotalPoints();
+#pragma omp parallel
+  {
+    auto thread_point = Point(dims_.size());
+#pragma omp for reduction(+ : sum)
+    for (int i = 0; i < total_points; i++) {
+      FillPoint(i, thread_point);
+      sum += func_(thread_point);
+    }
+  }
+  result_ = sum * GetScalingFactor();
+  return true;
+}
+
+bool OMPTask::PostProcessingImpl() {
+  *reinterpret_cast<double *>(task_data->outputs[0]) = result_;
+  return true;
+}
+
+void OMPTask::FillPoint(int index, Point &point) const {
+  for (size_t i = 0; i < dims_.size(); i++) {
+    int coordinate_index = index % dims_[i].GetStepsCount();
+    point[i] = dims_[i].GetLowerBound() + (coordinate_index + 1) * dims_[i].GetStepSize();
+    index /= dims_[i].GetStepsCount();
+  }
+}
+
+int OMPTask::GetTotalPoints() const {
+  return std::accumulate(dims_.begin(), dims_.end(), 1,
+                         [](int accum, const Dimension &dim) -> int { return accum * dim.GetStepsCount(); });
+}
+
+double OMPTask::GetScalingFactor() const {
+  return std::accumulate(dims_.begin(), dims_.end(), 1.0,
+                         [](double accum, const Dimension &dim) -> double { return accum * dim.GetStepSize(); });
+}
+
+}  // namespace chernykh_a_multidimensional_integral_rectangle_omp
+  \end{lstlisting}
+
+  \subsection{Исходный код TBB-версии}\label{subsec:tbb}
+
+  \begin{lstlisting}[language=C++,label={lst:tbb}]
+#include "tbb/chernykh_a_multidimensional_integral_rectangle/include/ops_tbb.hpp"
+
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_reduce.h>
+#include <tbb/tbb.h>
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <numeric>
+#include <vector>
+
+namespace chernykh_a_multidimensional_integral_rectangle_tbb {
+
+bool TBBTask::ValidationImpl() {
+  auto *dims_ptr = reinterpret_cast<Dimension *>(task_data->inputs[0]);
+  uint32_t dims_size = task_data->inputs_count[0];
+  return dims_size > 0 &&
+         std::all_of(dims_ptr, dims_ptr + dims_size, [](const Dimension &dim) -> bool { return dim.IsValid(); });
+}
+
+bool TBBTask::PreProcessingImpl() {
+  auto *dims_ptr = reinterpret_cast<Dimension *>(task_data->inputs[0]);
+  uint32_t dims_size = task_data->inputs_count[0];
+  dims_.assign(dims_ptr, dims_ptr + dims_size);
+  return true;
+}
+
+bool TBBTask::RunImpl() {
+  int total_points = GetTotalPoints();
+  result_ = oneapi::tbb::parallel_reduce(
+      oneapi::tbb::blocked_range(0, total_points), 0.0,
+      [&](const oneapi::tbb::blocked_range<int> &range, double accum) -> double {
+        auto point = Point(dims_.size());
+        for (int i = range.begin(); i < range.end(); i++) {
+          FillPoint(i, point);
+          accum += func_(point);
+        }
+        return accum;
+      },
+      std::plus());
+  result_ *= GetScalingFactor();
+  return true;
+}
+
+bool TBBTask::PostProcessingImpl() {
+  *reinterpret_cast<double *>(task_data->outputs[0]) = result_;
+  return true;
+}
+
+void TBBTask::FillPoint(int index, Point &point) const {
+  for (size_t i = 0; i < dims_.size(); i++) {
+    int coordinate_index = index % dims_[i].GetStepsCount();
+    point[i] = dims_[i].GetLowerBound() + (coordinate_index + 1) * dims_[i].GetStepSize();
+    index /= dims_[i].GetStepsCount();
+  }
+}
+
+int TBBTask::GetTotalPoints() const {
+  return std::accumulate(dims_.begin(), dims_.end(), 1,
+                         [](int accum, const Dimension &dim) -> int { return accum * dim.GetStepsCount(); });
+}
+
+double TBBTask::GetScalingFactor() const {
+  return std::accumulate(dims_.begin(), dims_.end(), 1.0,
+                         [](double accum, const Dimension &dim) -> double { return accum * dim.GetStepSize(); });
+}
+
+}  // namespace chernykh_a_multidimensional_integral_rectangle_tbb
+  \end{lstlisting}
+
+  \subsection{Исходный код STL-версии}\label{subsec:stl}
+
+  \begin{lstlisting}[language=C++,label={lst:stl}]
+#include "stl/chernykh_a_multidimensional_integral_rectangle/include/ops_stl.hpp"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <numeric>
+#include <thread>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+namespace chernykh_a_multidimensional_integral_rectangle_stl {
+
+bool STLTask::ValidationImpl() {
+  auto *dims_ptr = reinterpret_cast<Dimension *>(task_data->inputs[0]);
+  uint32_t dims_size = task_data->inputs_count[0];
+  return dims_size > 0 &&
+         std::all_of(dims_ptr, dims_ptr + dims_size, [](const Dimension &dim) -> bool { return dim.IsValid(); });
+}
+
+bool STLTask::PreProcessingImpl() {
+  auto *dims_ptr = reinterpret_cast<Dimension *>(task_data->inputs[0]);
+  uint32_t dims_size = task_data->inputs_count[0];
+  dims_.assign(dims_ptr, dims_ptr + dims_size);
+  return true;
+}
+
+bool STLTask::RunImpl() {
+  int total_points = GetTotalPoints();
+  int num_threads = ppc::util::GetPPCNumThreads();
+  int points_per_thread = total_points / num_threads;
+  int extra_points = total_points % num_threads;
+
+  auto threads = std::vector<std::thread>();
+  auto partial_sums = std::vector<double>(num_threads, 0.0);
+
+  auto calculate_partial_sum = [&](int start_point, int end_point, int thread_index) -> void {
+    auto thread_point = Point(dims_.size());
+    for (int i = start_point; i < end_point; i++) {
+      FillPoint(i, thread_point);
+      partial_sums[thread_index] += func_(thread_point);
+    }
+  };
+
+  for (int i = 0; i < num_threads; i++) {
+    int start_point = (i * points_per_thread) + std::min(i, extra_points);
+    int end_point = start_point + points_per_thread + (i < extra_points ? 1 : 0);
+    threads.emplace_back(calculate_partial_sum, start_point, end_point, i);
+  }
+  std::ranges::for_each(threads, [](std::thread &thread) -> void { thread.join(); });
+
+  result_ = std::accumulate(partial_sums.begin(), partial_sums.end(), 0.0) * GetScalingFactor();
+  return true;
+}
+
+bool STLTask::PostProcessingImpl() {
+  *reinterpret_cast<double *>(task_data->outputs[0]) = result_;
+  return true;
+}
+
+void STLTask::FillPoint(int index, Point &point) const {
+  for (size_t i = 0; i < dims_.size(); i++) {
+    int coordinate_index = index % dims_[i].GetStepsCount();
+    point[i] = dims_[i].GetLowerBound() + (coordinate_index + 1) * dims_[i].GetStepSize();
+    index /= dims_[i].GetStepsCount();
+  }
+}
+
+int STLTask::GetTotalPoints() const {
+  return std::accumulate(dims_.begin(), dims_.end(), 1,
+                         [](int accum, const Dimension &dim) -> int { return accum * dim.GetStepsCount(); });
+}
+
+double STLTask::GetScalingFactor() const {
+  return std::accumulate(dims_.begin(), dims_.end(), 1.0,
+                         [](double accum, const Dimension &dim) -> double { return accum * dim.GetStepSize(); });
+}
+
+}  // namespace chernykh_a_multidimensional_integral_rectangle_stl
+  \end{lstlisting}
+
+  \subsection{Исходный код MPI+OpenMP-версии}\label{subsec:mpi+openmp}
+
+  \begin{lstlisting}[language=C++,label={lst:mpi+openmp}]
+#include "all/chernykh_a_multidimensional_integral_rectangle/include/ops_all.hpp"
+
+#include <omp.h>
+
+#include <algorithm>
+#include <boost/mpi/collectives/broadcast.hpp>
+#include <boost/mpi/collectives/reduce.hpp>
+#include <boost/serialization/vector.hpp>  // NOLINT(misc-include-cleaner)
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <numeric>
+#include <vector>
+
+namespace chernykh_a_multidimensional_integral_rectangle_all {
+
+bool AllTask::ValidationImpl() {
+  if (world_.rank() == 0) {
+    auto *dims_ptr = reinterpret_cast<Dimension *>(task_data->inputs[0]);
+    uint32_t dims_size = task_data->inputs_count[0];
+    return dims_size > 0 &&
+           std::all_of(dims_ptr, dims_ptr + dims_size, [](const Dimension &dim) -> bool { return dim.IsValid(); });
+  }
+  return true;
+}
+
+bool AllTask::PreProcessingImpl() {
+  if (world_.rank() == 0) {
+    auto *dims_ptr = reinterpret_cast<Dimension *>(task_data->inputs[0]);
+    uint32_t dims_size = task_data->inputs_count[0];
+    dims_.assign(dims_ptr, dims_ptr + dims_size);
+  }
+  return true;
+}
+
+bool AllTask::RunImpl() {
+  boost::mpi::broadcast(world_, dims_, 0);
+
+  int total_points = GetTotalPoints();
+  int points_per_process = total_points / world_.size();
+  int extra_points = total_points % world_.size();
+  int start_point = (world_.rank() * points_per_process) + std::min(world_.rank(), extra_points);
+  int end_point = start_point + points_per_process + (world_.rank() < extra_points ? 1 : 0);
+
+  double partial_sum = 0.0;
+#pragma omp parallel
+  {
+    auto thread_point = Point(dims_.size());
+#pragma omp for reduction(+ : partial_sum)
+    for (int i = start_point; i < end_point; i++) {
+      FillPoint(i, thread_point);
+      partial_sum += func_(thread_point);
+    }
+  }
+
+  boost::mpi::reduce(world_, partial_sum, result_, std::plus(), 0);
+
+  if (world_.rank() == 0) {
+    result_ *= GetScalingFactor();
+  }
+  return true;
+}
+
+bool AllTask::PostProcessingImpl() {
+  if (world_.rank() == 0) {
+    *reinterpret_cast<double *>(task_data->outputs[0]) = result_;
+  }
+  return true;
+}
+
+void AllTask::FillPoint(int index, Point &point) const {
+  for (size_t i = 0; i < dims_.size(); i++) {
+    int coordinate_index = index % dims_[i].GetStepsCount();
+    point[i] = dims_[i].GetLowerBound() + (coordinate_index + 1) * dims_[i].GetStepSize();
+    index /= dims_[i].GetStepsCount();
+  }
+}
+
+int AllTask::GetTotalPoints() const {
+  return std::accumulate(dims_.begin(), dims_.end(), 1,
+                         [](int accum, const Dimension &dim) -> int { return accum * dim.GetStepsCount(); });
+}
+
+double AllTask::GetScalingFactor() const {
+  return std::accumulate(dims_.begin(), dims_.end(), 1.0,
+                         [](double accum, const Dimension &dim) -> double { return accum * dim.GetStepSize(); });
+}
+
+}  // namespace chernykh_a_multidimensional_integral_rectangle_all
+  \end{lstlisting}
+
+\end{document}
