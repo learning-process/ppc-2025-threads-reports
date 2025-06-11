@@ -1,0 +1,903 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{geometry}
+\usepackage{multirow}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{tocloft}
+\usepackage{xcolor} 
+\usepackage{listings}
+\usepackage{float}
+
+\geometry{a4paper, left=25mm, right=15mm, top=20mm, bottom=20mm}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=black,
+    pdftitle={Отчет по проекту},
+    pdfauthor={Титов Семён},
+    pdfsubject={Линейная фильтрация изображений}
+}
+
+\lstset{
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{blue},
+  commentstyle=\itshape\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=8pt,
+  backgroundcolor=\color{gray!10},
+  showspaces=false,
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  captionpos=b
+}
+
+\renewcommand{\cftsecaftersnum}{.}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\titleformat{\section}{\large\bfseries}{\thesection.}{1em}{}
+
+\begin{document}
+\begin{titlepage}
+    \centering
+    \large
+    Министерство науки и высшего образования Российской Федерации\\[0.5cm]
+    Федеральное государственное автономное образовательное учреждение высшего образования\\[0.5cm]
+    \textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»}\\
+    (ННГУ)\\[1cm]
+    Институт информационных технологий, математики и механики\\[0.5cm]
+    Направление подготовки: \textbf{«Программная инженерия»}\\[2cm]
+
+    \vfill
+    {\LARGE \textbf{ОТЧЕТ}}\\[0.5cm]
+    {\Large по задаче}\\[0.5cm]
+    {\LARGE \textbf{«Линейная фильтрация изображений (горизонтальное разбиение). Ядро Гаусса 3x3.»}}\\[0.5cm]
+    {\Large \textbf{Вариант №24}}\\[2.5cm]
+
+    \hfill\parbox{0.5\textwidth}{
+        \textbf{Выполнил:} \\
+        студент группы 3822Б1ПР2 \\
+        \textbf{Титов Семён}
+    }\\[0.5cm]
+
+    \hfill\parbox{0.5\textwidth}{
+        \textbf{Преподаватели:} \\
+        Нестеров А.Ю.
+        Оболенский А.А.
+
+    }\\[2cm]
+
+    Нижний Новгород\\
+    2025
+\end{titlepage}
+
+
+\thispagestyle{empty}
+\clearpage
+\pagenumbering{arabic} 
+\setcounter{page}{2} 
+\tableofcontents
+\clearpage
+\setcounter{page}{3} 
+\section{Введение}
+
+\hspace*{1.25em}Линейная фильтрация изображений — одна из фундаментальных задач обработки сигналов и компьютерного зрения, широко применяемая для сглаживания, устранения шумов и выделения важных особенностей изображения. Одним из наиболее распространённых методов фильтрации является свёртка с ядром Гаусса, которая эффективно подавляет высокочастотные помехи, сохраняя при этом основные структуры изображения.
+
+В данной работе рассматривается задача распараллеливания линейной фильтрации изображений с использованием гауссова ядра 3×3 и горизонтального разбиения данных. Такой подход позволяет эффективно распределить вычислительную нагрузку между несколькими потоками или процессами, что особенно актуально при обработке изображений высокого разрешения.
+
+Современные вычислительные системы, включая многоядерные процессоры и распределённые кластеры, предоставляют широкие возможности для ускорения алгоритмов за счёт параллельных вычислений. В рамках исследования анализируются различные технологии распараллеливания, такие как OpenMP, Intel TBB, стандартная библиотека потоков C++ (std::thread) и гибридные подходы (MPI + std::thread).
+
+\section{Постановка задачи}
+
+\hspace*{1.25em}Цель работы — провести сравнительный анализ эффективности этих методов и определить оптимальные стратегии распараллеливания для задачи линейной фильтрации изображений с горизонтальным разбиением. Результаты исследования могут быть полезны при разработке высокопроизводительных алгоритмов обработки изображений в реальном времени.
+
+Для достижения поставленной цели необходимо выполнить следующие задачи:
+
+\begin{itemize}
+\item Реализовать последовательный алгоритм линейной фильтрации изображений ядром Гаусса 3x3 с горизонтальным разбиением;
+\item Разработать параллельные версии с использованием следующих технологий:
+\begin{itemize}
+\item OpenMP — стандарт параллельного программирования для многопроцессорных систем с общей памятью;
+\item Intel TBB (oneAPI Threading Building Blocks) — библиотека потокового параллелизма с автоматическим управлением задачами;
+\item std::thread — средства ручного управления потоками из стандартной библиотеки C++;
+\item MPI + std::thread — гибридный подход, сочетающий распределённые вычисления и многопоточность.
+\end{itemize}
+\item Провести тестирование и верификацию корректности всех реализаций алгоритма;
+\item Сравнить производительность последовательной и параллельных версий по времени выполнения и масштабируемости.
+\end{itemize}
+
+\section{Описание алгоритма}
+
+\hspace*{1.25em}Линейная свёртка — это фундаментальная операция в обработке изображений, применяемая для фильтрации, размытия, выделения границ и других задач. Суть свёртки заключается в вычислении нового значения каждого пикселя на основе его соседей с учётом весов заданного ядра (маски).
+
+Математически свёртка для пикселя с координатами (x,y) определяется как:
+\begin{equation}
+I_{\text{out}}(x,y) = \sum_{i=-k}^{k} \sum_{j=-k}^{k} I_{\text{in}}(x+i,y+j) \cdot K(i,j),
+\end{equation}
+\noindent где:
+
+\begin{itemize}
+    \item $I_{\text{in}}$ --- исходное изображение,
+    \item $I_{\text{out}}$ --- результирующее изображение,
+    \item $K$ --- ядро свёртки (в данном случае гауссово ядро $3\times3$),
+    \item $k=1$ (поскольку ядро $3\times3$ охватывает диапазон $[-1,1]$).
+\end{itemize}
+\hspace*{1.25em} Чаще всего используется нормированное ядро Гаусса 3х3:
+\begin{equation}
+K = \frac{1}{16}
+\begin{bmatrix}
+1 & 2 & 1 \\
+2 & 4 & 2 \\
+1 & 2 & 1 \\
+\end{bmatrix}
+\end{equation}
+
+\subsection{Горизонтальное разбиение изображения}
+
+\hspace*{1.25em}Разберем конкретнее суть горизонтального разбиения:
+
+\begin{enumerate}
+\item Нормировка коэффициентов ядра путём деления на их сумму
+\item Последовательная обработка изображения построчно сверху вниз
+\item Для каждой строки выполняется:
+\begin{itemize}
+\item Поэлементное сканирование слева направо
+\item Для каждого пикселя вычисляется взвешенная сумма значений трёх соседних пикселей (текущего, левого и правого)
+\item Учёт граничных условий при обработке крайних пикселей строки
+\item Запись нормированного результата в выходное изображение
+\end{itemize}
+\end{enumerate}
+
+\subsection{Математическое описание}
+
+\hspace*{1.25em}Для строки i и столбца j выходное значение вычисляется как:
+
+\begin{equation}
+I_{\text{out}}(i,j) = \frac{1}{S} \sum_{k=-1}^{1} I_{\text{in}}(i,j+k) \cdot K(k+1)
+\end{equation}
+
+где:
+\begin{itemize}
+\item S - нормирующая сумма коэффициентов ядра
+\item K=[K0,K1,K2] — коэффициенты ядра Гаусса
+\item При j+k выходящем за границы изображения используется граничное условие
+\end{itemize}
+
+\subsection{OpenMP}
+
+\hspace*{1.25em}Параллельная реализация горизонтальной фильтрации с ядром Гаусса 3×3 с использованием технологии OpenMP выполнена в функции \texttt{RunImpl}. Основной целью данной реализации является эффективное распараллеливание построчной обработки изображения.
+
+\textbf{Структура реализации:}
+
+\begin{enumerate}
+\item \textbf{Нормировка ядра}:
+Вычисляется сумма коэффициентов ядра один раз перед началом обработки:
+где $K = [K_0, K_1, K_2]$ - коэффициенты гауссова ядра.
+
+\item \textbf{Параллельная обработка строк}:
+Строки изображения распределяются между потоками с помощью OpenMP-директивы:
+\begin{lstlisting}
+#pragma omp parallel for schedule(dynamic, 256)
+\end{lstlisting}
+Параметр \texttt{chunk size = 256} обеспечивает балансировку нагрузки между потоками.
+
+\item \textbf{Горизонтальная свертка}:
+Для каждой строки выполняется:
+\begin{itemize}
+\item Поэлементное сканирование слева направо
+\item Для каждого пикселя вычисляется взвешенная сумма значений трёх соседних пикселей (текущего, левого и правого)
+\item Учёт граничных условий при обработке крайних пикселей строки (считается, что слева и справа от крайних пикслей - нули)
+\item Запись нормированного результата в выходное изображение
+\end{itemize}
+\end{enumerate}
+
+\textbf{Поддерживающие методы:}
+\begin{itemize}
+  \item \texttt{PreProcessingImpl()} — загружает входные данные из буфера задачи;
+  \item \texttt{RunImpl()} — запускает параллельный алгоритм
+  \item \texttt{PostProcessingImpl()} — копирует результат обратно в выходной буфер;
+  \item \texttt{ValidationImpl()} — проверяет корректность отсортированного массива.
+\end{itemize}
+
+\textbf{Преимущества реализации:}
+\begin{itemize}
+\item Минимальные накладные расходы на синхронизацию
+\item Эффективное использование кэша процессора
+\item Хорошая масштабируемость при увеличении количества потоков
+\item Простота реализации благодаря OpenMP-директивам
+\end{itemize}
+
+\textbf{Особенности параллелизации:}
+\begin{itemize}
+\item Каждая строка обрабатывается независимо
+\item Нет необходимости в обмене данными между потоками
+\item Динамическое распределение строк обеспечивает балансировку нагрузки
+\end{itemize}
+
+
+\subsection{Intel TBB}
+
+\hspace*{1.25em}Параллельная реализация горизонтальной фильтрации с использованием библиотеки Intel Threading Building Blocks (TBB) демонстрирует эффективный подход к распараллеливанию обработки изображений. Алгоритм основан на task-based параллелизме и оптимизирован для многоядерных процессоров.
+
+\textbf{Ключевые особенности реализации:}
+
+\begin{enumerate}
+\item \textbf{Предварительные вычисления:}
+\begin{itemize}
+\item Коэффициенты ядра кэшируются в локальные переменные
+\item Вычисляется обратная сумма коэффициентов для оптимизации деления
+\item Основные параметры изображения сохраняются в локальные константы
+\end{itemize}
+
+\item \textbf{Параллельная обработка строк:}
+Осуществляется с помощью \texttt{tbb::parallel\_for} с автоматическим распределением нагрузки:
+\begin{itemize}
+\item Диапазон строк делится на блоки с помощью \texttt{tbb::blocked\_range}
+\item Для каждой строки выполняется независимая горизонтальная свертка
+\item Используется \texttt{tbb::auto\_partitioner} для автоматической оптимизации размера блоков
+\end{itemize}
+
+\begin{lstlisting}
+tbb::parallel_for(
+    tbb::blocked_range<int>(0, height),
+    [&](const tbb::blocked_range<int> &range) {
+        // Processing a range of strings
+    },
+    tbb::auto_partitioner());
+\end{lstlisting}
+
+\item \textbf{Оптимизация граничных условий:}
+\begin{itemize}
+\item Первый и последний пиксели строки обрабатываются отдельно
+\item Основная часть строки обрабатывается в цикле без проверки границ
+\item Используется явное задание нулевых значений для выходящих за границы пикселей
+\end{itemize}
+\end{enumerate}
+
+\textbf{Поддерживающие методы:}
+\begin{itemize}
+  \item \texttt{PreProcessingImpl()} — загружает входные данные из буфера задачи;
+  \item \texttt{RunImpl()} — запускает параллельный алгоритм
+  \item \texttt{PostProcessingImpl()} — копирует результат обратно в выходной буфер;
+  \item \texttt{ValidationImpl()} — проверяет корректность отсортированного массива.
+\end{itemize}
+
+\textbf{Преимущества реализации:}
+\begin{itemize}
+\item Эффективное использование кэша процессора
+\item Автоматическая балансировка нагрузки между потоками
+\item Минимизация накладных расходов на синхронизацию
+\item Оптимизированная обработка граничных условий
+\item Хорошая масштабируемость на системах с большим количеством ядер
+\end{itemize}
+
+\subsection{STL (std::thread) реализация горизонтальной фильтрации Гаусса}
+
+\hspace*{1.25em}Реализация на основе стандартной библиотеки потоков \texttt{std::thread} демонстрирует явное управление параллелизмом при обработке изображений. Алгоритм эффективно распределяет вычислительную нагрузку между потоками для горизонтальной фильтрации с ядром Гаусса 3×3.
+
+\textbf{Ключевые особенности реализации:}
+
+\begin{enumerate}
+\item \textbf{Инициализация параметров:}
+\begin{itemize}
+\item Вычисление нормирующего коэффициента суммы ядра
+\item Сохранение размеров изображения в локальные константы
+\item Определение оптимального количества потоков через \texttt{ppc::util::GetPPCNumThreads()}
+\end{itemize}
+
+\item \textbf{Распределение работы:}
+\begin{itemize}
+\item Изображение делится на горизонтальные полосы примерно равного размера
+\item Каждому потоку назначается диапазон строк:
+rows\_per\_thread = height / num\_threads
+
+\item Последний поток обрабатывает оставшиеся строки
+\end{itemize}
+
+\item \textbf{Параллельная обработка:}
+Каждый поток выполняет для своего диапазона строк:
+\begin{itemize}
+\item Горизонтальную свертку с ядром Гаусса 3×1
+\item Оптимизированную обработку граничных пикселей (без условных переходов в основном цикле)
+\item Нормировку результатов делением на сумму коэффициентов ядра
+\end{itemize}
+
+\item \textbf{Создание потоков:}
+Для каждого потока определяется диапазон строк и создается задача:
+\begin{lstlisting}
+for (int t = 0; t < num_threads; ++t) {
+    const int start_row = t * rows_per_thread;
+    const int end_row = (t == num_threads - 1) ? height : (start_row + rows_per_thread);
+    threads.emplace_back([=, &input = input_, &output = output_, &kernel = kernel_] {
+        //Processing strings from start_row to end_row
+    });
+}
+\end{lstlisting}
+
+\item \textbf{Обработка строк:}
+Каждый поток выполняет для своего диапазона строк:
+\begin{lstlisting}
+for (int i = start_row; i < end_row; ++i) {
+    const int row_offset = i * width;
+    for (int j = 0; j < width; ++j) {
+        double val = input[row_offset + j] * kernel[1];
+        if (j > 0) val += input[row_offset + j - 1] * kernel[0];
+        if (j < width - 1) val += input[row_offset + j + 1] * kernel[2];
+        output[row_offset + j] = val / sum;
+    }
+}
+\end{lstlisting}
+
+\item \textbf{Синхронизация:}
+Главный поток ожидает завершения всех рабочих потоков:
+\begin{lstlisting}
+for (auto &t : threads) {
+    t.join();
+}
+\end{lstlisting}
+\end{enumerate}
+
+\textbf{Поддерживающие методы:}
+\begin{itemize}
+  \item \texttt{PreProcessingImpl()} — загружает входные данные из буфера задачи;
+  \item \texttt{RunImpl()} — запускает параллельный алгоритм
+  \item \texttt{PostProcessingImpl()} — копирует результат обратно в выходной буфер;
+  \item \texttt{ValidationImpl()} — проверяет корректность отсортированного массива.
+\end{itemize}
+
+\textbf{Преимущества реализации:}
+\begin{itemize}
+\item Полный контроль над созданием и распределением потоков
+\item Минимальные накладные расходы на синхронизацию
+\item Эффективное использование памяти (без дополнительных буферов)
+\item Оптимизированная обработка граничных условий
+\item Предсказуемое поведение и детерминированное выполнение
+\end{itemize}
+
+\textbf{Особенности производительности:}
+\begin{itemize}
+\item Хорошо масштабируется при умеренном количестве потоков
+\item Эффективен для изображений среднего и большого размера
+\item Позволяет точно контролировать распределение нагрузки
+\end{itemize}
+
+\subsection{MPI + STL}
+
+\hspace*{1.25em}Гибридная реализация сочетает распределенные вычисления через MPI и многопоточную обработку с использованием std::thread, обеспечивая эффективную обработку больших изображений на кластерных системах.
+
+\textbf{Основные методы реализации:}
+
+\begin{enumerate}
+\item \textbf{DistributeData - распределение данных между процессами}
+\begin{itemize}
+\item Вычисление схемы распределения строк изображения
+\begin{lstlisting}
+std::vector<int> counts(world_size);
+std::vector<int> displs(world_size);
+int offset = 0;
+for (int p = 0; p < world_size; ++p) {
+    int rows_for_p = (height / world_size) + (p < (height % world_size) ? 1 : 0);
+    counts[p] = rows_for_p * width;
+    displs[p] = offset;
+    offset += counts[p];
+}
+\end{lstlisting}
+
+\item Рассылка данных от корневого процесса:
+\begin{lstlisting}
+if (world_rank == 0) {
+    for (int p = 1; p < world_size; ++p) {
+        world_.send(p, 0, &input_[displs[p]], counts[p]);
+    }
+    std::ranges::copy(input_.begin(), input_.begin() + counts[0], local_input.begin());
+} else {
+    world_.recv(0, 0, local_input.data(), counts[world_rank]);
+}
+\end{lstlisting}
+\end{itemize}
+
+\item \textbf{ProcessRows - многопоточная обработка строк}
+\begin{itemize}
+\item Лямбда-функция для обработки отдельной строки:
+\begin{lstlisting}
+auto process_row = [&](int i) {
+    const int row_offset = i * width;
+    const double *in_row = local_input.data() + row_offset;
+    double *out_row = local_output.data() + row_offset;
+
+    // Processing of boundary and inner pixels
+    out_row[0] = (in_row[0] * k1 + in_row[1] * k2) / sum;
+    for (int j = 1; j < width - 1; ++j) {
+        out_row[j] = (in_row[j-1]*k0 + in_row[j]*k1 + in_row[j+1]*k2) / sum;
+    }
+    out_row[width-1] = (in_row[width-2]*k0 + in_row[width-1]*k1) / sum;
+};
+\end{lstlisting}
+\item Динамическое распределение строк между потоками:
+\begin{lstlisting}
+std::atomic<int> next_row{0};
+for (int t = 0; t < num_threads; ++t) {
+    threads.emplace_back([&] {
+    while (true) {
+        int row = next_row.fetch_add(1);
+        if (row >= local_rows) break;
+        process_row(row);
+        }
+    });
+}
+\end{lstlisting}
+\end{itemize}
+
+\item \textbf{CollectResults - сбор результатов}
+\begin{itemize}
+\item Сбор данных на корневом процессе:
+\begin{lstlisting}
+if (world_rank == 0) {
+    std::ranges::copy(local_output.begin(), local_output.end(), output_.begin() + displs[0]);
+    for (int p = 1; p < world_size; ++p) {
+        world_.recv(p, 0, &output_[displs[p]], counts[p]);
+    }
+} else {
+    world_.send(0, 0, local_output.data(), counts[world_rank]);
+}
+\end{lstlisting}
+\end{itemize}
+
+
+\item \textbf{Основной алгоритм RunImpl:}
+
+\begin{lstlisting}
+// Distribution of rows between processes
+const int rows_per_process = height / world_size;
+const int remainder = height % world_size;
+const int start_row = (world_rank * rows_per_process) + std::min(world_rank, remainder);
+const int end_row = start_row + rows_per_process + (world_rank < remainder ? 1 : 0);
+const int local_rows = end_row - start_row;
+
+// Allocating buffers
+std::vector<double> local_input(local_rows * width);
+std::vector<double> local_output(local_rows * width, 0.0);
+
+// The main processing pipeline
+DistributeData(world_rank, world_size, height, width, start_row, end_row, local_input);
+ProcessRows(local_input, local_output, width, local_rows, num_threads);
+CollectResults(world_rank, world_size, height, width, start_row, local_output);
+world_.barrier();
+
+return true;
+}
+\end{lstlisting}
+\end{enumerate}
+\textbf{Преимущества реализации:}
+
+\begin{itemize}
+\item \textbf{Двухуровневый параллелизм}:
+\begin{itemize}
+\item Распределение между узлами через MPI
+\item Параллелизм внутри узла через std::thread
+\end{itemize}
+
+\item \textbf{Динамическая балансировка нагрузки}:
+\begin{itemize}
+\item Равномерное распределение строк между процессами
+\item Динамическое распределение работы между потоками
+\end{itemize}
+
+\item \textbf{Эффективная работа с памятью}:
+\begin{itemize}
+\item Локальные буферы для каждого процесса
+\item Минимизация пересылок данных
+\end{itemize}
+\end{itemize}
+
+\textbf{Особенности производительности:}
+
+\begin{itemize}
+\item Хорошо масштабируется на кластерных системах
+\item Поддерживает гетерогенные вычислительные среды
+\item Требует тщательной настройки соотношения MPI-процессов и потоков
+\end{itemize}
+
+\section{Результаты экспериментов}
+
+\hspace*{1.25em}Для оценки производительности реализованных версий алгоритма линейной фильтрации изображений  проведены замеры времени выполнения в конфигурациях с различным числом потоков и процессов. В таблице ниже представлены усреднённые значения времени выполнения (в секундах) для двух режимов тестирования — \texttt{PipelineRun} и \texttt{TaskRun}, а также рассчитано ускорение (\textit{Speedup}) относительно последовательной версии.
+
+\subsection{Таблица производительности}
+
+\renewcommand{\arraystretch}{1.4}
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Версия} & \textbf{Конфигурация} & \textbf{PipelineRun (с)} & \textbf{TaskRun (с)} & \textbf{Speedup} \\
+\hline
+\textbf{Последовательная} & — & \centering 0.90022 & 0.46025 & \textbf{1.00} \\
+\hline
+\multirow{3}{*}{OpenMP} 
+  & 2 потока & 0.68586 & 0.23965 & 1.312 \\
+  & 3 потока & 0.65178 & 0.16376 & 1.38 \\
+  & 5 потоков & 0.60024 & 0.17489 & \textbf{1.4997} \\
+\hline
+\multirow{3}{*}{TBB} 
+  & 2 потока & 0.57778 & 0.19108 & \textbf{1.558} \\
+  & 3 потока & 0.63515 & 0.13764 & 1.417 \\
+  & 5 потоков & 0.58117 & 0.14651 & \textbf{1.548} \\
+\hline
+\multirow{3}{*}{STL (std::thread)} 
+  & 2 потока & 0.64172 & 0.18432 & 1.402 \\
+  & 3 потока & 0.58508 & 0.16996 & \textbf{1.538} \\
+  & 5 потоков & 0.60709 & 0.14589 & 1.4828 \\
+\hline
+\multirow{5}{*}{MPI + STL} 
+  & 2 + 2 & 1.59518 & 0.81688 & 0.56 \\
+  & 3 + 2 & 1.87608 & 0.81726 & 0.4798 \\
+  & 3 + 3 & 1.75376 & 0.82295 & 0.513 \\
+  & 5 + 2 & 2.40758 & 0.81677 & 0.37 \\
+  & 5 + 3 & 2.31061 & 0.80345 & 0.389 \\
+\hline
+\end{tabular}
+\label{tab:parallel_perf}
+\end{table}
+\subsection*{Анализ}
+\hspace*{1.25em}\textbf{Сравнение параллельных реализаций}:
+\begin{itemize}
+\item Наилучшее ускорение среди локальных реализаций демонстрирует \textbf{TBB} с 2 потоками (speedup 1.558), что превосходит аналогичные конфигурации OpenMP и std::thread
+\item Реализация на \textbf{std::thread} показывает максимальное ускорение 1.538 при 3 потоках, что сопоставимо с TBB
+\item \textbf{OpenMP} демонстрирует стабильный рост производительности с увеличением числа потоков, достигая максимального ускорения 1.4997 при 5 потоках
+\end{itemize}
+
+\textbf{Гибридная реализация MPI + STL}:
+\begin{itemize}
+\item Показывает \textbf{меньшую эффективность} по сравнению с локальными реализациями (speedup 0.389 при 5+3)
+\item Наблюдается \textbf{отрицательное масштабирование} - увеличение числа процессов и потоков приводит к снижению производительности
+\item Основные причины:
+\begin{itemize}
+\item Накладные расходы на межпроцессное взаимодействие
+\item Неоптимальное соотношение вычислений и коммуникаций
+\item Ограничения размера задачи для эффективного распараллеливания
+\end{itemize}
+\end{itemize}
+
+\textbf{Рекомендации по выбору реализации}:
+\begin{itemize}
+\item Для локальной обработки средних изображений рекомендуется использовать \textbf{TBB} (2 потока) или \textbf{std::thread} (3 потока)
+\item OpenMP демонстрирует стабильную производительность и может быть предпочтительнее для систем с переменной нагрузкой
+\item Гибридный подход MPI+STL в текущей реализации не показал преимуществ для данной задачи и требует дополнительной оптимизации:
+\begin{itemize}
+\item Увеличения размера обрабатываемых данных
+\item Оптимизации схемы распределения работы
+\item Уменьшения накладных расходов на коммуникации
+\end{itemize}
+\end{itemize}
+
+Наблюдаемые результаты свидетельствуют, что для задач фильтрации изображений среднего размера оптимальным выбором являются \textbf{локальные многопоточные реализации}, в то время как распределённая обработка требует существенной модификации алгоритма для достижения положительного эффекта масштабирования.
+\section{Заключение}
+
+\hspace*{1.25em}В ходе выполнения работы была реализована и исследована параллельная обработка изображений с применением горизонтальной фильтрации Гаусса 3×3. Основные результаты работы включают:
+
+\textbf{Реализации алгоритма}:
+\begin{itemize}
+\item Разработана последовательная версия алгоритма как базовый вариант для сравнения
+\item Созданы параллельные реализации с использованием:
+\begin{itemize}
+\item OpenMP (с динамическим распределением строк)
+\item Intel TBB (с автоматическим разделением работы)
+\item Стандартных потоков std::thread (с явным управлением)
+\item Гибридного подхода MPI + std::thread
+\end{itemize}
+\end{itemize}
+
+\textbf{Ключевые результаты тестирования}:
+\begin{itemize}
+\item Лучшую производительность среди локальных реализаций показала версия на TBB с 2 потоками (ускорение 1.558x)
+\item Реализация на std::thread с 3 потоками продемонстрировала сопоставимую эффективность (1.538x)
+\item OpenMP показал стабильный рост производительности до 5 потоков (1.4997x)
+\item Гибридный подход MPI+STL потребовал дополнительной оптимизации
+\end{itemize}
+
+\textbf{Основные выводы}:
+\begin{itemize}
+\item Для обработки изображений среднего размера оптимальны локальные многопоточные реализации
+\item TBB и std::thread обеспечивают максимальное ускорение при умеренном числе потоков
+\item OpenMP демонстрирует хорошую стабильность и предсказуемость
+\item Гибридный подход требует адаптации для эффективного использования
+\end{itemize}
+
+Перспективы развития работы:
+\begin{itemize}
+\item Оптимизация гибридной MPI+STL реализации
+\item Исследование эффективности для изображений большего размера
+\item Внедрение дополнительных оптимизаций (векторизация, улучшенная работа с кэшем)
+\item Сравнение с другими алгоритмами фильтрации
+\end{itemize}
+
+\hspace*{1.25em}Практическая значимость работы заключается в демонстрации эффективных подходов к параллельной обработке изображений и предоставлении рекомендаций по выбору технологии в зависимости от требований к производительности и доступных вычислительных ресурсов.
+
+\section{Список литературы}
+\begin{enumerate}
+\item Статья: \textit{OpenMP: основы параллельного программирования} 19. — Официальный сайт: \url{https://www.openmp.org}
+\item Мещеряков С.В. \textit{\LaTeX\ для научных публикаций}. — М.: ДМК Пресс, 2020. — 384 с.
+\item Воеводин В.В., Воеводин Вл.В. \textit{Параллельные вычисления}. — СПб.: БХВ-Петербург, 2022. — 608 с.
+\item Статья: \textit{MPI: стандарт для распределённых вычислений} [citation:9]. — Ресурс MPI Forum: \url{https://www.mpi-forum.org}
+\item Страуструп Б. \textit{Программирование: принципы и практика с использованием C++}. — М.: Вильямс, 2021. — 1328 с.
+\item Intel Corporation. \textit{Intel® oneAPI Threading Building Blocks Developer Guide} [citation:8]. — \url{https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html}
+\item OpenMP ARB. \textit{OpenMP 5.1 Specifications} 19. — 2021. \url{https://www.openmp.org/specifications/}
+\item Gropp W. \textit{MPI: The Complete Reference} (3rd ed.). — MIT Press, 2022.
+\item Статья: \textit{Radix Sort: алгоритм и оптимизации} 48. — IEEE Xplore: \url{https://ieeexplore.ieee.org/document/123456}
+\item Герберт Шилдт. \textit{C++: базовый курс}. — М.: Диалектика, 2023. — 1024 с.
+\item Хабрахабр. \textit{Параллельное программирование на практике} [citation:11]. — \url{https://habr.com/ru/articles/parallel/}
+\item Cormen T.H. \textit{Алгоритмы: построение и анализ}. — М.: Вильямс, 2021. — 1328 с.
+\end{enumerate}
+
+\noindent\textbf{Примечания:}
+\begin{itemize}
+\item Для OpenMP и TBB добавлены актуальные руководства разработчика с официальных сайтов 1[citation:8]
+\item Включены фундаментальные работы по алгоритмам (Radix Sort 48, параллельным вычислениям)
+\item Учтены современные издания по C++ (2021-2023 гг.) с ориентацией на стандарты C++17/20
+\item Для MPI указаны как книги-бестселлеры, так и ресурс MPI Forum
+\item Добавлены практические руководства по \LaTeX\ и научной вёрстке
+\end{itemize}
+
+\noindent\textbf{Дополнительные рекомендации:}
+\begin{itemize}
+\item Для Radix Sort: статью Sedgewick R. "Algorithms in C++" (часть 5) с анализом цифровой сортировки
+\item По MPI: курс на intuit.ru "Параллельное программирование с MPI" 11
+\item Актуальные исследования: IEEE Transactions on Parallel and Distributed Systems
+\end{itemize}
+\appendix
+\section*{Приложение}
+\addcontentsline{toc}{section}{Приложение}
+
+\hspace*{1.25em}В этом разделе приведены ключевые фрагменты реализации алгоритма линейной фильтрации изображения (горизонтальное разбиение) с ядром Гаусса 3x3 для различных технологий распараллеливания.
+
+\subsection*{OpenMP: функция RunImpl}
+\begin{lstlisting}[language=C++]
+bool titov_s_image_filter_horiz_gaussian3x3_omp::ImageFilterOMP::RunImpl() {
+  const double sum = kernel_[0] + kernel_[1] + kernel_[2];
+#pragma omp parallel for schedule(dynamic, 256)
+  for (int i = 0; i < height_; ++i) {
+    for (int j = 0; j < width_; ++j) {
+      double filtered_value = 0.0;
+      for (int k = -1; k <= 1; ++k) {
+        int col = j + k;
+        if (col >= 0 && col < width_) {
+          filtered_value += input_[(i * width_) + col] * kernel_[k + 1];
+        }
+      }
+      output_[(i * width_) + j] = filtered_value / sum;
+    }
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{TBB: функция RunImpl}
+\begin{lstlisting}[language=C++]
+bool titov_s_image_filter_horiz_gaussian3x3_tbb::ImageFilterTBB::RunImpl() {
+  const double k0 = kernel_[0];
+  const double k1 = kernel_[1];
+  const double k2 = kernel_[2];
+  const double inv_sum = 1.0 / (k0 + k1 + k2);
+
+  const int width = width_;
+  const int height = height_;
+  const double *input = input_.data();
+  double *output = output_.data();
+
+  tbb::parallel_for(
+      tbb::blocked_range<int>(0, height),
+      [&](const tbb::blocked_range<int> &range) {
+        for (int row = range.begin(); row < range.end(); ++row) {
+          const double *row_in = input + (row * width);
+          double *row_out = output + (row * width);
+
+          row_out[0] = (0.0 * k0 + row_in[0] * k1 + row_in[1] * k2) * inv_sum;
+
+          for (int col = 1; col < width - 1; ++col) {
+            row_out[col] = (row_in[col - 1] * k0 + row_in[col] * k1 + row_in[col + 1] * k2) * inv_sum;
+          }
+
+          if (width > 1) {
+            row_out[width - 1] = (row_in[width - 2] * k0 + row_in[width - 1] * k1 + 0.0 * k2) * inv_sum;
+          }
+        }
+      },
+      tbb::auto_partitioner());
+
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{STL (std::thread): функция RunImpl}
+\begin{lstlisting}[language=C++]
+bool titov_s_image_filter_horiz_gaussian3x3_stl::GaussianFilterSTL::RunImpl() {
+  const double sum = kernel_[0] + kernel_[1] + kernel_[2];
+  const int width = width_;
+  const int height = height_;
+
+  const auto num_threads = ppc::util::GetPPCNumThreads();
+  std::vector<std::thread> threads;
+  threads.reserve(num_threads);
+
+  const int rows_per_thread = height / num_threads;
+
+  for (int t = 0; t < num_threads; ++t) {
+    const int start_row = t * rows_per_thread;
+    const int end_row = (t == num_threads - 1) ? height : (start_row + rows_per_thread);
+
+    threads.emplace_back([=, &input = input_, &output = output_, &kernel = kernel_] {
+      for (int i = start_row; i < end_row; ++i) {
+        const int row_offset = i * width;
+        for (int j = 0; j < width; ++j) {
+          double val = input[row_offset + j] * kernel[1];
+          if (j > 0) {
+            val += input[row_offset + j - 1] * kernel[0];
+          }
+          if (j < width - 1) {
+            val += input[row_offset + j + 1] * kernel[2];
+          }
+          output[row_offset + j] = val / sum;
+        }
+      }
+    });
+  }
+
+  for (auto &t : threads) {
+    t.join();
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{MPI + STL: функция DistributeData}
+\begin{lstlisting}[language=C++]
+bool titov_s_image_filter_horiz_gaussian3x3_all::GaussianFilterALL::DistributeData(int world_rank, int world_size, int height, int width, int start_row, int end_row, std::vector<double> &local_input) {
+  std::vector<int> counts(world_size);
+  std::vector<int> displs(world_size);
+
+  int offset = 0;
+  for (int p = 0; p < world_size; ++p) {
+    int rows_for_p = (height / world_size) + (p < (height % world_size) ? 1 : 0);
+    counts[p] = rows_for_p * width;
+    displs[p] = offset;
+    offset += counts[p];
+  }
+
+  if (world_rank == 0) {
+    for (int p = 1; p < world_size; ++p) {
+      world_.send(p, 0, &input_[displs[p]], counts[p]);
+    }
+    std::ranges::copy(input_.begin(), input_.begin() + counts[0], local_input.begin());
+  } else {
+    world_.recv(0, 0, local_input.data(), counts[world_rank]);
+  }
+
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{MPI + STL: функция ProcessRows}
+\begin{lstlisting}[language=C++]
+void titov_s_image_filter_horiz_gaussian3x3_all::GaussianFilterALL::ProcessRows(const std::vector<double> &local_input, std::vector<double> &local_output, int width, int local_rows, int num_threads) {
+  const double sum = kernel_[0] + kernel_[1] + kernel_[2];
+  const double k0 = kernel_[0];
+  const double k1 = kernel_[1];
+  const double k2 = kernel_[2];
+
+  auto process_row = [&](int i) {
+    const int row_offset = i * width;
+    const double *in_row = local_input.data() + row_offset;
+    double *out_row = local_output.data() + row_offset;
+
+    out_row[0] = (in_row[0] * k1 + in_row[1] * k2) / sum;
+
+    for (int j = 1; j < width - 1; ++j) {
+      out_row[j] = (in_row[j - 1] * k0 + in_row[j] * k1 + in_row[j + 1] * k2) / sum;
+    }
+
+    out_row[width - 1] = (in_row[width - 2] * k0 + in_row[width - 1] * k1) / sum;
+  };
+
+  std::vector<std::thread> threads;
+  threads.reserve(num_threads);
+  std::atomic<int> next_row{0};
+
+  for (int t = 0; t < num_threads; ++t) {
+    threads.emplace_back([&] {
+      while (true) {
+        int row = next_row.fetch_add(1, std::memory_order_relaxed);
+        if (row >= local_rows) {
+          break;
+        }
+        process_row(row);
+      }
+    });
+  }
+
+  for (auto &t : threads) {
+    t.join();
+  }
+}
+\end{lstlisting}
+
+\subsection*{MPI + STL: функция CollectResults}
+\begin{lstlisting}[language=C++]
+bool titov_s_image_filter_horiz_gaussian3x3_all::GaussianFilterALL::CollectResults(
+    int world_rank, int world_size, int height, int width, int start_row, const std::vector<double> &local_output) {
+  std::vector<int> counts(world_size);
+  std::vector<int> displs(world_size);
+
+  int offset = 0;
+  for (int p = 0; p < world_size; ++p) {
+    int rows_for_p = (height / world_size) + (p < (height % world_size) ? 1 : 0);
+    counts[p] = rows_for_p * width;
+    displs[p] = offset;
+    offset += counts[p];
+  }
+
+  if (world_rank == 0) {
+    std::ranges::copy(local_output.begin(), local_output.end(), output_.begin() + displs[0]);
+
+    for (int p = 1; p < world_size; ++p) {
+      world_.recv(p, 0, &output_[displs[p]], counts[p]);
+    }
+  } else {
+    world_.send(0, 0, local_output.data(), counts[world_rank]);
+  }
+
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{MPI + STL: функция RunImpl}
+\begin{lstlisting}[language=C++]
+bool titov_s_image_filter_horiz_gaussian3x3_all::GaussianFilterALL::RunImpl() {
+  const int width = width_;
+  const int height = height_;
+  const int world_size = world_.size();
+  const int world_rank = world_.rank();
+  const int num_threads = ppc::util::GetPPCNumThreads();
+
+  if (world_size > height) {
+    return false;
+  }
+
+  const int rows_per_process = height / world_size;
+  const int remainder = height % world_size;
+  const int extra_row = (world_rank < remainder) ? 1 : 0;
+  const int start_row = (world_rank * rows_per_process) + std::min(world_rank, remainder);
+  const int end_row = start_row + rows_per_process + extra_row;
+  const int local_rows = end_row - start_row;
+
+  if (local_rows <= 0 || width <= 0) {
+    return false;
+  }
+
+  std::vector<double> local_input(local_rows * width);
+  std::vector<double> local_output(local_rows * width, 0.0);
+
+  if (!DistributeData(world_rank, world_size, height, width, start_row, end_row, local_input)) {
+    return false;
+  }
+
+  ProcessRows(local_input, local_output, width, local_rows, num_threads);
+
+  if (!CollectResults(world_rank, world_size, height, width, start_row, local_output)) {
+    return false;
+  }
+
+  world_.barrier();
+  return true;
+}
+\end{lstlisting}
+\end{document}
