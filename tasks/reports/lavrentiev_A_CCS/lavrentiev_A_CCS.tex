@@ -1,0 +1,712 @@
+\documentclass[12pt]{article}
+\usepackage[russian]{babel}
+\usepackage{graphicx} 
+\usepackage{times}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\lstdefinestyle{mystyle}{
+    keywordstyle=\color{purple},   
+    numberstyle=\tiny\color{gray},   
+    stringstyle=\color{green},    
+    basicstyle=\ttfamily\footnotesize, 
+    breakatwhitespace=false, 
+    breaklines=true,  
+    captionpos=b,   
+    keepspaces=true,  
+    numbers=left,      
+    showspaces=false,  
+    showstringspaces=false,   
+    tabsize=2          
+}
+
+\title{LavrentievCCSReport}
+\author{Лаврентьев Алексей}
+\date{May 2025}
+
+\begin{document}
+\begin{titlepage}
+\begin{center}
+\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\
+\textbf{Федеральное государственное автономное образовательное учреждение высшего образования \\ «Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»} \\
+Институт информационных технологий, математики и механики \\
+\vspace{3cm}
+{\Large
+\textbf{Отчёт по лабораторной работе:} \\[0.5cm]
+\textbf{"Умножение разреженных матриц. Элементы типа double. Формат хранения матрицы – столбцовый (CCS)"} \\
+}
+\vspace{2cm}
+\begin{flushright}
+\textbf{Выполнил:} студент группы 3822Б1ФИ3\_и1\\
+Лаврентьев Алексей \\
+\vspace{0.5cm}
+\textbf{Преподаватель:} \\
+доцент кафедры ВВСП, к.т.н \\ Сысоев А.В.
+\end{flushright}
+\vspace{2.5cm}
+Нижний Новгород \\
+2025
+\end{center}
+\end{titlepage}
+\begin{center}
+    \section*{Введение}
+\end{center}
+\textbf{Разреженная матрица} - матрица, имеющая малое количество ненулевых элементов. Матрица называется разреженной тогда и только тогда, когда при её размерности $N*N$ количество ненулевых элементов не превосходит $N$. Существует отдельный раздел алгебры, изучающий данные матрицы и их взаимодействие (Sparse algebra), а область применения разреженных матриц достаточно объемна: 
+\begin{enumerate}
+    \item Постановка и решение задач оптимизации
+    \item Моделирование сетей
+    \item Решение дифференциальных уравнений в частных производных
+\end{enumerate}
+
+Учитывая частоту применения разреженных матриц на практике, очевидно, что оптимизация операций, проводимых с ними, является важной задачей. Именно этой теме и посвящены выполненные лабораторные работы.
+\newpage
+\begin{center}
+    \section*{Постановка задачи}
+\end{center}
+Необходимо реализовать алгоритм умножения двух разреженных матриц с элементами типа double и форматом их хранения по столбцам. Решение данной задачи удобно представить в виде последовательности мелких подзадач:
+\begin{enumerate}
+    \item Представить исходные матрицы $A, B$ в \textbf{разреженном виде}.
+    \item Транспонировать одну из исходных матриц (здесь и далее договоримся, что транспонировать будем матрицу $A$).
+    \item Умножить полученные матрицы $A^T$ и $B$ с помощью алгоритма, похожего на классическое умножение матриц.
+    \item Перевести полученную матрицу из разреженного вида в классический.
+\end{enumerate}
+
+В рамках курса необходимо реализовать параллельную версию алгоритма умножения двух разреженных матриц. Для реализации параллелизма требуется использование следующих технологий:
+\begin{itemize}
+    \item OpenMP (Open Multi Processing)
+    \item TBB (Threading Building Blocks)
+    \item Средства STL (std::thread)
+    \item MPI (Message Passing Interface)
+\end{itemize}
+\newpage
+\begin{center}
+    \section*{Описание алгоритма}
+\end{center}
+
+Как уже было обозначенно в разделе введение, разреженные матрицы имеют широкое распространение и хорошо известны во многих областях. Как следствие: существует множество подходов к реализации разреженных матриц. В нашем случае матрица должна храниться по столбцам, а это подразумевает под собой разделение матрицы на 3 вектора: вектор ненулевых элементов, вектор индексов строк, вектор сумм количества значений в каждом столбце исходной матрицы. Чтобы понять идею подхода, обратимся к примеру.
+
+Пусть сущестует некоторая матрица $A$ размерности $4*4$.\\
+
+$A$ = $\begin{pmatrix}
+0 & 0 & 0 & 4 \\
+2 & 0 & 0 & 7 \\
+0 & 1 & 2 & 0 \\
+0 & 5 & 0 & 0
+\end{pmatrix}$ \\
+
+Тогда векторы, её представления в разреженном виде будут выглядеть следующим образом: \\
+$(2, 5, 2, 4 ,7)$ - элементы \\
+$(1, 3, 2, 0, 1)$  - индексы строк\\
+$(1, 2, 3, 5)$ - сумма количества элементов по столбцам \\
+
+В рамках лабораторных работ для хранения разреженных матриц была реализована структура Sparse следующего вида:
+\lstset{style=mystyle}
+\begin{lstlisting}[language=C++]
+struct Sparse {
+  std::pair<int, int> size;
+  std::vector<double> elements;
+  std::vector<int> rows;
+  std::vector<int> columnsSum;
+};
+\end{lstlisting}
+
+Преимущества подобного формата хранения разреженных матриц очевидны, причем, чем больше будет исходная матрица, тем эффективнее будет разреженный формат хранения. Например, для хранения матрицы размерности $200*20$, имеющей 100 ненулевых элементов, нам потребуется всего лишь 220 элементов, против 4000 в классическом виде. Сам алгоритм представления матрицы в разреженном виде тривиален и может быть выполнен за 1 проход цикла. 
+
+Следующим шагом в работе алгоритма умножения матриц является транспонирование матрицы $A$. Существует несколько алгоритмов транспонирования матриц, не отличающихся большим разрывом в производительности, поэтому было принято решение воспользоваться наиболее простым в реализации. Его идея заключается в следующем: сделать итерацию по всем ненулевым элементам и сохранить индексы их строк в транспонированном виде, после чего переписать сохраненные значения в нужном порядке, попутно увеличивая счетчик количества элементов по столбцам. Оценка сложности транспонирования составляет $O(M(N + 1))$, где $N$ - количество ненулевых элементов, а $M$ - количество столбцов исходной матрицы. 
+
+Сам алгоритм умножения матриц достаточно прост, но при этом объемен, так как требует выполнения нескольких условий на каждом шаге (проверка совпадений индексов умножаемых элементов, учет количества элементов в текущем столбце и т д). Грубая оценка сложности алгоритма дает следующую верхнюю границу: $O(N^2 * M^2)$, где зачастую $M < N$. 
+
+На последнем этапе происходит преобразование разреженный матрицы к исходному виду. Операция является тривиальной и выполняется за $O(N *M)$.\newpage
+\begin{center}
+    \section*{Описание схемы параллельного алгоритма}
+\end{center}
+Каждая из частей алгоритма умножения разреженных матриц подразумевает перезапись уже существующих данных в новом виде. Проще говоря: мы постоянно сталкиваемся с извлечением и добавлением элементов одного вектора в другой. Из-за этого применение технологий распараллеливания к таким операциям, как приведение к разреженному виду или транспонирование становится невозможным. Мы попросту не можем гарантировать порядок, в котором потоки будут добавлять элементы в векторы, а это имеет \textbf{ключевое} значение.
+
+Таким образом, параллельной обработке может подвергаться лишь часть алгоритма, занимающаяся непосредственно умножением матриц. Идея заключается в том, чтобы в максимально равной степени разделить между потоками итерации внешнего цикла и записывать результат умножения элементов в заранее заготовленные ячейки векторов. Стоит отметить, что задача определения количества памяти, которое нужно зарезервировать под элементы и прочие данные, является далеко не тривиальной и имеет множество подводных камней. В рамках данных лабораторных работ была использована не самая эффективная, но наиболее простая методика - выделение памяти размера $N^2$, что соответствует результату умножения двух матриц, подходящих под определение "разреженные".
+
+Рассмотрим все вариации параллельного алгоритма умножения разреженных матриц.\newpage
+\subsection*{OpenMP}
+OpenMP представляет собой простой, но в то же время мощный инструмент параллельной обработки данных. Главным преимуществом OpenMP является наличие механизма, автоматически разедляющего итерации цикла между потоками. Идея решения выглядит следующим образом:
+\begin{enumerate}
+    \item Создание вектора данных с каждого потока. Вектор имеет размер количества существующих потоков, что определяется через ppc::util::GetPPCNumThreads(), а тип вектора представляет собой пару векторов типов double и int.
+    \item  Создание параллельной области с помощью директивы препроцессора \#pragma omp parallel и разделение итераций цикла между потоками командой \#pragma omp for.
+    \item  На каждом потоке создается своя пара векторов, в котороую "складываются" элементы, получившиеся в результате произведения и индексы их строк. В конце работы цикла пара векторов помещается в вектор общих данных на позицию, определяему функцией omp\_get\_thread\_num().
+    \item На заключительном шаге происходит слияние данных, полученных на каждом потоке, а также происходит обработка вектора сумм количества элементов.
+\end{enumerate}
+
+Благодаря OpenMP можно получить существенный прирост производительности, примерно в 2.5-3 раза в сравненнии с параллельной версией. \newpage
+\subsection*{TBB}
+TBB - механизм параллельной обработки данных, предложенный компанией Intel. В отличии от OpenMP, не так прост в использовании и требует более глубокого понимания процесса распределения данных, однако, зачастую, показывает лучшие результаты в плане производительности. На ранней стадии своего существования TBB требовал от программиста использования множества инструментов (operator(), явно прописанный конструктор коприрования и т д), но с появлением в С++ лямбда-выражений применение TBB стало значительно проще. Решение задачи распараллеливания с помощью средств TBB сводится к следуюшим шагам:
+\begin{enumerate}
+    \item Создание служебного объекта oneapi::tbb::task\_arena размера количества потоков.
+    \item Вызов у объекта task\_arena метода execute() и применение в его рамках функции oneapi::tbb::parallel\_for с параметром 
+    blocked\_range. В конструкторе blocked\_range указываются индексы первого и последнего элемента диапазона разбиение, а также grangsize - количественное разделение данных между потоками.
+    \item Исполнение в рамках parallel\_for главного цикла, выполняющего умножения матриц и запись результатов в промежуточный контейнер размерности $N^2$. 
+    \item Перезапись ненулевых значений элементов и строк в итоговую матрицу, обработка вектора сумм количества элементов.
+\end{enumerate}
+С использованием средств TBB скорость исполнения параллельного алгоритма в сравнении с последовательным увеличивается в 3 или даже 4 раза! \newpage
+\subsection*{STL}
+Как и в большинстве современных языков программирования, в С++ присутствуют встроенные средства распараллеливания. Одним из таких инструментов является класс std::thread, впервые появившийся ещё в С++11. Идея std::thread состоит в создании отдельного потока, в котором будут обрабаываться данные, указанные в конструкторе объекта std::thread. В качестве аргумента конструктор принимает лямбда-выражение, что делает применение std::thread отдаленно схожим с использованием TBB. Шаги работы алгоритма:
+\begin{enumerate}
+    \item Создание вектора потоков размера ppc::util::GetPPCNumThreads().
+    \item Создание лямбда-выражения matrix\_multiplicator, в котором происходит умножение элементов на заданном интервале и запись результатов в вектор выделенного размера.
+    \item Определение количества данных, выдаваемых каждому потоку на исполнение. 
+    \item Запуск цикла по вектору потоков и создание на каждой итерации потока, с указанием в конструкторе лямбда-выражения matrix\_multiplicator, начала и конца отрезка итерирования.
+    \item После завершения цикла необходимо вызвать для каждого потока операцию join(), которая грубо говоря отвечает за завершение потока. 
+    \item Очистить вектор данных от лишних нулевых элементов.
+\end{enumerate}
+С помощью средств STL можно относительно простым путем применить механизмы распараллеливания и добиться существенного уменьшения времени исполнения программы. Скорость исполнения относительно последовательной версии увеличивается в 3-4 раза.\newpage
+\subsection*{MPI + STL}
+MPI - относительно неплохой инструмент для работы в системах с раздельной памятью, который, впрочем, можно применить и в системах с единой памятью. В теории, использование MPI в сочетании со средствами многопоточности может многократно ускорить работу алгоритма, однако не стоит забывать о накладных расходах, которые значительно затормаживают работу алгоритма. Шаги решения задачи:
+\begin{enumerate}
+    \item Перегрузка шаблонного метода serialize для структуры Sparse с целью передачи исходных векторов на все процессы с помощью boost::mpi::broadcast.
+    \item Максимально "честное" разделение обрабатываемых данных между всеми процессами. Распределение вектора разбиения данных между всеми процессами.
+    \item На каждом процессе вызывается умножение матриц с использованием технологий многопоточной обработки STL.
+    \item На предыдущем шаге на выходе получается матрица, представляющая собой кусочный ответ. Для максимально быстрой передачи всех кусочных решений на нулевой процесс было принято решение выполнить их слияние в сплошной вектор типа double. После этого получившийся вектор отправляется на нулевой процесс функцией boost::mpi::gatherv.
+    \item На нулевом процессе происходит коллекционирование данных со всех процессов, после чего, путем достаточной долгой поэтапной обработки ненулевые данные распространяются между векторами результирующей матрицы.
+\end{enumerate}
+Подобный способ использования технологий MPI может показаться странным и неоптимальным, однако он проявил себя, как более оптимальный, чем передача данных тремя последовательными операциями boost::mpi::gatherv. Итоговое ускорение программы относительно последовательной версии может достигать 1.2 раза.\newpage
+\begin{center}
+    \section*{Статистические данные по экспериментам}
+\end{center}
+Далее будут приведены результаты тестов производительности, полученных, в результате применения каждой технологии. Важно уточнить, что замеры производились на матрицах размерности $700*700$, причем заполненных не нулями ровно на $1/6$ часть от их объма. Числа, которым были заполненны матрицы, находились в диапазоне $|500|$. 
+
+Результаты тестов будут представлены в одной таблице, скорость выполнения Pipline и Task тестов разделены значком X. \\
+
+\begin{tabular}{|c|c|}
+  \cline{1-2}
+  Sequential & 0.57X0.494 \\
+  \cline{1-2}
+\end{tabular} 
+\\
+
+\begin{tabular}{|c|c|c|c|c|}
+    \cline{1-5}
+    Технология & 1 поток & 2 потока & 3 потока & 4 потока \\ \hline
+    OpenMP & 1.02X0.944 & 0.573X0.51& 0.45X0.36& 0.37X0.29 \\ \hline
+    TBB & 1.03X0.94& 0.6X0.52& 0.45X0.39& 0.41X0.29 \\ \hline
+    STL & 1.03X0.98 & 0.59X0.46& 0.48X0.38 & 0.4X0.3\\ \hline
+    MPI + STL(1) & 1.18X1.07 & 0.74X0.63& 0.56X0.45 & 0.48X0.39 \\ \hline
+    MPI + STL(2) & 0.77X0.67& 0.54X0.45 & 0.52X0.41 & 0.5X0.37 \\ \hline
+    MPI + STL(3) & 0.7X0.59 & 0.59X0.501 & 0.53X0.45 & 0.49X0.39 \\ \hline
+    \cline{1-5}
+\end{tabular}
+
+Запуски тестов проводились на машине со следующими характеристиками:
+\begin{itemize}
+    \item Процессор AMD  Ryzen 5 5500U 2.1 Hz.
+    \item ОЗУ 16 Гб.
+    \item Операционная система Windows 11 x64.
+    \item Сборка производилась с использованием Visual Studio 2022.
+\end{itemize}
+
+Выводы из тестов: с увеличением количества потоков, скорость прохождения тестов линейно увеличивается и уже на 3 потоках превосходит sequential версию. Пик производительности достигается на 5-6 потоках, после чего ускорение не наблюдается. В случае с использованием MPI, при грамотном соотношение количества процессов и потоков можно добиться неплохих показателей ускорения (несколько десятков процентов, но меньше 50).
+\newpage
+\begin{center}
+    \section*{Заключение}
+\end{center}
+Использование механизмов распараллеливания сложных, в плане вычислений, алгоритмов позволяет добиться значительного прироста эффективности, что делает их максимально полезными в повседневной жизни разработчика. С другой стороны, важно помнить о том, что злоупотреблять многопоточностью не стоит, так как в какой-то момент количество ресурсов, затрачиваемых на распараллеливание может превысить эффект от параллельной обработки. 
+\newpage
+\begin{center}
+    \section*{Использованная литература}
+\end{center}
+Список использованных источников: \\
+\begin{itemize}
+    \item Мееров И.Б., Сысоев А.В., при поддержке Intel. Разреженное матричное умножение.
+    \item Мееров И.Б. при участии Лебедева С.А., Пировой А.Ю. Оптимизация структур данных при работе с разреженными матрицами
+    \item Крейг К., Рэндольф Э. Пакет для умножения разреженных матриц.
+\end{itemize}
+\newpage
+\begin{center}
+    \section*{Приложение}
+\end{center}
+
+\textbf{Реализация sequential версии с набором функций, актуальных для каждой версии} \\
+\lstset{style=mystyle}
+\begin{lstlisting}[language=C++]
+lavrentiev_a_ccs_seq::Sparse lavrentiev_a_ccs_seq::
+CCSSequential::ConvertToSparse(std::pair<int, int> bsize, 
+    const std::vector<double> &values) {
+  auto [size, elements, rows, columns_sum] = Sparse();
+  columns_sum.resize(bsize.second);
+  for (int i = 0; i < bsize.second; ++i) {
+    for (int j = 0; j < bsize.first; ++j) {
+      if (values[i + (bsize.second * j)] != 0) {
+        elements.emplace_back(values[i + (bsize.second * j)]);
+        rows.emplace_back(j);
+        columns_sum[i] += 1;
+      }
+    }
+    if (i != bsize.second - 1) {
+      columns_sum[i + 1] = columns_sum[i];
+    }
+  }
+  return {.size = bsize, .elements = elements, .rows = rows, .
+columnsSum = columns_sum};
+}
+
+lavrentiev_a_ccs_seq::Sparse lavrentiev_a_ccs_seq::
+CCSSequential::MatMul(const Sparse 
+&matrix1, const Sparse &matrix2) {
+  auto [size, elements, rows, columns_sum] = Sparse();
+  columns_sum.resize(matrix2.size.second);
+  Sparse new_matrix1 = Transpose(matrix1);
+  for (int i = 0; i < static_cast<int>(
+  matrix2.columnsSum.size()); ++i) {
+    for (int j = 0; j < static_cast<int>(
+    new_matrix1.columnsSum.size()); ++j) {
+      double sum = 0.0;
+      int start_index1 = j != 0 ? new_matrix1.columnsSum[j] -
+      GetElementsCount(j, new_matrix1.columnsSum) : 0;
+      int start_index2 = i != 0 ? matrix2.columnsSum[i]
+      - GetElementsCount(i, matrix2.columnsSum) : 0;
+      for (int n = 0; n < 
+      GetElementsCount(j,new_matrix1.columnsSum); n++) {
+        for (int n2 = 0; n2 < 
+        GetElementsCount(i, matrix2.columnsSum); n2++) {
+          if (new_matrix1.rows[start_index1 + n] == 
+          matrix2.rows[start_index2 + n2]) {
+            sum += new_matrix1.elements[n + start_index1] 
+            * matrix2.elements[n2 + start_index2];
+          }
+        }
+      }
+      if (sum != 0) {
+        elements.emplace_back(sum);
+        rows.emplace_back(j);
+        columns_sum[i]++;
+      }
+    }
+  }
+  for (auto i = 1; i < static_cast<int>
+  (columns_sum.size()); ++i) {
+    columns_sum[i] = columns_sum[i] + columns_sum[i - 1];
+  }
+  size.first = matrix2.size.second;
+  size.second = matrix2.size.second;
+
+  return {.size = size, .elements = elements, .rows = rows, 
+  .columnsSum = columns_sum};
+}
+
+int lavrentiev_a_ccs_seq::CCSSequential::
+GetElementsCount(int index, const std::vector<int> 
+&columns_sum) {
+  if (index == 0) {
+    return columns_sum[index];
+  }
+  return columns_sum[index] - columns_sum[index - 1];
+}
+
+std::vector<double> lavrentiev_a_ccs_seq::CCSSequential::
+ConvertFromSparse(const Sparse &matrix) {
+  std::vector<double> nmatrix(matrix.size.first * 
+  matrix.size.second);
+  int counter = 0;
+  for (size_t i = 0; i < matrix.columnsSum.size(); ++i) {
+    for (int j = 0; j < GetElementsCount(static_cast<int>(i), 
+      matrix.columnsSum); ++j) {
+      nmatrix[i + (matrix.size.second * matrix.rows[counter])] = 
+      matrix.elements[counter];
+      counter++;
+    }
+  }
+  return nmatrix;
+}
+
+lavrentiev_a_ccs_seq::Sparse lavrentiev_a_ccs_seq::
+CCSSequential::
+Transpose(const Sparse &sparse) {
+  auto [size, elements, rows, columns_sum] = Sparse();
+  size.first = sparse.size.second;
+  size.second = sparse.size.first;
+  int need_size = std::max(sparse.size.first, 
+  sparse.size.second);
+  std::vector<std::vector<double>> new_elements(need_size);
+  std::vector<std::vector<int>> new_indexes(need_size);
+  int counter = 0;
+  for (int i = 0; i < static_cast<int>(
+  sparse.columnsSum.size()); ++i) {
+    for (int j = 0; j < 
+    GetElementsCount(i, sparse.columnsSum); ++j) {
+    new_elements[sparse.rows[counter]].
+    emplace_back(sparse.elements[counter]);
+      new_indexes[sparse.rows[counter]].emplace_back(i);
+      counter++;
+    }
+  }
+  for (int i = 0; i < static_cast<int>
+  (new_elements.size()); ++i) {
+    for (int j = 0; j < static_cast<int>
+    (new_elements[i].size()); ++j) {
+      elements.emplace_back(new_elements[i][j]);
+      rows.emplace_back(new_indexes[i][j]);
+    }
+    if (i > 0) {
+      columns_sum.emplace_back(new_elements[i].size() + 
+      columns_sum[i - 1]);
+    } else {
+      columns_sum.emplace_back(new_elements[i].size());
+    }
+  }
+  return {.size = size, .elements = elements, .rows = rows, 
+  .columnsSum = columns_sum};
+}
+
+bool lavrentiev_a_ccs_seq::CCSSequential::ValidationImpl() {
+  return task_data->inputs_count[0] * 
+  task_data->inputs_count[3] == 
+  task_data->outputs_count[0] &&
+         task_data->inputs_count[0] == 
+         task_data->inputs_count[3] &&
+         task_data->inputs_count[1] == 
+         task_data->inputs_count[2];
+}
+
+bool lavrentiev_a_ccs_seq::CCSSequential::PreProcessingImpl() {
+  A_.size = {static_cast<int>(task_data->inputs_count[0]), 
+  static_cast<int>(task_data->inputs_count[1])};
+  B_.size = {static_cast<int>(task_data->inputs_count[2]),
+  static_cast<int>(task_data->inputs_count[3])};
+  if (IsEmpty()) {
+    return true;
+  }
+  std::vector<double> am(A_.size.first * A_.size.second);
+  auto *in_ptr = reinterpret_cast<double *>
+  (task_data->inputs[0]);
+  for (int i = 0; i < A_.size.first * 
+  A_.size.second; ++i) {
+    am[i] = in_ptr[i];
+  }
+  A_ = ConvertToSparse(A_.size, am);
+  std::vector<double> bm(B_.size.first * B_.size.second);
+  auto *in_ptr2 = reinterpret_cast<double *>
+  (task_data->inputs[1]);
+  for (int i = 0; i < B_.size.first * B_.size.second; ++i) {
+    bm[i] = in_ptr2[i];
+  }
+  B_ = ConvertToSparse(B_.size, bm);
+  return true;
+}
+
+bool lavrentiev_a_ccs_seq::CCSSequential::IsEmpty() 
+const {
+  return A_.size.first * A_.size.second == 0 || 
+  B_.size.first * B_.size.second == 0;
+}
+
+bool lavrentiev_a_ccs_seq::CCSSequential::RunImpl() {
+  Answer_ = MatMul(A_, B_);
+  return true;
+}
+
+bool lavrentiev_a_ccs_seq::CCSSequential::
+PostProcessingImpl() {
+  std::vector<double> result = ConvertFromSparse(Answer_);
+  for (auto i = 0; i < static_cast<int>(result.size()); ++i) {
+    reinterpret_cast<double *>(task_data->outputs[0])[i] = 
+    result[i];
+  }
+  return true;
+}
+\end{lstlisting}
+
+\textbf{Реализация функции умножения матриц в параллельных версиях}
+\lstset{style=mystyle}
+\begin{lstlisting}[language=C++]
+lavrentiev_a_ccs_omp::Sparse lavrentiev_a_ccs_omp
+::CCSOMP::MatMul(const Sparse &matrix1, 
+const Sparse &matrix2) {
+  Sparse result_matrix;
+  result_matrix.columnsSum.resize(matrix2.size.second);
+  auto new_matrix1 = Transpose(matrix1);
+  std::vector<std::pair<std::vector<double>, 
+  std::vector<int>>> threads_data(
+      std::max(1, ppc::util::GetPPCNumThreads()));
+#pragma omp parallel
+  {
+    std::pair<std::vector<double>, std::vector<int>> 
+    current_thread_data;
+#pragma omp for
+    for (int i = 0; i < static_cast<int>(
+    matrix2.columnsSum.size()); ++i) {
+      for (int j = 0; j < static_cast<int>
+      (new_matrix1.columnsSum.size()); ++j) {
+        double sum = 0.0;
+        for (int n = 0; n < GetElementsCount(j, 
+        new_matrix1.columnsSum); n++) {
+          for (int n2 = 0; n2 < GetElementsCount(i, 
+          matrix2.columnsSum); n2++) {
+            if (new_matrix1.rows[CalculateStartIndex(j,
+            new_matrix1.columnsSum) + n] ==
+                matrix2.rows[CalculateStartIndex
+                (i, matrix2.columnsSum) + n2]) {
+              sum += new_matrix1.elements
+              [n + CalculateStartIndex(j, 
+              new_matrix1.columnsSum)] *
+              matrix2.elements
+            [n2 + CalculateStartIndex(i, 
+            matrix2.columnsSum)];
+            }
+          }
+        }
+        if (sum != 0) {
+          current_thread_data.first.push_back(sum);
+          current_thread_data.second.push_back(j);
+          result_matrix.columnsSum[i]++;
+        }
+      }
+    }
+    threads_data[omp_get_thread_num()] = 
+    std::move(current_thread_data);
+  }
+  for (size_t i = 1; i < 
+  result_matrix.columnsSum.size(); ++i) {
+    result_matrix.columnsSum[i] = 
+    result_matrix.columnsSum[i] + 
+    result_matrix.columnsSum[i - 1];
+  }
+  if (!result_matrix.columnsSum.empty()) {
+    result_matrix.elements.resize
+    (result_matrix.columnsSum.back());
+    result_matrix.rows.resize
+    (result_matrix.columnsSum.back());
+  }
+  int count = 0;
+  for (size_t i = 0; i < threads_data.size(); ++i) {
+    std::ranges::copy(threads_data[i].first, 
+    result_matrix.elements.begin() + count);
+    std::ranges::copy(threads_data[i].second,
+    result_matrix.rows.begin() + count);
+    count += static_cast<int>(threads_data[i].first.size());
+  }
+  result_matrix.size.first = matrix2.size.second;
+  result_matrix.size.second = matrix2.size.second;
+  return {.size = result_matrix.size,
+          .elements = result_matrix.elements,
+          .rows = result_matrix.rows,
+          .columnsSum = result_matrix.columnsSum};
+}
+
+lavrentiev_a_ccs_tbb::Sparse lavrentiev_a_ccs_tbb
+::CCSTBB::MatMul(const Sparse &matrix1, 
+const Sparse &matrix2) {
+  oneapi::tbb::task_arena worker(ppc::util::
+  GetPPCNumThreads());
+  Sparse imatrix; imatrix.columnsSum.resize(matrix2.size.second);
+  imatrix.elements_and_rows.
+  resize((matrix2.columnsSum.size() * 
+  matrix1.columnsSum.size()));
+  auto new_matrix1 = Transpose(matrix1);
+  auto sum = [&](int i_index, int j_index) {
+    double s = 0.0;
+    for (int x = 0; x < GetElementsCount(j_index, 
+    new_matrix1.columnsSum); x++) {
+      for (int y = 0; y < GetElementsCount(i_index, 
+      matrix2.columnsSum); y++) {
+        if (new_matrix1.elements_and_rows
+        [CalculateStartIndex(j_index, new_matrix1.columnsSum) + 
+        x].second ==
+            matrix2.elements_and_rows
+            [CalculateStartIndex(i_index, matrix2.columnsSum)
+            + y].second) {
+          s += new_matrix1.elements_and_rows[x + 
+          CalculateStartIndex(j_index, 
+          new_matrix1.columnsSum)].first *
+               matrix2.elements_and_rows
+               [y + CalculateStartIndex
+               (i_index, matrix2.columnsSum)].first;
+        }
+      }
+    }
+    return s;
+  };
+  worker.execute([&] {
+oneapi::tbb::parallel_for(
+ oneapi::tbb::blocked_range<int>(0, static_cast<int>
+(matrix2.columnsSum.size()),
+  matrix2.columnsSum.size() / 
+ppc::util::GetPPCNumThreads()),
+[&](const oneapi::tbb::blocked_range<int> &blocked_range)
+{for (int i = blocked_range.begin(); i != 
+  blocked_range.end(); ++i) {
+for (int j = 0; j < static_cast<int>
+(new_matrix1.columnsSum.size()); ++j) {
+              double s = sum(i, j);
+if (s != 0) {imatrix.elements_and_rows[(i * 
+                matrix2.size.second) + j] = {s, j};
+                imatrix.columnsSum[i]++;
+              }
+            }
+          }
+        });
+  });
+  for (size_t i = 1; i < imatrix.columnsSum.size(); ++i) {
+    imatrix.columnsSum[i] = imatrix.columnsSum[i] + 
+    imatrix.columnsSum[i - 1];
+  }
+  imatrix.size.first = matrix2.size.second;
+  imatrix.size.second = matrix2.size.second;
+  std::vector<std::pair<double, int>> new_elements_and_rows;
+  for (size_t i = 0; i < 
+  imatrix.elements_and_rows.size(); ++i) {
+    if (imatrix.elements_and_rows[i].first != 0.0) {
+      new_elements_and_rows.emplace_back
+      (imatrix.elements_and_rows[i]);
+    }
+  }
+  return {.size = imatrix.size, .elements_and_rows =
+  new_elements_and_rows, .columnsSum = imatrix.columnsSum};
+}
+
+lavrentiev_a_ccs_stl::Sparse lavrentiev_a_ccs_stl::CCSSTL
+::MatMul(const Sparse &matrix1, const Sparse &matrix2) {
+  Sparse temporary_matrix;
+  std::vector<std::thread> threads(ppc::util
+  ::GetPPCNumThreads());
+  temporary_matrix.columnsSum.resize
+  (matrix2.size.second);
+  temporary_matrix.elements_and_rows.resize
+  ((matrix2.columnsSum.size() * matrix1.columnsSum.size()) +
+                std::max(matrix1.columnsSum.size(), 
+                matrix2.columnsSum.size()));
+  auto transposed_matrix = Transpose(matrix1);
+  auto accumulate = [&](int i_index, int j_index) {
+    double sum = 0.0;
+    for (int x = 0; x < GetElementsCount(j_index, 
+transposed_matrix.columnsSum); x++) {
+      for (int y = 0; y < GetElementsCount(i_index, 
+      matrix2.columnsSum); y++) {
+        if (transposed_matrix.elements_and_rows
+        [CalculateStartIndex(j_index, transposed_matrix.columnsSum)
+        + x]
+        .second == matrix2.elements_and_rows
+        [CalculateStartIndex
+        (i_index, matrix2.columnsSum)
+        + y].second) {
+          sum += transposed_matrix.elements_and_rows[x + 
+          CalculateStartIndex(j_index, 
+          transposed_matrix.columnsSum)]
+                     .first *
+        matrix2.elements_and_rows[y + 
+        CalculateStartIndex(i_index, matrix2.columnsSum)]
+        .first;
+        }
+      }
+    }
+    return sum;
+  };
+  auto matrix_multiplicator = [&](int begin, int end) {
+    for (int i = begin; i != end; ++i) {
+      for (int j = 0; j < static_cast<int>(
+     transposed_matrix.columnsSum.size());  ++j) {
+        double s = accumulate(i, j);
+        if (s != 0) {
+          temporary_matrix.elements_and_rows
+          [(i * matrix2.size.second) + j] = {s, j};
+          temporary_matrix.columnsSum[i]++;
+        }
+      }
+    }
+  };
+  int thread_data_amount = 
+  static_cast<int>(matrix2.columnsSum.size()) / 
+  ppc::util::GetPPCNumThreads();
+  for (size_t i = 0; i < threads.size(); ++i) {
+    if (i != threads.size() - 1) {
+      threads[i] = 
+      std::thread(matrix_multiplicator, i * 
+      thread_data_amount, (i + 1) * thread_data_amount);
+    } else {
+      threads[i] =
+          std::thread(matrix_multiplicator,
+          i * thread_data_amount,
+         ((i + 1) * thread_data_amount) + 
+         (matrix2.columnsSum.size() % ppc::util::
+         GetPPCNumThreads()));
+    }
+  }
+  std::ranges::for_each(threads, 
+  [&](std::thread &thread) { thread.join(); });
+  for (size_t i = 1; i < 
+  temporary_matrix.columnsSum.size(); ++i) {
+    temporary_matrix.columnsSum[i] = 
+    temporary_matrix.columnsSum[i] + 
+    temporary_matrix.columnsSum[i - 1];
+  }
+  temporary_matrix.size.first = matrix2.size.second;
+  temporary_matrix.size.second = matrix2.size.second;
+  std::erase_if(temporary_matrix.elements_and_rows,
+  [](auto &current_element) { 
+  return current_element.first == 0.0; });
+  return {.size = temporary_matrix.size,
+          .elements_and_rows =
+          temporary_matrix.elements_and_rows,
+          .columnsSum = temporary_matrix.columnsSum};
+}
+
+bool lavrentiev_a_ccs_all::CCSALL::RunImpl() {
+  boost::mpi::broadcast(world_, displ_, 0);
+  boost::mpi::broadcast(world_, A_, 0);
+  boost::mpi::broadcast(world_, B_, 0);
+  if (displ_.empty()) {
+    return true;
+  }
+  resize_data_ = static_cast<int>(B_.columnsSum.size() * 
+  A_.columnsSum.size());
+  Process_data_ = MatMul(A_, B_, 
+  displ_[world_.rank()], displ_[world_.rank() + 1]);
+  CollectSizes();
+  CollectData();
+  if (world_.rank() == 0) {
+    Answer_.columnsSum.clear();
+    Answer_.rows.clear();
+    Answer_.elements.clear();
+    Answer_.elements.reserve(resize_data_);
+    Answer_.rows.reserve(resize_data_);
+    Answer_.columnsSum.reserve(resize_data_);
+    std::vector<double> data_reader((resize_data_ *
+    world_.size() * 2) +
+    std::accumulate(sum_sizes_.begin(), 
+    sum_sizes_.end(), 0));
+    std::vector<int> size(world_.size(), 
+    resize_data_ * 2);
+    for (int i = 0; i < world_.size(); ++i) {
+      size[i] += sum_sizes_[i];
+    }
+    boost::mpi::gatherv(world_, sending_data_, 
+    data_reader.data(), size, 0);
+    int process_data_num = 0;
+    int sum_by_elements_count = sum_sizes_.front();
+    int past_data = 0;
+    for (int i = 0; i < static_cast<int>(
+    data_reader.size()); ++i) {
+      if (i == (resize_data_ * 2 * 
+      (process_data_num + 1)) + sum_by_elements_count) {
+        past_data += (resize_data_ * 2)
+        + sum_sizes_[process_data_num];
+        process_data_num++;
+        sum_by_elements_count +=
+        sum_sizes_[process_data_num];
+      }
+      AddData(data_reader, past_data, i);
+    }
+    for (size_t i = 1; i <
+    Answer_.columnsSum.size(); ++i) {
+      Answer_.columnsSum[i] =
+      Answer_.columnsSum[i] + Answer_.columnsSum[i - 1];
+    }
+    Answer_.size.first = B_.size.second;
+    Answer_.size.second = B_.size.second;
+  } else {
+    boost::mpi::gatherv(world_, sending_data_, 0);
+  }
+  return true;
+}
+\end{lstlisting}
+\end{document}
+
