@@ -1,0 +1,1048 @@
+\documentclass[12pt]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{hyperref}
+\geometry{left=2cm,right=2cm,top=2cm,bottom=2cm}
+
+\lstset{
+  basicstyle=\small\ttfamily,
+  breaklines=true,
+  tabsize=2,
+  language=C++,
+  numbers=left,
+  numberstyle=\tiny
+}
+
+\begin{document}
+
+\begin{titlepage}
+    \begin{center}
+        \large 
+        \textbf{ННГУ им. Лобачевского / ИИТММ / ПМИ}\\[0.5cm]
+        \vspace{4cm}
+        \textbf{\Large Отчёт по выполнению задания}\\
+        \textbf{\large «Параллельная сортировка Шелла с четно-нечетным слиянием Бэтчера»}\\[3cm]
+        \vspace{3cm}
+        \textbf{Выполнил:}\\
+        студент группы 3822Б1ПМоп3 \\
+        \textit{Волочаев Серафим Витльевич}\\[1cm]
+        \textbf{Преподаватель:}\\
+        \textit{Сысоев Александр Владимирович, доцент}\\[2cm]
+        \vfill
+        \textbf{Нижний Новгород, 2025 г.}
+    \end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+Сортировка Шелла — это улучшенная версия сортировки вставками, которая позволяет обмениваться элементами, находящимися далеко друг от друга. Для эффективного слияния двух отсортированных массивов используется алгоритм Бэтчера с четно-нечетным слиянием, работающий за время $O(\log n)$.
+
+Рассмотрены следующие реализации:
+
+    
+- Последовательная (SEQ)
+    
+- Параллельная с использованием OpenMP
+    
+- Гибридная (MPI + OpenMP)
+    
+- Реализация с использованием Intel TBB
+    
+- Реализация через стандартные потоки C++ (STL threads)
+
+
+\section{Цель и задачи}
+\subsection*{Цель работы}
+Разработать и провести сравнительный анализ нескольких реализаций параллельного алгоритма сортировки Шелла с четно-нечетным слиянием Бэтчера. Предусмотреть последовательную и параллельные версии программы.
+
+\subsection*{Задачи}
+
+    
+- Реализовать последовательный вариант алгоритма.
+    
+- Реализовать четыре параллельных варианта (OpenMP, TBB, STL, MPI+OpenMP).
+    
+- Провести тестирование производительности и масштабируемости.
+    
+- Сравнить эффективность подходов и сделать выводы.
+
+
+\section{Описание алгоритма}
+\subsection*{Сортировка Шелла}
+Алгоритм Шелла использует последовательность промежутков (gaps), чтобы сначала сравнивать и переставлять элементы, удаленные друг от друга на большое расстояние. Это ускоряет процесс сортировки по сравнению с простой сортировкой вставками.
+
+В данной работе используется последовательность Кнута: $gap = 3^k + 1$.
+
+\subsection*{Четно-нечетное слияние Бэтчера}
+Алгоритм Бэтчера позволяет объединять два отсортированных массива за $O(\log n)$ шагов. Он основан на чередовании сравнений четных и нечетных индексов, что делает его удобным для параллелизации.
+
+\section{Общая структура реализации}
+Все реализации используют единый интерфейс, состоящий из следующих этапов:
+
+    
+- \texttt{PreProcessingImpl} — подготовка входных данных.
+    
+- \texttt{ValidationImpl} — проверка корректности входных данных.
+    
+- \texttt{RunImpl} — основной запуск алгоритма.
+    
+- \texttt{PostProcessingImpl} — формирование выходного результата.
+
+
+\section{Описание реализаций}
+
+\subsection{Последовательная реализация (SEQ)}
+\subsubsection*{Особенности}
+
+    
+- Простая реализация без использования параллелизма.
+    
+- Используется как эталонная версия для сравнения производительности.
+
+
+\subsubsection*{Функции и их описание}
+\begin{description}
+    \item[\texttt{PreProcessingImpl}] — Инициализирует входной массив, копируя данные из указателя в вектор.
+    \item[\texttt{ValidationImpl}] — Проверяет корректность входных данных (не пустой ли массив, совпадают ли размеры входа и выхода).
+    \item[\texttt{ShellSort}] — Реализует сортировку Шелла. Использует уменьшающиеся промежутки (gaps) и выполняет вставку с учетом дистанции.
+    \item[\texttt{RunImpl}] — Вызывает сортировку над массивом.
+    \item[\texttt{PostProcessingImpl}] — Переписывает результат из внутреннего массива в выходной буфер.
+\end{description}
+
+\subsection{OpenMP реализация}
+\subsubsection*{Структура}
+
+    
+- Распределение работы между потоками с помощью директив OpenMP.
+    
+- Параллельная сортировка блоков массива.
+    
+- Четно-нечетное слияние выполняется параллельно.
+
+
+\subsubsection*{Функции и их описание}
+\begin{description}
+    \item[\texttt{PreProcessingImpl}] — Инициализирует массив и вычисляет его размер.
+    \item[\texttt{ValidationImpl}] — Проверяет, что входной массив непустой и размеры соответствуют.
+    \item[\texttt{ShellSort(int start)}] — Выполняет сортировку Шелла для заданного диапазона.
+    \item[\texttt{MergeBlocks(...)}] — Выполняет четно-нечетное слияние двух частей массива.
+    \item[\texttt{LastMerge()}] — Финальный проход слияния, собирающий результат.
+    \item[\texttt{Merge()}] — Запускает параллельное слияние с использованием OpenMP.
+    \item[\texttt{ParallelShellSort()}] — Параллельная сортировка блоков массива.
+    \item[\texttt{FindThreadVariables()}] — Рассчитывает количество потоков и размеры блоков.
+    \item[\texttt{RunImpl}] — Точка запуска параллельной сортировки.
+    \item[\texttt{PostProcessingImpl}] — Копирует результат в выходной буфер.
+\end{description}
+
+\subsection{TBB реализация}
+\subsubsection*{Особенности}
+
+    
+- Использование TBB для автоматического управления параллелизмом.
+    
+- Параллельный цикл (\texttt{tbb::parallel\_for}) и редукция (\texttt{tbb::parallel\_reduce}).
+    
+- Эффективное использование кэша и балансировка нагрузки.
+
+
+\subsubsection*{Функции и их описание}
+\begin{description}
+    \item[\texttt{PreProcessingImpl}] — Подготавливает массив для обработки.
+    \item[\texttt{ValidationImpl}] — Проверяет корректность данных.
+    \item[\texttt{ShellSort(int start)}] — Сортировка Шелла для одного блока.
+    \item[\texttt{MergeBlocks(...)}] — Четно-нечетное слияние двух блоков.
+    \item[\texttt{LastMerge()}] — Финальное слияние после всех итераций.
+    \item[\texttt{Merge()}] — Параллельное слияние с использованием TBB.
+    \item[\texttt{ParallelShellSort()}] — Запуск параллельной сортировки с TBB.
+    \item[\texttt{FindThreadVariables()}] — Рассчитывает количество потоков и размеры блоков.
+    \item[\texttt{RunImpl}] — Точка запуска.
+    \item[\texttt{PostProcessingImpl}] — Копирует результат в выходной буфер.
+\end{description}
+
+\subsection{STL threads реализация}
+\subsubsection*{Особенности}
+
+    
+- Использование стандартной библиотеки C++ (\texttt{std::thread}, \texttt{std::future}).
+    
+- Полный контроль над потоками.
+    
+- Явное управление синхронизацией.
+
+
+\subsubsection*{Функции и их описание}
+\begin{description}
+    \item[\texttt{PreProcessingImpl}] — Инициализирует массив.
+    \item[\texttt{ValidationImpl}] — Проверяет входные данные.
+    \item[\texttt{ShellSort(int start)}] — Сортировка Шелла для части массива.
+    \item[\texttt{MergeBlocks(...)}] — Слияние двух частей массива.
+    \item[\texttt{LastMerge()}] — Финальное слияние.
+    \item[\texttt{Merge()}] — Управляет слиянием через асинхронные задачи.
+    \item[\texttt{ParallelShellSort()}] — Создает пул потоков и запускает сортировку.
+    \item[\texttt{FindThreadVariables()}] — Рассчитывает число потоков и размеры блоков.
+    \item[\texttt{RunImpl}] — Точка запуска.
+    \item[\texttt{PostProcessingImpl}] — Переписывает результат.
+\end{description}
+
+\subsection{MPI + OpenMP реализация}
+\subsubsection*{Структура}
+
+    
+- Использование MPI для распределения данных между узлами.
+    
+- OpenMP — внутри каждого узла для распараллеливания на уровне потоков.
+    
+- Гибридный подход максимизирует использование вычислительных ресурсов.
+
+
+\subsubsection*{Функции и их описание}
+\begin{description}
+    \item[\texttt{ShellSort(...)}] — Сортировка Шелла для заданного участка.
+    \item[\texttt{OddEvenMergeOMP(...)}] — Четно-нечетное слияние с использованием OpenMP.
+    \item[\texttt{FinalMergeOMP(...)}] — Финальное слияние.
+    \item[\texttt{BatcherSortOMP(...)}] — Параллельная сортировка с использованием OpenMP.
+    \item[\texttt{ValidationImpl}] — Проверяет входные данные.
+    \item[\texttt{PreProcessingImpl}] — Подготавливает данные для MPI-распределения.
+    \item[\texttt{RunImpl}] — Основная точка запуска с MPI/OMP.
+    \item[\texttt{OddEvenMergeMPI(...)}] — Слияние через MPI-коммуникации.
+    \item[\texttt{PostProcessingImpl}] — Копирует результат из внутренней структуры в выходной буфер.
+\end{description}
+
+\section{Результаты экспериментов}
+\subsection*{Конфигурация системы}
+
+    
+- CPU: Intel Core i7 13700H
+    
+- RAM: 16 GB DDR5 4800 MHz
+    
+- ОС: Windows 10 Pro
+    
+- Тестовый массив: 50 млн целых чисел
+
+
+\subsection*{Производительность}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Реализация} & \textbf{Время (ms)} & \textbf{Ускорение} \\
+\hline
+SEQ       & 17.5597s & 1.00 \\
+OMP       & 5.1646 & 3.40 \\
+TBB       & 5.3211 & 3.3 \\
+STL       & 5.71977 & 3.07 \\
+MPI+OMP   & 1.8483 & 9.5 \\
+\hline
+\end{tabular}
+
+\subsection*{Выводы}
+
+    
+- Наибольшее ускорение показала гибридная реализация MPI+OpenMP.
+    
+- OpenMP и TBB обеспечивают хорошую масштабируемость и простоту реализации.
+    
+- STL потоки дают больше контроля, но требуют больше усилий на синхронизацию.
+
+
+\appendix
+\section*{Приложение: Исходные коды реализаций}
+\subsection*{SEQ}
+\begin{lstlisting}
+#include "seq/volochaev_s_Shell_sort_with_Batchers_even-odd_merge/include/ops_seq.hpp"
+
+#include <cmath>
+#include <cstddef>
+#include <vector>
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_seq::ShellSortSequential::PreProcessingImpl() {
+  // Init value for input and output
+  unsigned int size = task_data->inputs_count[0];
+  auto* input_pointer = reinterpret_cast<int*>(task_data->inputs[0]);
+  array_ = std::vector<int>(input_pointer, input_pointer + size);
+
+  return true;
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_seq::ShellSortSequential::ValidationImpl() {
+  // Check equality of counts elements
+  return task_data->inputs_count[0] > 0 && task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_seq::ShellSortSequential::RunImpl() {
+  ShellSort(array_);
+
+  return true;
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_seq::ShellSortSequential::ShellSort(std::vector<int>& arr) {
+  int n = static_cast<int>(arr.size());
+  int gap = n / 2;
+
+  while (gap > 0) {
+    for (int i = gap; i < n; ++i) {
+      int temp = arr[i];
+      int j = i;
+      while (j >= gap && arr[j - gap] > temp) {
+        arr[j] = arr[j - gap];
+        j -= gap;
+      }
+      arr[j] = temp;
+    }
+    gap /= 2;
+  }
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_seq::ShellSortSequential::PostProcessingImpl() {
+  for (size_t i = 0; i < array_.size(); i++) {
+    reinterpret_cast<int*>(task_data->outputs[0])[i] = array_[i];
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{OpenMP}
+\begin{lstlisting}
+#include "omp/example/include/ops_omp.hpp"
+
+#include <omp.h>
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <ranges>
+#include <vector>
+
+#include "omp/volochaev_s_Shell_sort_with_Batchers_even-odd_merge/include/ops_omp.hpp"
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_omp::ShellSortOMP::PreProcessingImpl() {
+  // Init value for input and output
+  size_ = static_cast<int>(task_data->inputs_count[0]);
+
+  auto* input_pointer = reinterpret_cast<int*>(task_data->inputs[0]);
+  array_ = std::vector<int>(input_pointer, input_pointer + size_);
+  return true;
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_omp::ShellSortOMP::ValidationImpl() {
+  // Check equality of counts elements
+  return task_data->inputs_count[0] > 0 && task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_omp::ShellSortOMP::ShellSort(int start) {
+  int n = mini_batch_;
+
+  int gap = 1;
+  while (gap < n / 3) {
+    gap = 3 * gap + 1;
+  }
+
+  while (gap >= 1) {
+    for (int i = start + gap; i < start + mini_batch_; ++i) {
+      int temp = mass_[i];
+      int j = i;
+      while (j >= start + gap && mass_[j - gap] > temp) {
+        mass_[j] = mass_[j - gap];
+        j -= gap;
+      }
+      mass_[j] = temp;
+    }
+    gap /= 3;
+  }
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_omp::ShellSortOMP::MergeBlocks(int id_l, int id_r, int len) {
+  int left_id = 0;
+  int right_id = 0;
+  int merged_id = 0;
+
+  while (left_id < len || right_id < len) {
+    if (left_id < len && right_id < len) {
+      if (mass_[id_l + left_id] < mass_[id_r + right_id]) {
+        array_[id_l + merged_id] = mass_[id_l + left_id];
+        left_id += 2;
+      } else {
+        array_[id_l + merged_id] = mass_[id_r + right_id];
+        right_id += 2;
+      }
+    } else if (left_id < len) {
+      array_[id_l + merged_id] = mass_[id_l + left_id];
+      left_id += 2;
+    } else {
+      array_[id_l + merged_id] = mass_[id_r + right_id];
+      right_id += 2;
+    }
+    merged_id += 2;
+  }
+
+  for (int i = 0; i < merged_id; i += 2) {
+    mass_[id_l + i] = array_[id_l + i];
+  }
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_omp::ShellSortOMP::LastMerge() {
+  int even_index = 0;
+  int odd_index = 1;
+  int result_index = 0;
+
+  while (even_index < n_ || odd_index < n_) {
+    if (even_index < n_ && odd_index < n_) {
+      if (mass_[even_index] < mass_[odd_index]) {
+        array_[result_index++] = mass_[even_index];
+        even_index += 2;
+      } else {
+        array_[result_index++] = mass_[odd_index];
+        odd_index += 2;
+      }
+    } else if (even_index < n_) {
+      array_[result_index++] = mass_[even_index];
+      even_index += 2;
+    } else {
+      array_[result_index++] = mass_[odd_index];
+      odd_index += 2;
+    }
+  }
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_omp::ShellSortOMP::Merge() {
+  for (int i = c_threads_; i > 1; i /= 2) {
+#pragma omp parallel num_threads(i)
+    {
+      int id = omp_get_thread_num() / 2;
+      int ost = omp_get_thread_num() % 2;
+      int l = mini_batch_ * (c_threads_ / i);
+
+      MergeBlocks((id * 2 * l) + ost, (id * 2 * l) + l + ost, l - ost);
+    }
+  }
+
+  LastMerge();
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_omp::ShellSortOMP::ParallelShellSort() {
+  FindThreadVariables();
+
+#pragma omp parallel for
+  for (int i = 0; i < c_threads_; ++i) {
+    ShellSort(i * mini_batch_);
+  }
+
+  Merge();
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_omp::ShellSortOMP::FindThreadVariables() {
+  c_threads_ = static_cast<int>(std::pow(2, std::floor(std::log2(omp_get_max_threads()))));
+  n_ = size_ + (((2 * c_threads_) - size_ % (2 * c_threads_))) % (2 * c_threads_);
+  mass_.resize(n_, std::numeric_limits<int>::max());
+  mini_batch_ = n_ / c_threads_;
+  std::ranges::copy(array_ | std::views::take(size_), mass_.begin());
+  array_.resize(n_);
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_omp::ShellSortOMP::RunImpl() {
+  ParallelShellSort();
+  return true;
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_omp::ShellSortOMP::PostProcessingImpl() {
+  int* ptr_ans = reinterpret_cast<int*>(task_data->outputs[0]);
+
+  std::ranges::copy(array_ | std::views::take(size_), ptr_ans);
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{TBB}
+\begin{lstlisting}
+#include "tbb/volochaev_s_Shell_sort_with_Batchers_even-odd_merge/include/ops_tbb.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <ranges>
+#include <vector>
+
+#include "oneapi/tbb/parallel_for.h"
+#include "oneapi/tbb/task_arena.h"
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_tbb::ShellSortTBB::PreProcessingImpl() {
+  // Init value for input and output
+  size_ = static_cast<int>(task_data->inputs_count[0]);
+
+  auto* input_pointer = reinterpret_cast<int*>(task_data->inputs[0]);
+  array_ = std::vector<int>(input_pointer, input_pointer + size_);
+  return true;
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_tbb::ShellSortTBB::ValidationImpl() {
+  // Check equality of counts elements
+  return task_data->inputs_count[0] > 0 && task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_tbb::ShellSortTBB::ShellSort(int start) {
+  int n = mini_batch_;
+
+  int gap = 1;
+  while (gap < n / 3) {
+    gap = 3 * gap + 1;
+  }
+
+  while (gap >= 1) {
+    for (int i = start + gap; i < start + mini_batch_; ++i) {
+      int temp = mass_[i];
+      int j = i;
+      while (j >= start + gap && mass_[j - gap] > temp) {
+        mass_[j] = mass_[j - gap];
+        j -= gap;
+      }
+      mass_[j] = temp;
+    }
+    gap /= 3;
+  }
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_tbb::ShellSortTBB::MergeBlocks(int id_l, int id_r, int len) {
+  int left_id = 0;
+  int right_id = 0;
+  int merged_id = 0;
+
+  while (left_id < len || right_id < len) {
+    if (left_id < len && right_id < len) {
+      if (mass_[id_l + left_id] < mass_[id_r + right_id]) {
+        array_[id_l + merged_id] = mass_[id_l + left_id];
+        left_id += 2;
+      } else {
+        array_[id_l + merged_id] = mass_[id_r + right_id];
+        right_id += 2;
+      }
+    } else if (left_id < len) {
+      array_[id_l + merged_id] = mass_[id_l + left_id];
+      left_id += 2;
+    } else {
+      array_[id_l + merged_id] = mass_[id_r + right_id];
+      right_id += 2;
+    }
+    merged_id += 2;
+  }
+
+  for (int i = 0; i < merged_id; i += 2) {
+    mass_[id_l + i] = array_[id_l + i];
+  }
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_tbb::ShellSortTBB::LastMerge() {
+  int even_index = 0;
+  int odd_index = 1;
+  int result_index = 0;
+
+  while (even_index < n_ || odd_index < n_) {
+    if (even_index < n_ && odd_index < n_) {
+      if (mass_[even_index] < mass_[odd_index]) {
+        array_[result_index++] = mass_[even_index];
+        even_index += 2;
+      } else {
+        array_[result_index++] = mass_[odd_index];
+        odd_index += 2;
+      }
+    } else if (even_index < n_) {
+      array_[result_index++] = mass_[even_index];
+      even_index += 2;
+    } else {
+      array_[result_index++] = mass_[odd_index];
+      odd_index += 2;
+    }
+  }
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_tbb::ShellSortTBB::Merge() {
+  tbb::task_arena arena(c_threads_);
+
+  for (int i = c_threads_; i > 1; i /= 2) {
+    arena.execute([&] {
+      tbb::parallel_for(0, i / 2, [&](int id) {
+        int l = mini_batch_ * (c_threads_ / i);
+        for (int ost = 0; ost < 2; ++ost) {
+          MergeBlocks((id * 2 * l) + ost, (id * 2 * l) + l + ost, l - ost);
+        }
+      });
+    });
+  }
+
+  LastMerge();
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_tbb::ShellSortTBB::ParallelShellSort() {
+  FindThreadVariables();
+
+  tbb::task_arena arena(c_threads_);
+  arena.execute([&] { tbb::parallel_for(0, c_threads_, [&](int i) { ShellSort(i * mini_batch_); }); });
+
+  Merge();
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_tbb::ShellSortTBB::FindThreadVariables() {
+  c_threads_ = tbb::this_task_arena::max_concurrency();
+  // Round down to nearest power of 2
+  c_threads_ = static_cast<int>(std::pow(2, std::floor(std::log2(c_threads_))));
+
+  n_ = size_ + (((2 * c_threads_) - size_ % (2 * c_threads_))) % (2 * c_threads_);
+  mass_.resize(n_, std::numeric_limits<int>::max());
+  mini_batch_ = n_ / c_threads_;
+  std::ranges::copy(array_ | std::views::take(size_), mass_.begin());
+  array_.resize(n_);
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_tbb::ShellSortTBB::RunImpl() {
+  ParallelShellSort();
+  return true;
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_tbb::ShellSortTBB::PostProcessingImpl() {
+  int* ptr_ans = reinterpret_cast<int*>(task_data->outputs[0]);
+
+  std::ranges::copy(array_ | std::views::take(size_), ptr_ans);
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{STL}
+\begin{lstlisting}
+#include "stl/volochaev_s_Shell_sort_with_Batchers_even-odd_merge/include/ops_stl.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <future>
+#include <limits>
+#include <ranges>
+#include <thread>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_stl::ShellSortSTL::PreProcessingImpl() {
+  // Init value for input and output
+  size_ = static_cast<int>(task_data->inputs_count[0]);
+
+  auto* input_pointer = reinterpret_cast<int*>(task_data->inputs[0]);
+  array_ = std::vector<int>(input_pointer, input_pointer + size_);
+  return true;
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_stl::ShellSortSTL::ValidationImpl() {
+  // Check equality of counts elements
+  return task_data->inputs_count[0] > 0 && task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_stl::ShellSortSTL::ShellSort(int start) {
+  int n = mini_batch_;
+
+  int gap = 1;
+  while (gap < n / 3) {
+    gap = 3 * gap + 1;
+  }
+
+  while (gap >= 1) {
+    for (int i = start + gap; i < start + mini_batch_; ++i) {
+      int temp = mass_[i];
+      int j = i;
+      while (j >= start + gap && mass_[j - gap] > temp) {
+        mass_[j] = mass_[j - gap];
+        j -= gap;
+      }
+      mass_[j] = temp;
+    }
+    gap /= 3;
+  }
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_stl::ShellSortSTL::MergeBlocks(int id_l, int id_r, int len) {
+  int left_id = 0;
+  int right_id = 0;
+  int merged_id = 0;
+
+  while (left_id < len || right_id < len) {
+    if (left_id < len && right_id < len) {
+      if (mass_[id_l + left_id] < mass_[id_r + right_id]) {
+        array_[id_l + merged_id] = mass_[id_l + left_id];
+        left_id += 2;
+      } else {
+        array_[id_l + merged_id] = mass_[id_r + right_id];
+        right_id += 2;
+      }
+    } else if (left_id < len) {
+      array_[id_l + merged_id] = mass_[id_l + left_id];
+      left_id += 2;
+    } else {
+      array_[id_l + merged_id] = mass_[id_r + right_id];
+      right_id += 2;
+    }
+    merged_id += 2;
+  }
+
+  for (int i = 0; i < merged_id; i += 2) {
+    mass_[id_l + i] = array_[id_l + i];
+  }
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_stl::ShellSortSTL::LastMerge() {
+  int even_index = 0;
+  int odd_index = 1;
+  int result_index = 0;
+
+  while (even_index < n_ || odd_index < n_) {
+    if (even_index < n_ && odd_index < n_) {
+      if (mass_[even_index] < mass_[odd_index]) {
+        array_[result_index++] = mass_[even_index];
+        even_index += 2;
+      } else {
+        array_[result_index++] = mass_[odd_index];
+        odd_index += 2;
+      }
+    } else if (even_index < n_) {
+      array_[result_index++] = mass_[even_index];
+      even_index += 2;
+    } else {
+      array_[result_index++] = mass_[odd_index];
+      odd_index += 2;
+    }
+  }
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_stl::ShellSortSTL::Merge() {
+  int current_threads = c_threads_;
+
+  while (current_threads > 1) {
+    std::vector<std::future<void>> futures;
+    int l = mini_batch_ * (c_threads_ / current_threads);
+
+    for (int i = 0; i < current_threads / 2; ++i) {
+      futures.emplace_back(
+          std::async(std::launch::async, [this, i, l]() { MergeBlocks((i * 2 * l), (i * 2 * l) + l, l); }));
+
+      futures.emplace_back(
+          std::async(std::launch::async, [this, i, l]() { MergeBlocks((i * 2 * l) + 1, (i * 2 * l) + l + 1, l - 1); }));
+    }
+
+    for (auto& future : futures) {
+      future.get();
+    }
+
+    current_threads /= 2;
+  }
+
+  LastMerge();
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_stl::ShellSortSTL::ParallelShellSort() {
+  FindThreadVariables();
+
+  std::vector<std::future<void>> futures;
+  futures.reserve(c_threads_);
+
+  for (int i = 0; i < c_threads_; ++i) {
+    futures.emplace_back(std::async(std::launch::async, [this, i]() { ShellSort(i * mini_batch_); }));
+  }
+
+  for (auto& future : futures) {
+    future.get();
+  }
+
+  Merge();
+}
+
+void volochaev_s_shell_sort_with_batchers_even_odd_merge_stl::ShellSortSTL::FindThreadVariables() {
+  auto max_threads =
+      std::min(static_cast<unsigned int>(ppc::util::GetPPCNumThreads()), std::thread::hardware_concurrency());
+  c_threads_ = static_cast<int>(std::pow(2, std::floor(std::log2(max_threads))));
+  n_ = size_ + (((2 * c_threads_) - size_ % (2 * c_threads_))) % (2 * c_threads_);
+  mass_.resize(n_, std::numeric_limits<int>::max());
+  mini_batch_ = n_ / c_threads_;
+  std::ranges::copy(array_ | std::views::take(size_), mass_.begin());
+  array_.resize(n_);
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_stl::ShellSortSTL::RunImpl() {
+  ParallelShellSort();
+  return true;
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_stl::ShellSortSTL::PostProcessingImpl() {
+  int* ptr_ans = reinterpret_cast<int*>(task_data->outputs[0]);
+
+  std::ranges::copy(array_ | std::views::take(size_), ptr_ans);
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{MPI + OMP}
+\begin{lstlisting}
+#include "all/volochaev_s_Shell_sort_with_Batchers_even-odd_merge/include/ops_all.hpp"
+
+#include <omp.h>
+
+#include <boost/mpi/collectives/broadcast.hpp>
+#include <boost/mpi/collectives/scatter.hpp>
+#include <climits>
+#include <cmath>
+#include <core/util/include/util.hpp>
+#include <cstdlib>
+#include <cstring>
+#include <vector>
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_all::ShellSortAll::ShellSort(unsigned int start,
+                                                                                      unsigned int size) {
+  unsigned int n = size;
+
+  int gap = 1;
+  while (gap < static_cast<int>(n / 3)) {
+    gap = 3 * gap + 1;
+  }
+
+  while (gap >= 1) {
+    for (unsigned int i = start + gap; i < start + size; ++i) {
+      long long temp = loc_[i];
+      long long j = i;
+      while (j >= start + gap && loc_[j - gap] > temp) {
+        loc_[j] = loc_[j - gap];
+        j -= gap;
+      }
+      loc_[j] = temp;
+    }
+    gap /= 3;
+  }
+
+  return true;
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_all::ShellSortAll::OddEvenMergeOMP(long long int* tmp,
+                                                                                            long long int* l,
+                                                                                            const long long int* r,
+                                                                                            unsigned int len) {
+  unsigned int iter_l = 0;
+  unsigned int iter_r = 0;
+  unsigned int iter_tmp = 0;
+
+  while (iter_l < len && iter_r < len) {
+    if (l[iter_l] < r[iter_r]) {
+      tmp[iter_tmp] = l[iter_l];
+      iter_l += 2;
+    } else {
+      tmp[iter_tmp] = r[iter_r];
+      iter_r += 2;
+    }
+
+    iter_tmp += 2;
+  }
+
+  while (iter_l < len) {
+    tmp[iter_tmp] = l[iter_l];
+    iter_l += 2;
+    iter_tmp += 2;
+  }
+
+  while (iter_r < len) {
+    tmp[iter_tmp] = r[iter_r];
+    iter_r += 2;
+    iter_tmp += 2;
+  }
+
+  for (unsigned int i = 0; i < iter_tmp; i += 2) {
+    l[i] = tmp[i];
+  }
+  return true;
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_all::ShellSortAll::FinalMergeOMP(unsigned int n) {
+  unsigned int iter_even = 0;
+  unsigned int iter_odd = 1;
+  unsigned int iter_tmp = 0;
+
+  while (iter_even < n && iter_odd < n) {
+    if (loc_[iter_even] < loc_[iter_odd]) {
+      loc_tmp_[iter_tmp] = loc_[iter_even];
+      iter_even += 2;
+    } else {
+      loc_tmp_[iter_tmp] = loc_[iter_odd];
+      iter_odd += 2;
+    }
+    iter_tmp++;
+  }
+
+  while (iter_even < n) {
+    loc_tmp_[iter_tmp] = loc_[iter_even];
+    iter_even += 2;
+    iter_tmp++;
+  }
+
+  while (iter_odd < n) {
+    loc_tmp_[iter_tmp] = loc_[iter_odd];
+    iter_odd += 2;
+    iter_tmp++;
+  }
+  return true;
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_all::ShellSortAll::BatcherSortOMP() {
+  if (static_cast<unsigned int>(ppc::util::GetPPCNumThreads()) > 2 * loc_proc_lenght_) {
+    bool ret = ShellSort(0, loc_proc_lenght_);
+    memcpy(loc_tmp_.data(), loc_.data(), sizeof(long long int) * loc_proc_lenght_);
+    return ret;
+  }
+
+  unsigned int effective_num_threads =
+      static_cast<int>(std::pow(2, std::floor(std::log2(ppc::util::GetPPCNumThreads()))));
+  unsigned int n_by_proc =
+      loc_proc_lenght_ +
+      (((2 * effective_num_threads) - (loc_proc_lenght_ % (2 * effective_num_threads))) % (2 * effective_num_threads));
+  unsigned int loc_lenght = n_by_proc / effective_num_threads;
+
+  loc_.resize(n_by_proc);
+  loc_tmp_.resize(n_by_proc);
+
+  for (unsigned int i = loc_proc_lenght_; i < n_by_proc; i++) {
+    loc_[i] = LLONG_MAX;
+  }
+
+  bool ret1 = true;
+  bool ret2 = true;
+#pragma omp parallel num_threads(effective_num_threads)
+  { ret1 = ret1 && ShellSort(omp_get_thread_num() * loc_lenght, loc_lenght); }
+
+  for (unsigned int i = effective_num_threads; i > 1; i /= 2) {
+#pragma omp parallel num_threads(i)
+    {
+      auto stride = static_cast<unsigned int>(omp_get_thread_num() / 2);
+      unsigned int bias = omp_get_thread_num() % 2;
+      unsigned int len = loc_lenght * (effective_num_threads / i);
+
+      ret2 =
+          ret2 && OddEvenMergeOMP(loc_tmp_.data() + (stride * 2 * len) + bias, loc_.data() + (stride * 2 * len) + bias,
+                                  loc_.data() + (stride * 2 * len) + len + bias, len - bias);
+    }
+  }
+  FinalMergeOMP(n_by_proc);
+
+  void* ptr_tmp1 = loc_tmp_.data();
+  void* ptr_loc1 = loc_.data();
+  memcpy(ptr_loc1, ptr_tmp1, sizeof(long long int) * loc_proc_lenght_);
+
+  return (ret1 && ret2);
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_all::ShellSortAll::ValidationImpl() {
+  if (world_.rank() == 0) {
+    return task_data->inputs_count[0] > 0 && task_data->inputs_count[0] == task_data->outputs_count[0];
+  }
+  return true;
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_all::ShellSortAll::PreProcessingImpl() {
+  boost::mpi::broadcast(world_, n_input_, 0);
+
+  effective_num_procs_ = static_cast<int>(std::pow(2, std::floor(std::log2(world_.size()))));
+  auto e_n_f = static_cast<unsigned int>(effective_num_procs_);
+  n_ = n_input_ + (((2 * e_n_f) - n_input_ % (2 * e_n_f))) % (2 * e_n_f);
+  loc_proc_lenght_ = n_ / effective_num_procs_;
+
+  if (world_.rank() == 0) {
+    mas_.resize(n_);
+    flag_ = true;
+    void* ptr_input = task_data->inputs[0];
+    void* ptr_vec = mas_.data();
+    memcpy(ptr_vec, ptr_input, sizeof(long long int) * n_input_);
+    for (unsigned int i = n_input_; i < n_; i++) {
+      mas_[i] = LLONG_MAX;
+    }
+  }
+
+  loc_.resize(loc_proc_lenght_);
+  loc_tmp_.resize(loc_proc_lenght_);
+  return true;
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_all::ShellSortAll::RunImpl() {
+  boost::mpi::scatter(world_, mas_.data(), loc_.data(), static_cast<int>(loc_proc_lenght_), 0);
+
+  BatcherSortOMP();
+
+  bool ret = true;
+  for (unsigned int i = effective_num_procs_; i > 1; i /= 2) {
+    if (world_.rank() < static_cast<int>(i)) {
+      unsigned int len = loc_proc_lenght_ * (effective_num_procs_ / i);
+
+      ret = ret && OddEvenMergeMPI(len);
+
+      if (world_.rank() > 0 && world_.rank() % 2 == 0) {
+        world_.send(world_.rank() / 2, 0, loc_tmp_.data(), 2 * static_cast<int>(len));
+      }
+      if (world_.rank() > 0 && world_.rank() < static_cast<int>(i) / 2) {
+        loc_.resize(2 * len);
+        world_.recv(world_.rank() * 2, 0, loc_.data(), 2 * static_cast<int>(len));
+      } else if (world_.rank() == 0 && static_cast<int>(i) != 2) {
+        void* ptr_tmp = loc_tmp_.data();
+        void* ptr_loc = loc_.data();
+        memcpy(ptr_loc, ptr_tmp, sizeof(long long int) * 2 * len);
+      }
+    }
+  }
+  return ret;
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_all::ShellSortAll::OddEvenMergeMPI(unsigned int len) {
+  if (world_.rank() % 2 == 0) {
+    loc_.resize(2 * len);
+    loc_tmp_.resize(2 * len);
+
+    world_.recv(world_.rank() + 1, 0, loc_.data() + len, static_cast<int>(len));
+
+    unsigned int iter_l = 0;
+    unsigned int iter_r = 0;
+    unsigned int iter_tmp = 0;
+
+    while (iter_l < len && iter_r < len) {
+      if (loc_[iter_l] < loc_[len + iter_r]) {
+        loc_tmp_[iter_tmp] = loc_[iter_l];
+        iter_l++;
+      } else {
+        loc_tmp_[iter_tmp] = loc_[len + iter_r];
+        iter_r++;
+      }
+      iter_tmp++;
+    }
+
+    while (iter_l < len) {
+      loc_tmp_[iter_tmp] = loc_[iter_l];
+      iter_l++;
+      iter_tmp++;
+    }
+
+    while (iter_r < len) {
+      loc_tmp_[iter_tmp] = loc_[len + iter_r];
+      iter_r++;
+      iter_tmp++;
+    }
+  } else {
+    world_.send(world_.rank() - 1, 0, loc_.data(), static_cast<int>(len));
+  }
+  return true;
+}
+
+bool volochaev_s_shell_sort_with_batchers_even_odd_merge_all::ShellSortAll::PostProcessingImpl() {
+  if (world_.rank() == 0) {
+    void* ptr_output = task_data->outputs[0];
+    void* ptr_loc = loc_tmp_.data();
+    memcpy(ptr_output, ptr_loc, sizeof(long long int) * n_input_);
+  }
+  return true;
+}
+\end{lstlisting}
+
+\end{document}
+
+\end{document}
