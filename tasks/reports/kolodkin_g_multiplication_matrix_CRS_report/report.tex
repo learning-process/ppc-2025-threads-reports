@@ -1,0 +1,436 @@
+\documentclass[14pt,a4paper]{extarticle}
+\renewcommand{\normalsize}{\fontsize{14pt}{16.8pt}\selectfont}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{framed}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
+
+\geometry{
+  a4paper,
+  left=30mm,
+  right=15mm,
+  top=20mm,
+  bottom=20mm
+}
+
+\titleformat{\section}[block]
+  {\normalfont\fontsize{14}{16}\bfseries}
+  {\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]
+  {\normalfont\fontsize{14}{16}\bfseries\filcenter}
+  {\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}[block]
+  {\normalfont\fontsize{14}{16}\bfseries\filcenter}
+  {\thesubsubsection.}{0.5em}{}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red},
+    frame=single,
+    tabsize=4,
+    showstringspaces=false,
+    breaklines=true
+}
+
+\sloppy
+
+\onehalfspacing
+\setlength{\parindent}{1.25cm}
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+
+\onehalfspacing
+
+\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\
+Федеральное государственное автономное образовательное учреждение высшего образования \\
+«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского» (ННГУ) \\
+Институт информационных технологий, математики и механики
+
+\vspace{4cm}
+
+\textbf{ОТЧЕТ ПО ЛАБОРАТОРНОЙ РАБОТЕ} \\
+\textbf{«Умножение разреженных матриц. Элементы комплексного типа. Формат данных - строковый(CRS)»} \\
+\textbf{Вариант 6}
+
+\vspace{4cm}
+
+\begin{flushright}
+\textbf{Выполнил:} \\
+Студент 3 курса \\
+группы 3822Б1ФИ3 \\
+Колодкин Г.В.
+
+\vspace{1cm}
+
+\textbf{Преподаватель:} \\
+доцент кафедры ВВСП, к.т.н. \\
+Сысоев А.В.
+\end{flushright}
+
+\vspace{1cm}
+
+\begin{center}
+Нижний Новгород\\
+2025
+\end{center}
+
+\end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+
+Умножение матриц является одной из известных задач программирования. Необходимо разработать алгоритм, который будет как можно более эффективно и быстро проводить эту операцию.
+
+Стоит отметить, что матрицы могут быть плотными разреженными. Разреженные матрицы -  матрицы с преимущественно нулевыми элементами. В этом контексте эффективный алгоритм должен проводить умножение только ненулевых элементов, который влияют на итоговый результат.
+
+Кроме этого, матрицы могут иметь разный тип элементов. Помимо целочисленных, они могут быть вещественными и комплексными.
+
+\section{Постановка задачи}
+
+Требуется разработать алгоритм умножения разреженных матриц формата данных CRS с элементами комплексного типа, а именно:
+
+\begin{itemize}
+    \item Последовательную версию алгоритма;
+    \item Параллельные версии с использованием OMP, TBB и STL;
+    \item Версию с использованием MPI и STL;
+\end{itemize}
+
+Кроме этого, необходимо провести эксперименты на анализ производительности разлисных версий алгоритма.
+
+\section{Описание алгоритма}
+
+Алгоритм умножения разреженных матриц формата данных CRS A и B представляет из себя следующее:
+
+\begin{enumerate}
+    \item Обход строк матрицы A;
+    \item Обход ненулевых элементов матрицы A;
+    \item Обход соответствующих строк матрицы B;
+    \item Обработка элементов B;
+    \item Формирование результата
+\end{enumerate}
+
+\section{Описание реализации}
+
+Алгоритм включает следующие компоненты:
+
+\begin{itemize}
+    \item Class \texttt{TestTaskSequential}:
+    \begin{itemize}
+        \item \texttt{PreProcessingImpl()}: загрузка входных данных, преобразование вектора входных данных в матрицы A и B;
+        \item \texttt{PreProcessingImpl()}: проверка на возможность умножения(равенство число строк A и числа столбцов B);
+        \item \texttt{RunImpl()}: умножение матриц A и B, формирование вектора выходных данных(преобразование результирующей матрицы C в вектор);
+        \item \texttt{PostProcessingImpl()}: сохранение выходных данных
+    \end{itemize}
+\end{itemize}
+
+\subsection*{Реализация последовательной версии}
+\begin{lstlisting}[language=C++]
+  SparseMatrixCRS c(A_.numRows, B_.numCols);
+  for (unsigned int i = 0; i < (unsigned int)A_.numRows; ++i) {
+    for (unsigned int j = A_.rowPtr[i]; j < (unsigned int)A_.rowPtr[i + 1]; ++j) {
+      unsigned int col_a = A_.colIndices[j];
+      Complex value_a = A_.values[j];
+      for (unsigned int k = B_.rowPtr[col_a]; k < (unsigned int)B_.rowPtr[col_a + 1]; ++k) {
+        unsigned int col_b = B_.colIndices[k];
+        Complex value_b = B_.values[k];
+
+        c.AddValue((int)i, value_a * value_b, (int)col_b);
+      }
+    }
+  }
+\end{lstlisting}
+
+\section{Описание OpenMP версии алгоритма}
+
+Параллелизм выполнен с помощью директивы \texttt{\#pragma omp parallel for}, которая распараллеливает цикл по строкам матрицы A. Для каждого потока создается вектор temp\_results, в котором хранятся результаты локального умножения. Затем эти результаты объединяются в вектор local\_results, из которого, в свою очередь, формируется результирующая матрица C.
+
+\subsection*{Реализация OpenMP версии}
+\begin{lstlisting}[language=C++]
+  SparseMatrixCRS c(A_.numRows, B_.numCols);
+  std::vector<std::vector<std::pair<unsigned int, Complex>>> local_results(A_.numRows);
+
+#pragma omp parallel for
+  for (int i = 0; i < A_.numRows; i++) {
+    std::vector<std::pair<unsigned int, Complex>> temp_results;
+
+    for (int j = A_.rowPtr[i]; j < A_.rowPtr[i + 1]; j++) {
+      unsigned int col_a = A_.colIndices[j];
+      Complex value_a = A_.values[j];
+
+      for (int k = B_.rowPtr[col_a]; k < B_.rowPtr[col_a + 1]; k++) {
+        unsigned int col_b = B_.colIndices[k];
+        Complex value_b = B_.values[k];
+
+        temp_results.emplace_back(col_b, value_a * value_b);
+      }
+    }
+    local_results[i] = std::move(temp_results);
+  }
+
+  for (int i = 0; i < A_.numRows; i++) {
+    for (const auto& result : local_results[i]) {
+      c.AddValue(i, result.second, result.first);
+    }
+  }
+
+  output_ = ParseMatrixIntoVec(c);
+  return true;
+
+\end{lstlisting}
+
+\section{Описание TBB версии алгоритма}
+
+Реализация с использованием библиотеки Threading Building Blocks (TBB). Так же, как и в OpenMP, распараллеливание происходит за счет цикла по строкам матрицы A с помощью \texttt{\#tbb::parallel\_for}. Каждый поток проводит умножение с помощью лямбда-функции, заполняя свой участок вектора local\_results, из которого формируется матрица C.
+
+\subsection*{Реализация TBB версии}
+\begin{lstlisting}[language=C++]
+  SparseMatrixCRS c(A_.numRows, B_.numCols);
+
+  std::vector<std::vector<std::pair<int, Complex>>> local_results(A_.numRows);
+
+  tbb::parallel_for(tbb::blocked_range<unsigned int>(0, A_.numRows), [&](const tbb::blocked_range<unsigned int>& r) {
+    for (unsigned int i = r.begin(); i < r.end(); ++i) {
+      for (unsigned int j = A_.rowPtr[i]; j < (unsigned int)A_.rowPtr[i + 1]; ++j) {
+        unsigned int col_a = A_.colIndices[j];
+        Complex value_a = A_.values[j];
+
+        for (unsigned int k = B_.rowPtr[col_a]; k < (unsigned int)B_.rowPtr[col_a + 1]; ++k) {
+          unsigned int col_b = B_.colIndices[k];
+          Complex value_b = B_.values[k];
+          local_results[i].emplace_back(col_b, value_a * value_b);
+        }
+      }
+    }
+  });
+
+  for (size_t row_index = 0; row_index < local_results.size(); ++row_index) {
+    for (const auto& [col_index, value] : local_results[row_index]) {
+      c.AddValue(static_cast<int>(row_index), value, col_index);
+    }
+  }
+\end{lstlisting}
+
+\section{Описание STL версии алгоритма}
+
+Реализация с использованием стандартной библиотеки C++ (STL) заключается в следующем: параллелизм осуществляется за счет распараллеливания цикла с помощью потоков. Определяется количество потоков и создаются вектора для хранения потоков и локальных результатов. Дальше создается лямбда-функция worker, которая проводит умножение определенного количества строк матрицы A. После описания лямбда-функции следует разделение строк между потоками, после чего каждый поток к своим строкам применяет функцию worker. После запуска всех потоков основной поток ждет их завершения с помощью метода join(), результаты объединяются в матрицу c, которая, в свою очередь, после преобразуется в вектор output.
+
+\subsection*{Реализация STL версии}
+\begin{lstlisting}[language=C++]
+  SparseMatrixCRS c(A_.numRows, B_.numCols);
+  const int numThreads = ppc::util::GetPPCNumThreads();
+  std::vector<std::thread> threads(numThreads);
+  std::vector<SparseMatrixCRS> local_results(numThreads, SparseMatrixCRS(A_.numRows, B_.numCols));
+ 
+  auto worker = [&](unsigned int startRow, unsigned int endRow, int threadIndex) {
+    SparseMatrixCRS local_c(A_.numRows, B_.numCols);
+    for (unsigned int i = startRow; i < endRow; ++i) {
+      for (unsigned int j = A_.rowPtr[i]; j < (unsigned int)A_.rowPtr[i + 1]; ++j) {
+        unsigned int col_a = A_.colIndices[j];
+        Complex value_a = A_.values[j];
+        for (unsigned int k = B_.rowPtr[col_a]; k < (unsigned int)B_.rowPtr[col_a + 1]; ++k) {
+          unsigned int col_b = B_.colIndices[k];
+          Complex value_b = B_.values[k];
+
+          local_c.AddValue((int)i, value_a * value_b, (int)col_b);
+        }
+      }
+    }
+    local_results[threadIndex] = local_c;
+  };
+
+  unsigned int rowsPerThread = A_.numRows / numThreads;
+  for (int t = 0; t < numThreads; ++t) {
+    unsigned int startRow = t * rowsPerThread;
+    unsigned int endRow = (t == numThreads - 1) ? A_.numRows : startRow + rowsPerThread;
+    threads[t] = std::thread(worker, startRow, endRow, t);
+  }
+
+  for (auto& thread : threads) {
+    thread.join();
+  }
+
+  for (const auto& local_c : local_results) {
+    for (unsigned int i = 0; i < (unsigned int)local_c.numRows; ++i) {
+      for (unsigned int j = local_c.rowPtr[i]; j < (unsigned int)local_c.rowPtr[i + 1]; ++j) {
+        c.AddValue(i, local_c.values[j], local_c.colIndices[j]);
+      }
+    }
+  }
+\end{lstlisting}
+
+\section{Описание MPI + STL версии алгоритма}
+
+Данная версия алгоритма представляет собой решение, сочетающее параллелизацию через MPI (Message Passing Interface) и STL. Параллелизм осуществляется за счет распараллеливания цикла с помощью процессов. Определяется количество процессов и создается вектор формата координата-значение для хранения локальных результатов процессов. Параллелизм внутри процессов осуществляется за счет распараллеливания цикла с помощью потоков. Определяется количество потоков и создаются вектора для хранения потоков и локальных результатов потоков. Дальше создается лямбда-функция process\_start, которая проводит умножение определенного количества строк матрицы A. После описания лямбда-функции следует разделение строк между потоками, после чего каждый поток к своим строкам применяет функцию process\_start. После запуска всех потоков основной поток ждет их завершения с помощью метода join(), результаты объединяются в локальный вектор процесса, которые, в свою очередь, объединяет в один вектор корневой процесс. Он же, используя его, создает выходную матрицу с, которая в дальнейшем преобразуется в вектор output.
+
+\subsection*{Реализация MPI+STL версии}
+\begin{lstlisting}[language=C++]
+  int rank = 0;
+  int size = 0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  int a_num_rows = A_.numRows;
+  int a_num_cols = A_.numCols;
+  int b_num_rows = B_.numRows;
+  int b_num_cols = B_.numCols;
+
+  MPI_Bcast(&a_num_rows, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&a_num_cols, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&b_num_rows, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&b_num_cols, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+  int row_per_proc = a_num_rows / size;
+  int remainder = a_num_rows % size;
+
+  int start_row = (rank * row_per_proc) + std::min(rank, remainder);
+  int end_row = start_row + row_per_proc + (rank < remainder ? 1 : 0);
+
+  std::vector<CoordVal> local_results;
+
+  int num_threads = 4;
+
+  std::vector<std::thread> threads(num_threads);
+  std::vector<std::vector<CoordVal>> thread_results(num_threads);
+  int chunk_size = (end_row - start_row) / num_threads;
+  int current_start = start_row;
+
+  auto process_part = [&](int start_i, int end_i, int thread_index) {
+    std::vector<CoordVal>& local_thread_results = thread_results[thread_index];
+    for (int i = start_i; i < end_i; ++i) {
+      for (int j_idx = A_.rowPtr[i]; j_idx < A_.rowPtr[i + 1]; ++j_idx) {
+        int col_a = A_.colIndices[j_idx];
+        Complex value_a = A_.values[j_idx];
+
+        for (int k_idx = B_.rowPtr[col_a]; k_idx < B_.rowPtr[col_a + 1]; ++k_idx) {
+          int col_b = B_.colIndices[k_idx];
+          Complex value_b = B_.values[k_idx];
+
+          AddResult(local_thread_results, i, col_b, value_a * value_b);
+        }
+      }
+    }
+  };
+
+  for (int t = 0; t < num_threads; ++t) {
+    int thread_start = current_start + (chunk_size * t);
+    int thread_end = (t == num_threads - 1) ? end_row : thread_start + chunk_size;
+    threads[t] = std::thread(process_part, thread_start, thread_end, t);
+  }
+  for (auto& th : threads) {
+    th.join();
+  }
+  for (const auto& vec : thread_results) {
+    local_results.insert(local_results.end(), vec.begin(), vec.end());
+  }
+
+  int local_size_bytes = static_cast<int>(local_results.size() * sizeof(CoordVal));
+
+  std::vector<int> recv_counts(size);
+  MPI_Gather(&local_size_bytes, 1, MPI_INT, recv_counts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+  if (rank == 0) {
+    std::vector<int> displs(size);
+    if (!displs.empty()) {
+      displs[0] = 0;
+      for (int i = 1; i < size; ++i) {
+        displs[i] = displs[i - 1] + recv_counts[i - 1];
+      }
+    }
+    int total_bytes = displs[size - 1] + recv_counts[size - 1];
+
+    std::vector<char> recv_buffer(total_bytes);
+
+    std::vector<CoordVal> send_buffer(local_results.begin(), local_results.end());
+
+    MPI_Gatherv(send_buffer.data(), static_cast<int>(send_buffer.size() * sizeof(CoordVal)), MPI_BYTE,
+                recv_buffer.data(), recv_counts.data(), displs.data(), MPI_BYTE, 0, MPI_COMM_WORLD);
+
+    std::vector<CoordVal> all_results;
+    all_results.reserve(total_bytes / sizeof(CoordVal));
+    CoordVal* ptr = reinterpret_cast<CoordVal*>(recv_buffer.data());
+    size_t count_coords = total_bytes / sizeof(CoordVal);
+    for (size_t i = 0; i < count_coords; ++i) {
+      all_results.push_back(ptr[i]);
+    }
+    kolodkin_g_multiplication_matrix_all::SparseMatrixCRS c(a_num_rows, b_num_cols);
+    c = BuildResultMatrix(all_results, a_num_rows, b_num_cols);
+    output_ = ParseMatrixIntoVec(c);
+
+  } else {
+    MPI_Gatherv(local_results.data(), static_cast<int>(local_results.size() * sizeof(CoordVal)), MPI_BYTE, nullptr,
+                nullptr, nullptr, MPI_BYTE, 0, MPI_COMM_WORLD);
+  }
+\end{lstlisting}
+
+\newpage
+
+\section{Результаты экспериментов}
+
+Тесты были проведены на двух матрицах A и B размера 400 на 400 элементов. В матрице A ненулевыми элементами являются элементы в диапазоне [0,150] строк и [0,150] столбцов, в матрице B: [50,150] строк и [0,140] столбцов
+
+Результаты:
+
+\begin{table}[H]
+\centering
+\caption{Сравнение времени выполнения (в секундах) различных реализаций алгоритма}
+\label{tab:performance}
+\begin{tabular}{lrrrr}
+\toprule
+& \multicolumn{4}{c}{\textbf{Количество потоков/процессов-потоков}} \\
+\cmidrule(lr){2-5}
+\textbf{Реализация} & \textbf{2} & \textbf{4} & \textbf{5} & \textbf{8} \\
+\midrule
+Sequential(1) & 1.9 & - & - & - \\
+OpenMP & 1.68 & 1.49 & 1.38 & 1.41 \\
+TBB & 1.66 & 1.56 & 1.42 & 1.23 \\
+STL & 1.34 & 0.96 & 0.83 & 0.49 \\
+MPI+STL & 1.15 & 0.84 & 0.78 & 0.53 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Анализ результатов}
+
+На основании результатов можно сделать следующие выводы:
+
+\begin{itemize}
+    \item Все параллельные реализации показывают лучшую производительность по сравнению с последовательной версией (1.9 с)
+    \item Наилучший результат демонстрирует STL с 8 потоками (0.49 с)
+    \item Реализация TBB демонстрирует одинаковую по сравнению с OpenMP производительность
+    \item MPI+STL реализация превосходит OpenMP и TBB, но уступает STL версии
+\end{itemize}
+
+\newpage
+\section{Заключение}
+
+В ходе работы были реализованы и протестированы различные реализации паралелльного умножения разреженных матриц формата данных CRS с элементами комплексного типа:
+
+\begin{itemize}
+    \item Наилучшие результаты показала STL реализация с 8 потоками (0.49 с). Это связано с тем, что STL является стандартной библиотекой в C++.
+    \item TBB реализация демонстрирует схожую производительность с OpenMP
+    \item MPI+STL по эффективности превосходит TBB и OpenMP версию, но уступает STL версии
+    \item Наблюдается увеличение эффективности алгоритма при увеличении числа потоков
+\end{itemize}
+
+Исходя из всего этого, можно сделать вывод, что параллельные алгоритмы способствуют более эффективному выполнению умножения матриц.
+
+\end{document}
