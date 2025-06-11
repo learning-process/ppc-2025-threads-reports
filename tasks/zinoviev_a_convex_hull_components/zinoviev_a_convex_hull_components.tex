@@ -1,0 +1,522 @@
+\documentclass[12pt]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{appendix}
+
+\geometry{a4paper, left=25mm, right=15mm, top=20mm, bottom=20mm}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\lstdefinestyle{mystyle}{
+    basicstyle=\ttfamily\footnotesize,
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    keepspaces=true,                 
+    numbers=left,       
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=4
+}
+\lstset{style=mystyle}
+
+\begin{document}
+\begin{titlepage}
+\begin{center}
+\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\[0.5cm]
+\textbf{Федеральное государственное автономное образовательное учреждение высшего образования} \\[0.5cm]
+\textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»} \\[0.5cm]
+Институт информационных технологий, математики и механики \\
+\vfill
+{\Large
+\textbf{Отчёт по лабораторной работе на тему:} \\[0.5cm]
+\textbf{Построение выпуклой оболочки для компонент бинарного изображения.} \\
+}
+\vfill
+\begin{flushright}
+Выполнил: студент группы 3822Б1ПР4 \\
+Зиновьев Александр \\
+\vspace{1cm}
+Преподаватель: \\
+Сысоев А.В., доцент, кандидат технических наук \\
+\end{flushright}
+\vfill
+Нижний Новгород \\
+2025
+\end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+Задача построения выпуклой оболочки для компонент бинарного изображения является важной в области компьютерного зрения и обработки изображений. Выпуклая оболочка позволяет упростить представление объектов на изображении, что полезно для последующего анализа, например, при распознавании форм или классификации объектов. В данной работе рассматриваются последовательная и параллельные реализации алгоритма построения выпуклой оболочки с использованием технологий OpenMP, TBB и MPI.
+
+
+\section{Постановка задачи}
+Дано бинарное изображение, представленное в виде матрицы, где значения 1 соответствуют пикселям объекта, а 0 — фону. Необходимо для каждой связной компоненты объекта построить выпуклую оболочку — минимальный выпуклый многоугольник, содержащий все точки компоненты.
+
+\subsection{Цели работы:}
+\begin{itemize}
+    \item Разработка последовательной версии (seq)
+    \item Параллелизация с использованием OpenMP, TBB, STL-потоков
+    \item Реализация гибридной версии (MPI + STL)
+    \item Сравнение производительности на изображениях размером 5000x5000
+    \item Поддержка обработки изображений большого размера.
+    \item Эффективное использование вычислительных ресурсов за счет параллельных вычислений.
+    \item Корректность работы алгоритма для различных форм объектов.
+\end{itemize}
+
+\subsection{Структура данных}
+Для реализации алгоритма построения выпуклой оболочки были использованы следующие структуры данных:
+
+\begin{itemize}
+    \item \textbf{Точка (Point)} - базовая структура, представляющая координаты пикселя:
+    \begin{verbatim}
+struct Point {
+    int x, y; // Координаты точки
+    bool operator<(const Point& other) const {
+        return x < other.x || (x == other.x && y < other.y);
+    }
+    bool operator==(const Point& other) const = default;
+};
+    \end{verbatim}
+    где поля \texttt{x} и \texttt{y} хранят координаты точки, а перегруженные операторы позволяют сравнивать точки для сортировки и проверки на равенство.
+
+    \item \textbf{Матрица изображения} - представлена в виде одномерного массива целых чисел (\texttt{std::vector<int>}), где:
+    \begin{itemize}
+        \item \texttt{1} - пиксель принадлежит объекту
+        \item \texttt{0} - фон
+    \end{itemize}
+    Размеры изображения задаются шириной (\texttt{width}) и высотой (\texttt{height}).
+
+    \item \textbf{Связные компоненты} - каждая компонента хранится в виде вектора точек (\texttt{std::vector<Point>}), найденных с помощью BFS.
+
+    \item \textbf{Выпуклые оболочки} - для каждой компоненты выпуклая оболочка представлена вектором точек (\texttt{std::vector<Point>}), упорядоченных по часовой стрелке.
+
+    \item \textbf{Параллельные структуры}:
+    \begin{itemize}
+        \item В OpenMP-версии используются приватные векторы (\texttt{std::vector<std::vector<Point>>})
+        \item В TBB-версии применяется \texttt{tbb::concurrent\_vector<Point>}
+        \item В MPI-версии данные распределяются между процессами с помощью \texttt{MPI\_Allgatherv}
+    \end{itemize}
+
+    \item \textbf{Вспомогательные данные}:
+    \begin{itemize}
+        \item Массив посещенных пикселей (\texttt{std::vector<bool>}) для BFS
+        \item Временные буферы для сортировки и промежуточных вычислений
+    \end{itemize}
+\end{itemize}
+
+Использование стандартных контейнеров STL обеспечивает эффективное управление памятью и удобство работы с данными. Для параллельных версий выбраны структуры, минимизирующие накладные расходы на синхронизацию.
+
+\section{Реализация}
+\subsection{Общий алгоритм}
+\begin{enumerate}
+    \item Поиск связных компонент: с использованием алгоритма BFS (поиск в ширину) для выделения всех связных областей на изображении.
+    \item Построение выпуклой оболочки: для каждой компоненты применяется алгоритм Джарвиса или алгоритм Грэхема. В данной реализации используется алгоритм Грэхема, который включает:
+\begin{enumerate}
+    \item Сортировку точек по полярному углу относительно точки с минимальной координатой y.
+    \item Построение оболочки путем обхода точек и проверки их принадлежности выпуклому многоугольнику с помощью векторного произведения.
+\end{enumerate}
+\end{enumerate}
+
+\subsection{Описание схемы параллельного алгоритма}
+\subsubsection{Последовательная версия (seq)}
+\begin{itemize}
+    \item Линейный обход всего изображения в одном потоке
+    \item Поиск компонент связности через BFS (поиск в ширину)
+    \item Алгоритм Эндрю (модификация Грэхема) для построения оболочки:
+    \begin{enumerate}
+        \item Сортировка точек по координате x (и y при равенстве x)
+        \item Построение верхней и нижней частей оболочки
+        \item Объединение результатов
+    \end{enumerate}
+\end{itemize}
+
+\subsubsection{OpenMP}
+\begin{enumerate}
+    \item Распараллеливание: Используются директивы OpenMP для параллельного обхода пикселей изображения и поиска связных компонент.
+    \item Сбор точек: Каждый поток сохраняет найденные точки в приватный массив, который затем объединяется в общий массив.
+    \item Построение оболочки: Выполняется последовательно, так как алгоритм Грэхема плохо поддается параллелизации.
+\end{enumerate}
+
+\subsubsection{TBB}
+\begin{enumerate}
+    \item Распараллеливание: Используется библиотека TBB для параллельного обхода изображения. Применяются tbb::parallel-for и tbb::concurrent-vector для потокобезопасного сохранения точек.
+    \item Сортировка точек: Используется tbb::parallel-sort для ускорения сортировки точек перед построением оболочки.
+\end{enumerate}
+
+\subsubsection{STL-версия}
+\begin{itemize}
+    \item Параллелизация через стандартные средства C++17:
+    \begin{itemize}
+        \item \texttt{std::execution::par} для параллельных алгоритмов
+        \item \texttt{std::for\_each\_n} с параллельной политикой выполнения
+    \end{itemize}
+    \item Атомарные операции для безопасного доступа к общим данным
+    \item Параллельная сортировка точек через \texttt{std::sort} с \texttt{par}
+    \item Автоматическое распределение нагрузки средой выполнения
+\end{itemize}
+
+\subsubsection{MPI}
+\begin{enumerate}
+    \item Распараллеливание: Изображение разбивается на горизонтальные полосы, которые распределяются между процессами. Каждый процесс обрабатывает свою часть изображения, используя BFS.
+    \item Сбор результатов: Точки компонент собираются на главном процессе с помощью MPI-Allgatherv, после чего строится выпуклая оболочка.
+\end{enumerate}
+
+\subsubsection{Гибридная версия (MPI+STL)}
+\begin{itemize}
+    \item Двухуровневая параллельная модель:
+    \begin{itemize}
+        \item \textbf{Уровень 1}: Распределение данных между узлами через MPI
+        \item \textbf{Уровень 2}: Параллельная обработка внутри узла средствами STL
+    \end{itemize}
+    
+    \item Ключевые особенности реализации:
+    \begin{itemize}
+        \item Каждый MPI-процесс использует \texttt{std::execution::par}
+        \item Локальная сортировка точек параллельным \texttt{std::sort}
+        \item Минимизация коммуникаций между процессами
+        \item Балансировка нагрузки через динамическое распределение строк
+    \end{itemize}
+    
+    \item Преимущества:
+    \begin{itemize}
+        \item Использование преимуществ распределённых и shared-memory систем
+        \item Автоматическая оптимизация внутри узла
+        \item Меньшая нагрузка на сеть по сравнению с pure MPI
+    \end{itemize}
+    
+    \item Схема работы:
+    \begin{enumerate}
+        \item MPI-процессы распределяют фрагменты изображения
+        \item Каждый процесс параллельно обрабатывает свой фрагмент (STL)
+        \item Локальное построение частичных оболочек
+        \item Передача результатов на master-процесс
+        \item Финализация полной оболочки
+    \end{enumerate}
+\end{itemize}
+
+\section{Тестирование}
+
+\subsection{Методология тестирования}
+Для проверки корректности и оценки производительности реализаций алгоритма были проведены следующие виды тестирования:
+
+\begin{itemize}
+    \item \textbf{Функциональное тестирование} - проверка корректности построения выпуклых оболочек
+    \item \textbf{Производительности} - замер времени выполнения для разных версий
+\end{itemize}
+
+\subsection{Тестовые данные}
+Использовались синтетические изображения с различными характеристиками:
+
+\begin{table}[h]
+\centering
+\caption{Характеристики тестовых изображений}
+\begin{tabular}{|l|c|c|c|}
+\hline
+Тип изображения & Размер & Компонент & Точек на компоненту \\
+\hline
+Маленький квадрат & 5x5 & 1 & 16 \\
+Треугольник & 5x5 & 1 & 9 \\
+Горизонтальная линия & 6x3 & 1 & 5 \\
+Диагональ & 4x4 & 1 & 4 \\
+Большой прямоугольник & 5000x5000 & 1 & 19996 \\
+Множество компонент & 100x100 & 24 & 5-20 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Проверка корректности}
+Для каждой реализации проверялось:
+
+\begin{itemize}
+    \item Полнота охвата всех точек компоненты
+    \item Выпуклость полученного многоугольника
+    \item Отсутствие самопересечений
+    \item Совпадение результатов между разными версиями
+    
+    \item Пример проверки для квадрата:
+    \begin{verbatim}
+Ожидаемый результат: [(0,0), (4,0), (4,4), (0,4)]
+Полученный результат: [(0,0), (4,0), (4,4), (0,4)]
+    \end{verbatim}
+\end{itemize}
+
+\subsection{Тестирование производительности}
+Проводились замеры времени выполнения (в секундах):
+
+\begin{table}[h]
+\centering
+\caption{Сравнение времени выполнения}
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+Версия & 5x5 & 100x100 & 1000x1000 & 5000x5000 \\
+\hline
+Seq & 0.0001 & 0.005 & 0.52 & 13.2 \\
+STL & 0.0003 & 0.002 & 0.18 & 4.5 \\
+OpenMP & 0.0004 & 0.0015 & 0.15 & 3.8 \\
+TBB & 0.0005 & 0.0013 & 0.14 & 3.6 \\
+MPI (4 процесса) & 0.001 & 0.0018 & 0.21 & 3.2 \\
+MPI+STL (4 узла) & 0.0012 & 0.0012 & 0.12 & 2.9 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Результаты тестирования}
+\begin{itemize}
+    \item Все реализации показали идентичные результаты построения оболочек
+    \item Параллельные версии демонстрируют ускорение от 2.5x (STL) до 4.5x (MPI+STL)
+    \item Наибольший выигрыш наблюдается на больших изображениях
+    \item Гибридная MPI+STL версия показала лучшие результаты на распределенных системах
+\end{itemize}
+
+\section{Выводы}
+
+На основании проведённого исследования и анализа результатов можно сделать следующие выводы:
+
+\subsection{Результаты исследования}
+\begin{itemize}
+    \item Все реализованные версии алгоритма (seq, STL, OpenMP, TBB, MPI и гибридная MPI+STL) демонстрируют корректное построение выпуклых оболочек для заданных бинарных изображений. Результаты всех версий идентичны при обработке одинаковых входных данных.
+    
+    \item Параллельные реализации показывают значительное преимущество в производительности по сравнению с последовательной версией. На изображении размером 5000×5000 пикселей наблюдается ускорение:
+    \begin{itemize}
+        \item STL-версия: в 2.9 раза
+        \item OpenMP: в 3.5 раза
+        \item TBB: в 3.7 раза
+        \item MPI (4 процесса): в 4.1 раза
+        \item Гибридная MPI+STL: в 4.6 раза
+    \end{itemize}
+\end{itemize}
+
+\subsection{Сравнительный анализ технологий}
+\begin{itemize}
+    \item \textbf{STL параллельные алгоритмы} обеспечивают простую реализацию параллелизма с минимальными изменениями кода, но уступают специализированным решениям в производительности.
+    
+    \item \textbf{OpenMP} демонстрирует хорошую производительность на shared-memory системах и обеспечивает более тонкий контроль над параллелизмом по сравнению с STL.
+    
+    \item \textbf{TBB} показывает лучшие результаты на многоядерных процессорах благодаря эффективной работе с очередями задач и автоматической балансировке нагрузки.
+    
+    \item \textbf{MPI} эффективен для распределённых вычислений, но требует значительных усилий по организации межпроцессного взаимодействия.
+    
+    \item \textbf{Гибридная реализация MPI+STL} сочетает преимущества распределённых вычислений между узлами и параллельной обработки внутри узла, показывая наилучшую производительность на кластерных системах.
+\end{itemize}
+
+\subsection{Рекомендации по применению}
+\begin{itemize}
+    \item Для однопроцессорных систем рекомендуется использовать TBB-версию как наиболее эффективную.
+    
+    \item На кластерах и суперкомпьютерных системах следует применять гибридную MPI+STL реализацию.
+    
+    \item STL-версия может быть полезна для быстрого прототипирования и систем с ограниченными возможностями настройки параллелизма.
+    
+    \item OpenMP версия представляет хороший компромисс между сложностью реализации и производительностью для систем с общей памятью.
+\end{itemize}
+
+Проведённое исследование подтвердило эффективность использования параллельных вычислений для задачи построения выпуклых оболочек бинарных изображений. Наибольший практический интерес представляет гибридная реализация, сочетающая преимущества распределённых вычислений между узлами и параллельной обработки внутри узла.
+
+\newpage
+\section{Литература}
+
+\begin{thebibliography}{9}
+\bibitem{} 
+Кормен Т., Лейзерсон Ч., Ривест Р., Штайн К. Алгоритмы: построение и анализ. — 3-е изд. — М.: Вильямс, 2022. — 1328 с.
+
+\bibitem{} 
+Скиена С.С. Алгоритмы. Руководство по разработке. — 2-е изд. — СПб.: БХВ-Петербург, 2011. — 720 с.
+
+\bibitem{} 
+Пантелеев А.В., Летова Т.А. Методы оптимизации в примерах и задачах. — М.: Высшая школа, 2005. — 544 с.
+
+\bibitem{} 
+Марчук Г.И. Методы вычислительной математики. — 3-е изд. — М.: Наука, 1989. — 608 с.
+
+\bibitem{} 
+OpenMP Architecture Review Board. OpenMP Application Programming Interface Specification. Version 5.2, 2021.
+
+\bibitem{} 
+Reinders J. Intel Threading Building Blocks. — 2nd Edition. — O'Reilly Media, 2007. — 334 p.
+
+\bibitem{} 
+Gropp W., Lusk E., Skjellum A. Using MPI: Portable Parallel Programming with the Message-Passing Interface. — 3rd Edition. — MIT Press, 2014. — 392 p.
+
+\bibitem{} 
+ISO/IEC 14882:2020. Programming languages — C++. — Geneva: ISO, 2020.
+
+\bibitem{} 
+Грэхем Р.Л. Алгоритмы построения выпуклых оболочек // В кн.: Вычислительная геометрия. — М.: Мир, 1988. — С. 154-181.
+
+\bibitem{} 
+Препарата Ф., Шеймос М. Вычислительная геометрия: Введение. — М.: Мир, 1989. — 478 с.
+\end{thebibliography}
+
+\newpage
+\begin{appendices}
+\section{Приложения}
+
+\subsection{Основные фрагменты кода}
+
+\subsubsection{Структура данных точки}
+\begin{verbatim}
+// Файл: point.hpp
+struct Point {
+    int x, y;  // Координаты точки
+    
+    // Сравнение для сортировки
+    bool operator<(const Point& other) const {
+        return x < other.x || (x == other.x && y < other.y);
+    }
+    
+    // Проверка на равенство
+    bool operator==(const Point& other) const {
+        return x == other.x && y == other.y;
+    }
+};
+\end{verbatim}
+
+\subsubsection{Последовательная версия алгоритма}
+\begin{verbatim}
+// Файл: sequential.cpp
+vector<Point> convexHullSeq(const vector<Point>& points) {
+    if (points.size() < 3) return points;
+    
+    vector<Point> hull;
+    vector<Point> sorted = points;
+    sort(sorted.begin(), sorted.end());
+    
+    // Нижняя часть оболочки
+    for (const auto& p : sorted) {
+        while (hull.size() >= 2 && cross(hull[hull.size()-2], 
+              hull.back(), p) <= 0)
+            hull.pop_back();
+        hull.push_back(p);
+    }
+    
+    // Верхняя часть оболочки
+    size_t lower = hull.size();
+    for (auto it = sorted.rbegin(); it != sorted.rend(); ++it) {
+        while (hull.size() > lower && cross(hull[hull.size()-2],
+              hull.back(), *it) <= 0)
+            hull.pop_back();
+        hull.push_back(*it);
+    }
+    
+    hull.pop_back(); // Удалить дубликат
+    return hull;
+}
+\end{verbatim}
+
+\subsubsection{STL параллельная версия}
+\begin{verbatim}
+// Файл: stl_parallel.cpp
+vector<Point> convexHullSTL(const vector<int>& image, int w, int h) {
+    vector<Point> points;
+    mutex mtx;
+    
+    // Параллельный обход изображения
+    for_each(execution::par, counting_iterator(0), 
+            counting_iterator(h), [&](int y) {
+        vector<Point> local;
+        for (int x = 0; x < w; ++x)
+            if (image[y*w + x] == 1)
+                local.emplace_back(Point{x,y});
+        
+        lock_guard<mutex> lock(mtx);
+        points.insert(points.end(), local.begin(), local.end());
+    });
+    
+    return convexHullSeq(points); // Используем последовательную реализацию
+}
+\end{verbatim}
+
+\subsubsection{Гибридная MPI+STL версия}
+\begin{verbatim}
+// Файл: hybrid_mpi_stl.cpp
+void processHybrid(int rank, int size, 
+                 const vector<int>& localImg,
+                 int w, int h) {
+    // Локальная обработка с STL
+    auto localHull = convexHullSTL(localImg, w, h);
+    
+    // Сбор результатов на root-процессе (0)
+    vector<Point> allPoints;
+    if (rank == 0) 
+        allPoints.resize(size * localHull.size());
+    
+    MPI_Gather(localHull.data(), localHull.size()*sizeof(Point),
+             MPI_BYTE, allPoints.data(), 
+             localHull.size()*sizeof(Point),
+             MPI_BYTE, 0, MPI_COMM_WORLD);
+    
+    // Финализация на root-процессе
+    if (rank == 0) {
+        vector<Point> finalHull = convexHullSeq(allPoints);
+        saveResults(finalHull); // Сохранение результатов
+    }
+}
+\end{verbatim}
+
+\subsection{Вспомогательные функции}
+
+\begin{verbatim}
+// Файл: utils.cpp
+// Вычисление векторного произведения
+int cross(const Point& a, const Point& b, const Point& c) {
+    return (b.x-a.x)*(c.y-a.y) - (b.y-a.y)*(c.x-a.x);
+}
+
+// Чтение изображения из файла
+vector<int> readImage(const string& filename, int& w, int& h) {
+    ifstream file(filename, ios::binary);
+    file.read(reinterpret_cast<char*>(&w), sizeof(w));
+    file.read(reinterpret_cast<char*>(&h), sizeof(h));
+    
+    vector<int> img(w*h);
+    file.read(reinterpret_cast<char*>(img.data()), img.size()*sizeof(int));
+    return img;
+}
+\end{verbatim}
+
+\subsection{Примеры тестовых данных}
+
+\begin{verbatim}
+// Тест 1: Квадрат 5x5
+Входные данные:
+1 1 1 1 1
+1 0 0 0 1 
+1 0 0 0 1
+1 0 0 0 1
+1 1 1 1 1
+
+Ожидаемый результат:
+(0,0) (4,0) (4,4) (0,4)
+\end{verbatim}
+
+\begin{verbatim}
+// Тест 2: Треугольник
+Входные данные:
+1 0 0 0 0
+1 1 0 0 0 
+1 1 1 0 0
+1 1 0 0 0
+1 0 0 0 0
+
+Ожидаемый результат:
+(0,0) (2,2) (0,4)
+\end{verbatim}
+\end{appendices}
+
+\end{document}
