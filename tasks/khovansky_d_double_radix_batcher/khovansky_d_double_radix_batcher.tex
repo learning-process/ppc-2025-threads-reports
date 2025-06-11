@@ -1,0 +1,1313 @@
+\documentclass[12pt]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{framed}
+\usepackage{listings}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\geometry{
+	a4paper,
+	left=30mm,
+	right=15mm,
+	top=20mm,
+	bottom=20mm
+}
+
+\usepackage{titlesec}
+\titleformat{\section}[block]
+{\normalfont\fontsize{14}{16}\bfseries\centering}
+{\thesection.}{0.5em}{}
+\titleformat{\subsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries\filcenter}
+{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}[block]
+{\normalfont\fontsize{14}{16}\bfseries\filcenter}
+{\thesubsubsection.}{0.5em}{}
+
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{
+	basicstyle=\ttfamily\small,
+	frame=single,
+	tabsize=4,
+	showstringspaces=false,
+	breaklines=true
+}
+
+\sloppy
+\usepackage{setspace}
+\onehalfspacing
+\setlength{\parindent}{1.25cm}
+
+\newcommand{\appendixsection}[1]{%
+	\clearpage
+	\section*{\centering Приложение #1}
+	\addcontentsline{toc}{section}{Приложение #1}
+}
+
+\begin{document}
+
+\begin{titlepage}
+	\begin{center}
+
+		\onehalfspacing
+
+		\begin{center}
+			\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ} \\ 			
+			\vspace{0.5cm}
+			Федеральное государственное автономное образовательное учреждение высшего образования \\ 
+			\vspace{0.5cm}
+			\textbf{«Национальный исследовательский Нижегородский государственный университет имени Н.И. Лобачевского»} \\
+			\vspace{0.5cm}
+			\textbf{Институт информационных технологий, математики и механики}
+		\end{center}
+		\vspace{0.5cm}
+		\begin{center}
+		Направление подготовки: Фундаментальная информатика и информационные технологии
+
+
+		Профиль подготовки: «Инженерия программного обеспечения»
+		\end{center}
+		\vspace{3.5cm}
+		\begin{center}
+			\textbf{Отчёт по лабораторной работе:}
+
+			\textbf{"Поразрядная сортировка для вещественных чисел (тип double) с четно-нечетным слиянием Бэтчера"}
+		\end{center}
+
+		\vspace{3.5cm}
+
+		\begin{flushright}
+			\textbf{Выполнил:} \\
+			студент группы 3822Б1ФИ2 \\
+			Хованский Д.В. \\
+
+			\vspace{1cm}
+
+		\noindent\textbf{Преподаватель:} \\
+		к.т.н., доцент кафедры ВВСП \\
+		{Сысоев А.В.}
+		\end{flushright}
+
+		\vspace{2em}
+
+		\vfill
+
+		\begin{center}
+			Нижний Новгород \\
+			2025 г.
+		\end{center}
+
+	\end{center}
+\end{titlepage}
+
+\newpage
+
+\section*{Введение}
+
+В современной вычислительной технике эффективная сортировка больших объемов данных — критически важная задача. Данная работа реализует и сравнивает различные версии поразрядной сортировки для вещественных чисел типа double с применением четно-нечетного слияния Бэтчера. Акцент сделан на распараллеливании с использованием OpenMP, TBB, STL и MPI, а так же анализе производительности програм с соответствующими технологиями.
+
+\newpage
+
+\section{Постановка задачи}
+Требуется реализовать и проанализировать алгоритм сортировки массивов вещественных чисел, удовлетворяющий следующим требованиям:
+\begin{enumerate}
+    \item Поддержка чисел типа double (включая отрицательные значения)
+    \item Использование поразрядной сортировки (Radix Sort) 
+    \item Применение четно-нечетного слияния Бэтчера
+    \item Реализация пяти версий программы:
+    \begin{itemize}
+        \item Последовательная
+        \item Параллельная с OpenMP
+        \item Параллельная с Intel TBB
+        \item Параллельная с STL
+        \item Гибридная MPI + STL
+    \end{itemize}
+    \item Экспериментальная оценка производительности
+\end{enumerate}
+
+\newpage
+
+\section{Описание алгоритма}
+Алгоритм сочетает поразрядную сортировку с четно-нечетным слиянием Бэтчера для эффективной сортировки вещественных чисел. Основные этапы работы:
+
+\paragraph{Преобразование чисел}
+\begin{itemize}
+    \item Вещественные числа типа double преобразуются в целочисленный формат
+    \item Преобразование сохраняет естественный порядок чисел
+    \item Специальные значения (NaN, ±Inf) обрабатываются отдельно
+    \item Результат: массив беззнаковых 64-битных целых, пригодный для поразрядной сортировки
+\end{itemize}
+
+\paragraph{Поразрядная сортировка}
+\begin{itemize}
+    \item Обработка чисел поразрядно (от младших разрядов к старшим)
+    \item На каждом шаге:
+    \begin{enumerate}
+        \item Анализируется группа из 8 бит
+        \item Строится гистограмма распределения значений
+        \item Вычисляются префиксные суммы для определения позиций
+        \item Элементы перераспределяются по "корзинам"
+    \end{enumerate}
+    \item После обработки всех разрядов получаем упорядоченный массив
+\end{itemize}
+
+\paragraph{Четно-нечетное слияние Бэтчера}
+\begin{itemize}
+    \item Рекурсивный алгоритм слияния отсортированных последовательностей
+    \item Основные шаги:
+    \begin{enumerate}
+        \item Разделение массива на две равные части
+        \item Рекурсивная сортировка каждой части
+        \item Слияние результатов:
+        \begin{itemize}
+            \item Сравнение элементов с четными индексами
+            \item Сравнение элементов с нечетными индексами
+            \item Попарное сравнение-обмен соседних элементов
+        \end{itemize}
+    \end{enumerate}
+    \item Особенность: независимость операций сравнения-обмена на последнем этапе
+\end{itemize}
+
+\paragraph{Обратное преобразование}
+\begin{itemize}
+    \item Отсортированные целочисленные значения преобразуются обратно в double
+    \item Обеспечивается сохранение порядка вещественных чисел
+    \item Специальные значения восстанавливаются в исходное представление
+\end{itemize}
+
+\newpage
+
+\section{Описание реализаций}
+\subsection{Последовательная версия}
+
+\paragraph{Общая струтура:}
+Программная реализация последовательной версии алгоритма организована в виде набора специализированных функций, объединенных в пространство имен. Основные компоненты включают функции преобразования данных, поразрядную сортировку, четно-нечетное слияние Бэтчера и методы интерфейса для интеграции с системой тестирования.
+
+\paragraph{Преобразование данных:}
+Реализованы две взаимосвязанные функции преобразования: EncodeDoubleToUint64 для конвертации double в uint64\_t и DecodeUint64ToDouble для обратного преобразования. Особое внимание уделено корректной обработке отрицательных чисел через операцию полной инверсии битов и положительных чисел через инверсию старшего бита. Специальные случаи (нули разных знаков) обрабатываются в соответствии со стандартом IEEE 754.
+
+\paragraph{Алгоритм сортировки:}
+Поразрядная сортировка реализована в функции RadixSort, обрабатывающей 64-битные значения за 8 проходов (по 8 бит за проход). Каждый проход включает:
+\begin{enumerate}
+	\item Построение гистограммы распределения значений
+	\item Вычисление префиксных сумм для определения позиций
+	\item Перераспределение элементов по временному буферу
+\end{enumerate}
+Особенность реализации - использование единого временного буфера для минимизации затрат памяти.
+
+\paragraph{Четно-нечетное слияние:}
+Функция OddEvenMergeSort реализует рекурсивный алгоритм Бэтчера. Хотя в последовательной версии это слияние является избыточным (поскольку поразрядная сортировка уже дает упорядоченный массив), оно сохранено для единообразия архитектуры с параллельными версиями и вохможности их последующей интеграции.
+
+\paragraph{Основной рабочий цикл:}
+Функция RadixBatcherSort координирует весь процесс:
+\begin{enumerate}
+	\item Преобразование массива double в uint64\_t
+	\item Применение поразрядной сортировки
+	\item Выполнение четно-нечетного слияния
+	\item Обратное преобразование данных
+\end{enumerate}
+Для обеспечения корректной работы с системой тестирования реализованы стандартные методы PreProcessing, Validation, Run и PostProcessing.
+
+\subsection{OpenMP версия}
+
+Реализация алгоритма поразрядной сортировки слиянием Бэтчера с применением OpenMP построена на базе последовательной версии, с добавлением директив параллелизации. Основная цель — ускорение выполнения за счёт использования многопоточности в вычислительно затратных участках сортировки.
+
+\begin{itemize}
+  \item \textbf{Преобразование чисел:}  
+  Для преобразования чисел с плавающей запятой в 64-битные целые значения и обратно используются функции \texttt{EncodeDoubleToUint64} и \texttt{DecodeUint64ToDouble}. Эти операции распараллелены с помощью директивы \texttt{\#pragma omp parallel for}, что позволяет выполнять их одновременно на разных элементах массива.
+
+  \item \textbf{Параллельная поразрядная сортировка:}  
+  Основная часть сортировки — \texttt{RadixSort} — оптимизирована с использованием OpenMP. Частотные массивы заполняются в приватных копиях внутри потоков, после чего данные объединяются в общий массив частот в секции \texttt{critical}. Это позволяет избежать гонок данных, сохранив корректность подсчётов.
+
+  \item \textbf{Сортировка слиянием Бэтчера:}  
+  Для рекурсивной сортировки двух половин массива применяется \texttt{\#pragma omp parallel sections}, что позволяет выполнять сортировку независимо в двух потоках. Дополнительно, проход для попарных обменов реализован с помощью \texttt{\#pragma omp parallel for}.
+\end{itemize}
+
+\subsection{TBB версия}
+
+В данной реализации поразрядная сортировка слиянием Бэтчера реализована с применением библиотеки Intel Threading Building Blocks (TBB), обеспечивающей эффективную задачу параллельной обработки данных.
+
+\begin{itemize}
+  \item \textbf{Преобразование чисел:}  
+  Для корректной работы с вещественными числами типа \texttt{double} они предварительно кодируются в 64-битное представление с помощью функции \texttt{EncodeDoubleToUint64}. Раскодировка выполняется в конце с помощью \texttt{DecodeUint64ToDouble}. Обе операции над элементами массива выполняются параллельно с помощью \texttt{tbb::parallel\_for}.
+
+  \item \textbf{Параллельная поразрядная сортировка:}  
+  Алгоритм \texttt{RadixSort} разбит на несколько проходов по байтам. На каждом этапе частотный анализ по диапазону значений осуществляется в несколько потоков с использованием \texttt{tbb::combinable}, что позволяет безопасно собирать локальные частотные массивы от каждого потока и затем агрегировать их. Итоговая перестановка элементов производится последовательно.
+
+  \item \textbf{Параллельное слияние Бэтчера:}  
+  Сортировка слиянием реализована с помощью рекурсивного алгоритма \texttt{BatcherOddEvenMerge}. Разделение на подмассивы и рекурсивные вызовы происходят параллельно при помощи \texttt{tbb::parallel\_invoke}, если глубина рекурсии меньше заданной. Таким образом, достигается баланс между параллелизмом и глубиной стека вызовов.
+\end{itemize}
+
+\subsection{STL версия}
+
+Данная реализация алгоритма поразрядной сортировки с последующим слиянием Бэтчера построена на использовании стандартной библиотеки потоков языка C++ STL threads. Она обеспечивает базовую форму параллелизма с ручным управлением потоками.
+
+\begin{itemize}
+  \item \textbf{Кодирование и декодирование чисел:}  
+  Как и в других версиях, используется побитовая трансформация типа \texttt{double} в \texttt{uint64\_t}, которая обеспечивает корректный порядок сравнения чисел с плавающей точкой. Операции преобразования выполняются параллельно с использованием явного распределения работы по блокам между потоками.
+
+  \item \textbf{Поразрядная сортировка:}  
+  Сортировка выполняется побайтно (по 8 бит), с подсчетом частот значений каждого байта. Для каждого потока создается отдельный частотный массив, суммируемый на основном потоке после завершения работы всех потоков. Распределение и копирование данных по корзинам происходит последовательно.
+
+  \item \textbf{Сортировка слиянием Бэтчера:}  
+  Рекурсивное деление массива на части сопровождается созданием двух потоков на каждом уровне (если число доступных потоков больше одного). Это позволяет эффективно распараллелить сортировку на верхних уровнях рекурсии, сохраняя при этом контроль над глубиной распараллеливания. Завершающая часть алгоритма (нечетно-чётное слияние) выполняется последовательно.
+\end{itemize}
+
+\subsection{MPI+STL версия}
+
+Реализация использует гибридный подход: MPI применяется для распределения и слияния данных между процессами, а STL — для выполнения сортировки и операций слияния на локальных участках.
+\begin{itemize}
+  \item \textbf{Распределение данных (MPI):} Процесс с \texttt{rank == 0} получает исходный массив чисел типа \texttt{double}, дополняет его значениями \texttt{std::numeric\_limits<double>::max()}, чтобы его размер стал кратен числу процессов. После этого массив рассылается по всем процессам с помощью \texttt{boost::mpi::scatter}.
+
+  \item \textbf{Предварительная обработка (STL):} Каждый процесс локально преобразует свои элементы в тип \texttt{uint64\_t}, с сохранением порядка сортировки (так называемое «распрямление» представления чисел с плавающей точкой). Это позволяет использовать целочисленную поразрядную сортировку (RadixSort) без потери корректности порядка.
+
+  \item \textbf{Локальная сортировка (RadixSort):} Каждый процесс выполняет поразрядную сортировку своих локальных данных. Внутри сортировки применяется стандартная STL логика и многопоточность через \texttt{std::thread}. Массив сортируется побайтово (8 бит за проход), итеративно для всех 64 бит.
+
+  \item \textbf{Параллельное слияние (MPI + STL):} После локальной сортировки выполняется схема параллельного слияния по алгоритму Бэтчера. На каждой стадии процесса обмениваются с «партнёрскими» процессами своими блоками данных через \texttt{boost::mpi::isend} и \texttt{boost::mpi::irecv}. После обмена каждый процесс сливает два упорядоченных блока с помощью \texttt{std::ranges::merge}, оставляя либо меньшую, либо большую половину — в зависимости от \texttt{rank}.
+
+  \item \textbf{Обратное преобразование:} После завершения всех стадий каждый процесс декодирует свои \texttt{uint64\_t} значения обратно в \texttt{double}.
+
+  \item \textbf{Сбор результатов (MPI):} Все локально отсортированные блоки собираются на нулевом процессе с помощью \texttt{boost::mpi::gather}. Значения-заполнители удаляются, и финальный массив  копируется в выходной буфер.
+\end{itemize}
+
+\newpage
+
+\section{Результаты экспериментов}
+Для изучения производительности различных подходов к сортировке был проведён эксперимент с использованием набора данных, включающего 1 000 000 случайных чисел. Сравнение проводилось между последовательной реализацией алгоритма и его параллельными версиями, созданными с применением OpenMP, STL, TBB и комбинированного подхода MPI+STL.
+
+Для оценки производительности всех версий алгоритма использовалась следующая тестовая система:
+\begin{itemize}
+    \item Операционная система: Windows 10.
+    \item Процессор: AMD Ryzen 9 7900X 12 ядер 24 потока.
+    \item Оперативная память: 32 ГБ с частотой 6400 МГц.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Версия} & \textbf{Потоки} & \textbf{Pipeline (мс)} & \textbf{Task (мс)} & \textbf{Коэфф. PR} & \textbf{Коэфф. TR} \\
+\hline
+seq & —    & 263 & 263 & 1.00 & 1.00 \\
+\hline
+\multirow{4}{*}{OpenMP} 
+    & 1    & 1010 & 1089 & 0.26 & 0.24 \\
+    & 2    & 739  & 778  & 0.36 & 0.34 \\
+    & 3    & 873  & 944  & 0.30 & 0.28 \\
+    & 4    & 997  & 1080 & 0.26 & 0.24 \\
+\hline
+\multirow{4}{*}{Intel TBB} 
+    & 1    & 884  & 948  & 0.30 & 0.28 \\
+    & 2    & 555  & 595  & 0.47 & 0.44 \\
+    & 3    & 447  & 465  & 0.59 & 0.57 \\
+    & 4    & 389  & 400  & 0.68 & 0.66 \\
+\hline
+\multirow{4}{*}{STL} 
+    & 1    & 384  & 395  & 0.68 & 0.67 \\
+    & 2    & 300  & 304  & 0.88 & 0.86 \\
+    & 3    & 303  & 293  & 0.87 & 0.90 \\
+    & 4    & 278  & 278  & 0.95 & 0.95 \\
+\hline
+\multirow{6}{*}{MPI + STL} 
+    & 1 \& 1 & 376  & 305  & 0.70 & 0.86 \\
+    & 2 \& 2& 294  & 217  & 0.89 & 1.21 \\
+    & 3 \& 3& 331  & 264  & 0.79 & 1.00 \\
+    & 4 \& 4& 362  & 286  & 0.73 & 0.92 \\
+    & 1 \& 4& 321  & 260  & 0.82 & 1.01 \\
+    & 4 \& 1& 326  & 261  & 0.81 & 1.01 \\
+\hline
+\end{tabular}
+\caption{Сравнение производительности разных технологий параллелизации}
+\label{tab:parallel_perf}
+\end{table}
+
+\newpage
+
+\section{Выводы из результатов экспериментов}
+
+На основе проведённых измерений производительности были получены следующие выводы:
+\begin{itemize}
+  \item Последовательная реализация (seq) выступает в роли базовой, ведь как оказалось, в разы выгоднее реализовывать эту программу именно через эту версию.
+  \item Реализация с \texttt{OpenMP} демонстрирует нестабильные результаты: при увеличении количества потоков наблюдается как рост, так и снижение производительности.
+  \item \texttt{TBB} показывает значительно лучшие результаты, особенно при использовании 3--4 потоков. Это объясняется более эффективным распределением нагрузки и управлением задачами внутри TBB-рантайма.
+  \item Версия на \texttt{STL} оказывается одной из самых эффективных. При использовании 4 потоков достигается ускорение близкое к последовательной реализации.
+  \item Гибридная реализация с использованием \texttt{MPI + STL} демонстрирует конкурентоспособную производительность. Лучшие результаты достигаются при сбалансированном распределении нагрузки между MPI-процессами и локальными потоками (\texttt{2\&2}, \texttt{1\&4}, \texttt{4\&1}), где \texttt{TaskRun} опережает даже seq-реализацию. Это подтверждает эффективность комбинирования межпроцессного и внутрипроцессного параллелизма.
+\end{itemize}
+
+На основе результатов экспериментов можно сделать вывод, что данная задача не подходит для распараллеливания, так как очень сильно повышаются накладные расходы и очень слабо эффективность.  Это может быть связано с высоким оверхедом при распараллеливании, недостаточной эффективностью планировщика потоков и плохой масштабируемостью алгоритма RadixSort.
+
+\subsection{Оценка корректности}
+
+Все реализации прошли тщательное функциональное тестирование на различных наборах данных. Проводилась проверка как обыкновеннных массивов с элементами типа double, так и со специфическими, по типу массивов с зеркальными значниями, массивов с повторяющимися элементами и массивов отрицательных элементов. В тестах производительности после выполнения также проверялось поэлементное равенство \texttt{out[i]} и \texttt{exp\_out[i]} для всех $1\,000\,000$ элементов. Все тесты подтвердили корректность реализаций в разнообразных сценариях работы.
+
+\newpage
+
+\section{Заключение}
+
+В рамках данной работы была реализована и проанализирована поразрядная сортировка чисел с плавающей точкой типа \texttt{double} с использованием нескольких технологий параллелизации: OpenMP, TBB, STL (на потоках), а также гибридной модели \texttt{MPI + STL}.
+
+Сравнительный анализ показал, что:
+\begin{itemize}
+  \item Реализации на OpenMP имеют низкую производительность из-за накладных расходов на синхронизацию и неэффективного использования потоков.
+  \item TBB и STL версии демонстрируют приемлимые результаты при малом числе потоков, обеспечивая почти линейное ускорение.
+  \item MPI + STL показывает высокую эффективность при сбалансированной нагрузке, объединяя достоинства распределённой и многопоточной обработки.
+\end{itemize}
+
+Наиболее универсальной и масштабируемой оказалась версия \texttt{MPI + STL}, что делает её предпочтительным выбором для обработки больших массивов данных в распределённых системах.
+
+\newpage
+
+\section{Список литературы}
+
+\begin{enumerate}
+  \item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks}. — Нижний Новгород: ННГУ, 2007.
+  \item OpenMP Architecture Review Board. \textit{OpenMP Application Programming Interface}, Version 5.0, 2018.
+  \item Intel Corporation. \textit{Intel Threading Building Blocks (TBB)}, https://www.threadingbuildingblocks.org/.
+  \item Boost C++ Libraries. \textit{Boost.MPI Documentation}, https://www.boost.org/doc/libs/release/doc/html/mpi.html.
+  \item Sedgewick, R., Wayne, K. \textit{Algorithms (4th Edition)}. Addison-Wesley, 2011.
+  \item Hennessy, J. L., Patterson, D. A. \textit{Computer Architecture: A Quantitative Approach}. Morgan Kaufmann, 2017.
+  \item Knuth, D. E. \textit{The Art of Computer Programming, Volume 3: Sorting and Searching}. Addison-Wesley, 1998.
+\end{enumerate}
+
+\newpage
+
+\section*{Приложение}
+
+\subsection*{ops\_seq.cpp}
+\begin{lstlisting}[language=C++,
+    breaklines=true,       % Автоматический перенос строк
+    columns=fullflexible ]
+#include "seq/khovansky_d_double_radix_batcher/include/ops_seq.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <vector>
+
+namespace khovansky_d_double_radix_batcher_seq {
+namespace {
+uint64_t EncodeDoubleToUint64(double value) {
+  uint64_t bit_representation = 0;
+  std::memcpy(&bit_representation, &value, sizeof(value));
+
+  if ((bit_representation >> 63) != 0) {
+    return ~bit_representation;
+  }
+  return bit_representation ^ (1ULL << 63);
+}
+
+double DecodeUint64ToDouble(uint64_t encoded) {
+  if ((encoded >> 63) != 0) {
+    encoded ^= (1ULL << 63);
+  } else {
+    encoded = ~encoded;
+  }
+
+  double result = 0.0;
+  std::memcpy(&result, &encoded, sizeof(result));
+  return result;
+}
+
+void RadixSort(std::vector<uint64_t>& array) {
+  const int bits_in_byte = 8;
+  const int total_bits = 64;
+  const int bucket_count = 256;
+
+  std::vector<uint64_t> buffer(array.size(), 0);
+  std::vector<int> frequency(bucket_count, 0);
+
+  for (int shift = 0; shift < total_bits; shift += bits_in_byte) {
+    std::ranges::fill(frequency, 0);
+
+    for (uint64_t number : array) {
+      auto bucket = static_cast<uint8_t>((number >> shift) & 0xFF);
+      frequency[bucket]++;
+    }
+
+    for (int i = 1; i < bucket_count; i++) {
+      frequency[i] += frequency[i - 1];
+    }
+
+    for (int i = static_cast<int>(array.size()) - 1; i >= 0; i--) {
+      auto bucket = static_cast<uint8_t>((array[i] >> shift) & 0xFF);
+      buffer[--frequency[bucket]] = array[i];
+    }
+
+    array.swap(buffer);
+  }
+}
+
+void OddEvenMergeSort(std::vector<uint64_t>& array, int left, int right) {
+  if (right - left <= 1) {
+    return;
+  }
+
+  int middle = left + ((right - left) / 2);
+
+  OddEvenMergeSort(array, left, middle);
+  OddEvenMergeSort(array, middle, right);
+
+  for (int i = left; i + 1 < right; i += 2) {
+    if (array[i] > array[i + 1]) {
+      std::swap(array[i], array[i + 1]);
+    }
+  }
+}
+
+void RadixBatcherSort(std::vector<double>& data) {
+  std::vector<uint64_t> transformed_data(data.size(), 0);
+
+  for (std::size_t i = 0; i < data.size(); i++) {
+    transformed_data[i] = EncodeDoubleToUint64(data[i]);
+  }
+
+  RadixSort(transformed_data);
+  OddEvenMergeSort(transformed_data, 0, static_cast<int>(transformed_data.size()));
+
+  for (std::size_t i = 0; i < data.size(); i++) {
+    data[i] = DecodeUint64ToDouble(transformed_data[i]);
+  }
+}
+}  // namespace
+}  // namespace khovansky_d_double_radix_batcher_seq
+
+bool khovansky_d_double_radix_batcher_seq::RadixSeq::PreProcessingImpl() {
+  auto* in_ptr = reinterpret_cast<double*>(task_data->inputs[0]);
+
+  unsigned int input_size = task_data->inputs_count[0];
+  unsigned int output_size = task_data->outputs_count[0];
+
+  input_ = std::vector<double>(in_ptr, in_ptr + input_size);
+  output_ = std::vector<double>(output_size, 0);
+
+  return true;
+}
+
+bool khovansky_d_double_radix_batcher_seq::RadixSeq::ValidationImpl() {
+  if (!task_data) {
+    return false;
+  }
+
+  if (task_data->inputs[0] == nullptr && task_data->inputs_count[0] == 0) {
+    return false;
+  }
+
+  if (task_data->outputs[0] == nullptr) {
+    return false;
+  }
+
+  if (task_data->inputs_count[0] < 2) {
+    return false;
+  }
+
+  return task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+bool khovansky_d_double_radix_batcher_seq::RadixSeq::RunImpl() {
+  output_ = input_;
+  khovansky_d_double_radix_batcher_seq::RadixBatcherSort(output_);
+  return true;
+}
+
+bool khovansky_d_double_radix_batcher_seq::RadixSeq::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<double*>(task_data->outputs[0])[i] = output_[i];
+  }
+
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{ops\_omp.cpp}
+\begin{lstlisting}[language=C++,
+    breaklines=true,       % Автоматический перенос строк
+    columns=fullflexible ]
+#include "omp/khovansky_d_double_radix_batcher/include/ops_omp.hpp"
+
+#include <omp.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <vector>
+
+namespace khovansky_d_double_radix_batcher_omp {
+namespace {
+uint64_t EncodeDoubleToUint64(double value) {
+  uint64_t bit_representation = 0;
+  std::memcpy(&bit_representation, &value, sizeof(value));
+
+  if ((bit_representation >> 63) != 0) {
+    return ~bit_representation;
+  }
+  return bit_representation ^ (1ULL << 63);
+}
+
+double DecodeUint64ToDouble(uint64_t encoded) {
+  if ((encoded >> 63) != 0) {
+    encoded ^= (1ULL << 63);
+  } else {
+    encoded = ~encoded;
+  }
+
+  double result = 0.0;
+  std::memcpy(&result, &encoded, sizeof(result));
+  return result;
+}
+
+void RadixSort(std::vector<uint64_t>& array) {
+  const int bits_in_byte = 8;
+  const int total_bits = 64;
+  const int bucket_count = 256;
+
+  std::vector<uint64_t> buffer(array.size(), 0);
+  std::vector<int> frequency(bucket_count, 0);
+
+  for (int shift = 0; shift < total_bits; shift += bits_in_byte) {
+    std::vector<int> local_frequency(bucket_count, 0);
+
+#pragma omp parallel
+    {
+      std::vector<int> private_frequency(bucket_count, 0);
+
+#pragma omp for nowait
+      for (int64_t i = 0; i < static_cast<int64_t>(array.size()); i++) {
+        auto bucket = static_cast<uint8_t>((array[i] >> shift) & 0xFF);
+        private_frequency[bucket]++;
+      }
+
+#pragma omp critical
+      for (int i = 0; i < bucket_count; i++) {
+        local_frequency[i] += private_frequency[i];
+      }
+    }
+
+    for (int i = 1; i < bucket_count; i++) {
+      local_frequency[i] += local_frequency[i - 1];
+    }
+
+    for (int i = static_cast<int>(array.size()) - 1; i >= 0; i--) {
+      auto bucket = static_cast<uint8_t>((array[i] >> shift) & 0xFF);
+      buffer[--local_frequency[bucket]] = array[i];
+    }
+
+    array.swap(buffer);
+  }
+}
+
+void OddEvenMergeSort(std::vector<uint64_t>& array, int left, int right) {
+  if (right - left <= 1) {
+    return;
+  }
+
+  int middle = left + ((right - left) / 2);
+
+#pragma omp parallel sections
+  {
+#pragma omp section
+    OddEvenMergeSort(array, left, middle);
+#pragma omp section
+    OddEvenMergeSort(array, middle, right);
+  }
+
+#pragma omp parallel for
+  for (int i = left; i < right - 1; i += 2) {
+    if (array[i] > array[i + 1]) {
+      std::swap(array[i], array[i + 1]);
+    }
+  }
+}
+
+void RadixBatcherSort(std::vector<double>& data) {
+  std::vector<uint64_t> transformed_data(data.size(), 0);
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < static_cast<int64_t>(data.size()); i++) {
+    transformed_data[i] = EncodeDoubleToUint64(data[i]);
+  }
+
+  RadixSort(transformed_data);
+  OddEvenMergeSort(transformed_data, 0, static_cast<int>(transformed_data.size()));
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < static_cast<int64_t>(data.size()); i++) {
+    data[i] = DecodeUint64ToDouble(transformed_data[i]);
+  }
+}
+}  // namespace
+}  // namespace khovansky_d_double_radix_batcher_omp
+
+bool khovansky_d_double_radix_batcher_omp::RadixOMP::PreProcessingImpl() {
+  auto* in_ptr = reinterpret_cast<double*>(task_data->inputs[0]);
+
+  unsigned int input_size = task_data->inputs_count[0];
+  unsigned int output_size = task_data->outputs_count[0];
+
+  input_ = std::vector<double>(in_ptr, in_ptr + input_size);
+  output_ = std::vector<double>(output_size, 0);
+
+  return true;
+}
+
+bool khovansky_d_double_radix_batcher_omp::RadixOMP::ValidationImpl() {
+  if (!task_data) {
+    return false;
+  }
+
+  if (task_data->inputs[0] == nullptr && task_data->inputs_count[0] == 0) {
+    return false;
+  }
+
+  if (task_data->outputs[0] == nullptr) {
+    return false;
+  }
+
+  if (task_data->inputs_count[0] < 2) {
+    return false;
+  }
+
+  return task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+bool khovansky_d_double_radix_batcher_omp::RadixOMP::RunImpl() {
+  output_ = input_;
+  khovansky_d_double_radix_batcher_omp::RadixBatcherSort(output_);
+  return true;
+}
+
+bool khovansky_d_double_radix_batcher_omp::RadixOMP::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<double*>(task_data->outputs[0])[i] = output_[i];
+  }
+
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{ops\_tbb.cpp}
+\begin{lstlisting}[language=C++,
+    breaklines=true,       % Автоматический перенос строк
+    columns=fullflexible ]
+#include "tbb/khovansky_d_double_radix_batcher/include/ops_tbb.hpp"
+
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/combinable.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/parallel_invoke.h>
+#include <tbb/tbb.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <vector>
+
+namespace khovansky_d_double_radix_batcher_tbb {
+namespace {
+uint64_t EncodeDoubleToUint64(double value) {
+  uint64_t bit_representation = 0;
+  std::memcpy(&bit_representation, &value, sizeof(value));
+
+  if ((bit_representation >> 63) != 0) {
+    return ~bit_representation;
+  }
+  return bit_representation ^ (1ULL << 63);
+}
+
+double DecodeUint64ToDouble(uint64_t encoded) {
+  if ((encoded >> 63) != 0) {
+    encoded ^= (1ULL << 63);
+  } else {
+    encoded = ~encoded;
+  }
+
+  double result = 0.0;
+  std::memcpy(&result, &encoded, sizeof(result));
+  return result;
+}
+
+void RadixSort(std::vector<uint64_t>& array) {
+  const int bits_in_byte = 8;
+  const int total_bits = 64;
+  const int bucket_count = 256;
+
+  std::vector<uint64_t> buffer(array.size(), 0);
+  std::vector<int> frequency(bucket_count, 0);
+
+  for (int shift = 0; shift < total_bits; shift += bits_in_byte) {
+    tbb::combinable<std::vector<int>> local_freq([&]() { return std::vector<int>(bucket_count, 0); });
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, array.size()), [&](const tbb::blocked_range<size_t>& range) {
+      auto& local = local_freq.local();
+      for (size_t i = range.begin(); i < range.end(); ++i) {
+        auto bucket = static_cast<uint8_t>((array[i] >> shift) & 0xFF);
+        local[bucket]++;
+      }
+    });
+
+    std::ranges::fill(frequency, 0);
+    local_freq.combine_each([&](const std::vector<int>& local) {
+      for (int i = 0; i < bucket_count; ++i) {
+        frequency[i] += local[i];
+      }
+    });
+
+    for (int i = 1; i < bucket_count; ++i) {
+      frequency[i] += frequency[i - 1];
+    }
+
+    for (int i = static_cast<int>(array.size()) - 1; i >= 0; i--) {
+      auto bucket = static_cast<uint8_t>((array[i] >> shift) & 0xFF);
+      buffer[--frequency[bucket]] = array[i];
+    }
+
+    array.swap(buffer);
+  }
+}
+
+void BatcherOddEvenMerge(std::vector<uint64_t>& array, int left, int right, int max_depth, int depth = 0) {
+  if (right - left <= 1) {
+    return;
+  }
+
+  int mid = left + ((right - left) / 2);
+
+  if (depth < max_depth) {
+    tbb::parallel_invoke([&] { BatcherOddEvenMerge(array, left, mid, depth + 1); },
+                         [&] { BatcherOddEvenMerge(array, mid, right, depth + 1); });
+  } else {
+    BatcherOddEvenMerge(array, left, mid, depth + 1);
+    BatcherOddEvenMerge(array, mid, right, depth + 1);
+  }
+
+  for (int i = left; i + 1 < right; i += 2) {
+    if (array[i] > array[i + 1]) {
+      std::swap(array[i], array[i + 1]);
+    }
+  }
+}
+
+void RadixBatcherSort(std::vector<double>& data) {
+  std::vector<uint64_t> transformed_data(data.size(), 0);
+
+  int max_parallel_depth = int(std::log2(data.size()) + 1);
+
+  tbb::parallel_for(size_t(0), data.size(), [&](size_t i) { transformed_data[i] = EncodeDoubleToUint64(data[i]); });
+
+  RadixSort(transformed_data);
+  BatcherOddEvenMerge(transformed_data, 0, static_cast<int>(transformed_data.size()), max_parallel_depth);
+
+  tbb::parallel_for(size_t(0), data.size(), [&](size_t i) { data[i] = DecodeUint64ToDouble(transformed_data[i]); });
+}
+}  // namespace
+}  // namespace khovansky_d_double_radix_batcher_tbb
+
+bool khovansky_d_double_radix_batcher_tbb::RadixTBB::PreProcessingImpl() {
+  auto* in_ptr = reinterpret_cast<double*>(task_data->inputs[0]);
+
+  unsigned int input_size = task_data->inputs_count[0];
+  unsigned int output_size = task_data->outputs_count[0];
+
+  input_ = std::vector<double>(in_ptr, in_ptr + input_size);
+  output_ = std::vector<double>(output_size, 0);
+
+  return true;
+}
+
+bool khovansky_d_double_radix_batcher_tbb::RadixTBB::ValidationImpl() {
+  if (!task_data) {
+    return false;
+  }
+
+  if (task_data->inputs[0] == nullptr && task_data->inputs_count[0] == 0) {
+    return false;
+  }
+
+  if (task_data->outputs[0] == nullptr) {
+    return false;
+  }
+
+  if (task_data->inputs_count[0] < 2) {
+    return false;
+  }
+
+  return task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+bool khovansky_d_double_radix_batcher_tbb::RadixTBB::RunImpl() {
+  output_ = input_;
+  khovansky_d_double_radix_batcher_tbb::RadixBatcherSort(output_);
+  return true;
+}
+
+bool khovansky_d_double_radix_batcher_tbb::RadixTBB::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<double*>(task_data->outputs[0])[i] = output_[i];
+  }
+
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{ops\_stl.cpp}
+\begin{lstlisting}[language=C++,
+    breaklines=true,       % Автоматический перенос строк
+    columns=fullflexible ]
+#include "stl/khovansky_d_double_radix_batcher/include/ops_stl.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <thread>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+namespace khovansky_d_double_radix_batcher_stl {
+namespace {
+uint64_t EncodeDoubleToUint64(double value) {
+  uint64_t bit_representation = 0;
+  std::memcpy(&bit_representation, &value, sizeof(value));
+
+  if ((bit_representation >> 63) != 0) {
+    return ~bit_representation;
+  }
+  return bit_representation ^ (1ULL << 63);
+}
+
+double DecodeUint64ToDouble(uint64_t encoded) {
+  if ((encoded >> 63) != 0) {
+    encoded ^= (1ULL << 63);
+  } else {
+    encoded = ~encoded;
+  }
+
+  double result = 0.0;
+  std::memcpy(&result, &encoded, sizeof(result));
+  return result;
+}
+
+void RadixSort(std::vector<uint64_t>& array, int thread_count) {
+  const int bits_in_byte = 8;
+  const int total_bits = 64;
+  const int bucket_count = 256;
+
+  std::vector<uint64_t> buffer(array.size(), 0);
+  std::vector<std::vector<int>> local_frequencies(thread_count, std::vector<int>(bucket_count, 0));
+
+  for (int shift = 0; shift < total_bits; shift += bits_in_byte) {
+    std::vector<std::thread> threads;
+    size_t n = array.size();
+    size_t block_size = (n + thread_count - 1) / thread_count;
+
+    for (int t = 0; t < thread_count; ++t) {
+      size_t begin = t * block_size;
+      size_t end = std::min(begin + block_size, n);
+
+      threads.emplace_back([&, begin, end, t]() {
+        for (size_t i = begin; i < end; ++i) {
+          auto bucket = static_cast<uint8_t>((array[i] >> shift) & 0xFF);
+          local_frequencies[t][bucket]++;
+        }
+      });
+    }
+    for (auto& th : threads) {
+      th.join();
+    }
+
+    std::vector<int> frequency(bucket_count, 0);
+    for (int b = 0; b < bucket_count; ++b) {
+      for (int t = 0; t < thread_count; ++t) {
+        frequency[b] += local_frequencies[t][b];
+        local_frequencies[t][b] = 0;
+      }
+    }
+
+    for (int i = 1; i < bucket_count; i++) {
+      frequency[i] += frequency[i - 1];
+    }
+
+    for (int i = static_cast<int>(array.size()) - 1; i >= 0; i--) {
+      auto bucket = static_cast<uint8_t>((array[i] >> shift) & 0xFF);
+      buffer[--frequency[bucket]] = array[i];
+    }
+
+    array.swap(buffer);
+  }
+}
+
+void BatcherOddEvenMerge(std::vector<uint64_t>& array, int left, int right, int max_threads) {
+  if (right - left <= 1) {
+    return;
+  }
+
+  int middle = left + ((right - left) / 2);
+
+  std::thread left_thread;
+  std::thread right_thread;
+
+  if (max_threads > 1) {
+    left_thread = std::thread([&]() { BatcherOddEvenMerge(array, left, middle, max_threads / 2); });
+    right_thread = std::thread([&]() { BatcherOddEvenMerge(array, middle, right, max_threads / 2); });
+  } else {
+    BatcherOddEvenMerge(array, left, middle, 1);
+    BatcherOddEvenMerge(array, middle, right, 1);
+  }
+
+  if (left_thread.joinable()) {
+    left_thread.join();
+  }
+  if (right_thread.joinable()) {
+    right_thread.join();
+  }
+
+  for (int i = left; i + 1 < right; i += 2) {
+    if (array[i] > array[i + 1]) {
+      std::swap(array[i], array[i + 1]);
+    }
+  }
+}
+
+void RadixBatcherSort(std::vector<double>& data) {
+  std::vector<uint64_t> transformed_data(data.size());
+  size_t n = data.size();
+  const int thread_count = std::max(1, std::min(static_cast<int>(n), ppc::util::GetPPCNumThreads()));
+  size_t block_size = (n + thread_count - 1) / thread_count;
+  std::vector<std::thread> threads(thread_count);
+
+  for (int t = 0; t < thread_count; ++t) {
+    threads[t] = std::thread([&data, &transformed_data, t, block_size, n]() {
+      size_t begin = t * block_size;
+      size_t end = std::min(begin + block_size, n);
+      for (size_t i = begin; i < end; ++i) {
+        transformed_data[i] = EncodeDoubleToUint64(data[i]);
+      }
+    });
+  }
+  for (auto& th : threads) {
+    th.join();
+  }
+
+  RadixSort(transformed_data, thread_count);
+  BatcherOddEvenMerge(transformed_data, 0, static_cast<int>(n), thread_count);
+
+  threads.clear();
+  threads.resize(thread_count);
+
+  for (int t = 0; t < thread_count; ++t) {
+    threads[t] = std::thread([&data, &transformed_data, t, block_size, n]() {
+      size_t begin = t * block_size;
+      size_t end = std::min(begin + block_size, n);
+      for (size_t i = begin; i < end; ++i) {
+        data[i] = DecodeUint64ToDouble(transformed_data[i]);
+      }
+    });
+  }
+  for (auto& th : threads) {
+    th.join();
+  }
+}
+}  // namespace
+}  // namespace khovansky_d_double_radix_batcher_stl
+
+bool khovansky_d_double_radix_batcher_stl::RadixSTL::PreProcessingImpl() {
+  auto* in_ptr = reinterpret_cast<double*>(task_data->inputs[0]);
+
+  unsigned int input_size = task_data->inputs_count[0];
+  unsigned int output_size = task_data->outputs_count[0];
+
+  input_ = std::vector<double>(in_ptr, in_ptr + input_size);
+  output_ = std::vector<double>(output_size, 0);
+
+  return true;
+}
+
+bool khovansky_d_double_radix_batcher_stl::RadixSTL::ValidationImpl() {
+  if (!task_data) {
+    return false;
+  }
+
+  if (task_data->inputs[0] == nullptr && task_data->inputs_count[0] == 0) {
+    return false;
+  }
+
+  if (task_data->outputs[0] == nullptr) {
+    return false;
+  }
+
+  if (task_data->inputs_count[0] < 2) {
+    return false;
+  }
+
+  return task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+bool khovansky_d_double_radix_batcher_stl::RadixSTL::RunImpl() {
+  output_ = input_;
+  khovansky_d_double_radix_batcher_stl::RadixBatcherSort(output_);
+  return true;
+}
+
+bool khovansky_d_double_radix_batcher_stl::RadixSTL::PostProcessingImpl() {
+  for (size_t i = 0; i < output_.size(); i++) {
+    reinterpret_cast<double*>(task_data->outputs[0])[i] = output_[i];
+  }
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{ops\_all.cpp}
+\begin{lstlisting}[language=C++,
+    breaklines=true,       % Автоматический перенос строк
+    columns=fullflexible ]
+#include "all/khovansky_d_double_radix_batcher/include/ops_all.hpp"
+
+#include <algorithm>
+#include <boost/mpi/collectives.hpp>
+#include <boost/mpi/collectives/broadcast.hpp>
+#include <boost/mpi/collectives/gather.hpp>
+#include <boost/mpi/collectives/scatter.hpp>
+#include <boost/mpi/communicator.hpp>
+#include <boost/mpi/request.hpp>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <iterator>
+#include <limits>
+#include <ranges>
+#include <thread>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+namespace khovansky_d_double_radix_batcher_all {
+namespace {
+
+uint64_t EncodeDoubleToUint64(double value) {
+  uint64_t bit_representation = 0;
+  std::memcpy(&bit_representation, &value, sizeof(value));
+
+  if ((bit_representation >> 63) != 0) {
+    return ~bit_representation;
+  }
+  return bit_representation ^ (1ULL << 63);
+}
+
+double DecodeUint64ToDouble(uint64_t transformed_data) {
+  if ((transformed_data >> 63) != 0) {
+    transformed_data ^= (1ULL << 63);
+  } else {
+    transformed_data = ~transformed_data;
+  }
+
+  double result = 0.0;
+  std::memcpy(&result, &transformed_data, sizeof(result));
+  return result;
+}
+
+void RadixSort(std::vector<uint64_t>& array, int thread_count) {
+  const int bits_in_byte = 8;
+  const int total_bits = 64;
+  const int bucket_count = 256;
+
+  std::vector<uint64_t> buffer(array.size(), 0);
+  std::vector<std::vector<int>> local_frequencies(thread_count, std::vector<int>(bucket_count, 0));
+
+  for (int shift = 0; shift < total_bits; shift += bits_in_byte) {
+    std::vector<std::thread> threads;
+    size_t n = array.size();
+    size_t block_size = (n + thread_count - 1) / thread_count;
+
+    for (int t = 0; t < thread_count; ++t) {
+      size_t begin = t * block_size;
+      size_t end = std::min(begin + block_size, n);
+
+      threads.emplace_back([&, begin, end, t]() {
+        for (size_t i = begin; i < end; ++i) {
+          auto bucket = static_cast<uint8_t>((array[i] >> shift) & 0xFF);
+          local_frequencies[t][bucket]++;
+        }
+      });
+    }
+    for (auto& th : threads) {
+      th.join();
+    }
+
+    std::vector<int> frequency(bucket_count, 0);
+    for (int b = 0; b < bucket_count; ++b) {
+      for (int t = 0; t < thread_count; ++t) {
+        frequency[b] += local_frequencies[t][b];
+        local_frequencies[t][b] = 0;
+      }
+    }
+
+    for (int i = 1; i < bucket_count; i++) {
+      frequency[i] += frequency[i - 1];
+    }
+
+    for (int i = static_cast<int>(array.size()) - 1; i >= 0; i--) {
+      auto bucket = static_cast<uint8_t>((array[i] >> shift) & 0xFF);
+      buffer[--frequency[bucket]] = array[i];
+    }
+
+    array.swap(buffer);
+  }
+}
+}  // namespace
+}  // namespace khovansky_d_double_radix_batcher_all
+
+bool khovansky_d_double_radix_batcher_all::RadixAll::PreProcessingImpl() {
+  int rank = world_.rank();
+  int size = world_.size();
+
+  if (rank == 0) {
+    size_t total = task_data->inputs_count[0];
+    size_t per_proc = (total + size - 1) / size;
+    input_.resize(per_proc * size, std::numeric_limits<double>::max());
+    auto* src = reinterpret_cast<double*>(task_data->inputs[0]);
+    std::copy(src, src + total, input_.begin());
+  }
+
+  size_t per_proc = 0;
+  if (rank == 0) {
+    per_proc = input_.size() / size;
+  }
+  boost::mpi::broadcast(world_, per_proc, 0);
+
+  std::vector<double> local(per_proc);
+  boost::mpi::scatter(world_, input_, local.data(), static_cast<int>(per_proc), 0);
+  input_.swap(local);
+
+  return true;
+}
+
+bool khovansky_d_double_radix_batcher_all::RadixAll::ValidationImpl() {
+  if (world_.rank() != 0) {
+    return true;
+  }
+
+  if (!task_data) {
+    return false;
+  }
+
+  if (task_data->inputs[0] == nullptr && task_data->inputs_count[0] == 0) {
+    return false;
+  }
+
+  if (task_data->outputs[0] == nullptr) {
+    return false;
+  }
+
+  if (task_data->inputs_count[0] < 2) {
+    return false;
+  }
+
+  return task_data->inputs_count[0] == task_data->outputs_count[0];
+}
+
+bool khovansky_d_double_radix_batcher_all::RadixAll::RunImpl() {
+  int rank = world_.rank();
+  int size = world_.size();
+
+  std::vector<uint64_t> local;
+  local.reserve(input_.size());
+  for (auto d : input_) {
+    local.push_back(EncodeDoubleToUint64(d));
+  }
+  size_t n = local.size();
+  const int thread_count = std::max(1, std::min(static_cast<int>(n), ppc::util::GetPPCNumThreads()));
+  RadixSort(local, thread_count);
+
+  int stages = static_cast<int>(std::ceil(std::log2(size)));
+  for (int stage = 0; stage < stages; ++stage) {
+    int offset = 1 << (stages - stage - 1);
+
+    for (int step = offset; step > 0; step >>= 1) {
+      int partner = rank ^ step;
+      if (partner >= size) {
+        continue;
+      }
+
+      const int data_size = static_cast<int>(local.size());
+
+      boost::mpi::request reqs[2];
+      std::vector<uint64_t> recv_data(local.size());
+
+      if (rank < partner) {
+        reqs[0] = world_.isend(partner, 0, local.data(), data_size);
+        reqs[1] = world_.irecv(partner, 0, recv_data.data(), data_size);
+      } else {
+        reqs[0] = world_.irecv(partner, 0, recv_data.data(), data_size);
+        reqs[1] = world_.isend(partner, 0, local.data(), data_size);
+      }
+      reqs[0].wait();
+      reqs[1].wait();
+
+      std::vector<uint64_t> merged;
+      std::ranges::merge(local, recv_data, std::back_inserter(merged));
+
+      if (rank < partner) {
+        local.assign(merged.begin(), merged.begin() + static_cast<std::ptrdiff_t>(local.size()));
+      } else {
+        local.assign(merged.end() - static_cast<std::ptrdiff_t>(local.size()), merged.end());
+      }
+    }
+    world_.barrier();
+  }
+
+  output_.resize(local.size());
+  for (size_t i = 0; i < local.size(); ++i) {
+    output_[i] = DecodeUint64ToDouble(local[i]);
+  }
+
+  return true;
+}
+
+bool khovansky_d_double_radix_batcher_all::RadixAll::PostProcessingImpl() {
+  int rank = world_.rank();
+  int size = world_.size();
+  const int local_size = static_cast<int>(output_.size());
+
+  std::vector<double> gathered;
+
+  if (rank == 0) {
+    gathered.resize(local_size * size);
+  }
+
+  boost::mpi::gather(world_, output_.data(), local_size, gathered.data(), 0);
+
+  if (rank == 0) {
+    auto removed = std::ranges::remove(gathered, std::numeric_limits<double>::max());
+    gathered.erase(removed.begin(), removed.end());
+
+    std::ranges::sort(gathered);
+
+    auto* out_ptr = reinterpret_cast<double*>(task_data->outputs[0]);
+    std::ranges::copy(gathered, out_ptr);
+  }
+
+  return true;
+}
+\end{lstlisting}
+
+\end{document}
