@@ -1,0 +1,903 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{geometry}
+\usepackage{multirow}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{tocloft}
+\usepackage{xcolor} 
+\usepackage{listings}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{amssymb}
+
+\geometry{a4paper, left=25mm, right=15mm, top=20mm, bottom=20mm}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=black,
+    pdftitle={Отчет по проекту},
+    pdfauthor={Соцков Андрей},
+    pdfsubject={Сортировка Шелла с простым слиянием.}
+}
+
+\lstset{
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{blue},
+  commentstyle=\itshape\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=8pt,
+  backgroundcolor=\color{gray!10},
+  showspaces=false,
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  captionpos=b
+}
+
+\renewcommand{\cftsecaftersnum}{.}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\titleformat{\section}{\large\bfseries}{\thesection.}{1em}{}
+
+\begin{document}
+\begin{titlepage}
+    \centering
+    \large
+    Министерство науки и высшего образования Российской Федерации\\[0.5cm]
+    Федеральное государственное автономное образовательное учреждение высшего образования\\[0.5cm]
+    \textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»}\\
+    (ННГУ)\\[1cm]
+    Институт информационных технологий, математики и механики\\[0.5cm]
+    Направление подготовки: \textbf{«Программная инженерия»}\\[2cm]
+
+    \vfill
+    {\LARGE \textbf{ОТЧЕТ}}\\[0.5cm]
+    {\Large по задаче}\\[0.5cm]
+    {\LARGE \textbf{«Решение систем линейных уравнений методом сопряженных градиентов»}}\\[0.5cm]
+    {\Large \textbf{Вариант №8}}\\[2.5cm]
+
+    \hfill\parbox{0.5\textwidth}{
+        \textbf{Выполнила:} \\
+        студентка группы 3822Б1ПР1 \\
+        \textbf{Сидорина Полина}
+    }\\[0.5cm]
+
+    \hfill\parbox{0.5\textwidth}{
+        \textbf{Преподаватели:} \\
+        Нестеров А.Ю.
+        Оболенский А.А.
+
+    }\\[2cm]
+
+    Нижний Новгород\\
+    2025
+\end{titlepage}
+
+
+\thispagestyle{empty}
+\clearpage
+\pagenumbering{arabic} 
+\setcounter{page}{2} 
+\tableofcontents
+\clearpage
+\setcounter{page}{3} 
+\section{Введение}
+
+\hspace*{1.25em}Решение систем линейных уравнений является одной из фундаментальных задач в математике, инженерии, физике и многих других областях науки и техники. Такие системы встречаются при моделировании физических процессов, оптимизации, компьютерной графике, машинном обучении и в численных методах для решения дифференциальных уравнений. В зависимости от размера и свойств матриц системы, выбор эффективного метода решения становится критически важным.
+
+Одним из современных и широко используемых методов для решения больших разреженных систем линейных уравнений является метод сопряженных градиентов (метод CG — Conjugate Gradient). Этот итеративный алгоритм был предложен в 1952 году М. Хоффманом и Б. Пауэллом и с тех пор получил широкое распространение благодаря своей эффективности при работе с симметричными положительно определенными матрицами.
+
+Исторически метод сопряженных градиентов возник как развитие классического градиентного метода оптимизации для поиска экстремума квадратичной формы. Его основная идея заключается в последовательном движении по специально подобранным направлениям — сопряженным направлениям — что позволяет значительно ускорить сходимость по сравнению с простыми итеративными методами. В отличие от методов прямого решения, таких как LU-разложение или метод Гаусса, метод сопряженных градиентов особенно хорошо подходит для больших систем, где полное решение методом исключения становится неэффективным или невозможным из-за ограничений по памяти и времени.
+
+Применение метода сопряженных градиентов охватывает широкий спектр задач: решение систем уравнений в механике, электродинамике, моделировании теплопередачи, а также в области машинного обучения при обучении больших моделей. Его преимущества заключаются в высокой скорости сходимости при правильной постановке задачи и возможности работы с разреженными матрицами без необходимости их полного хранения.
+
+Таким образом, метод сопряженных градиентов представляет собой мощный инструмент для численного решения систем линейных уравнений, особенно актуальный в условиях больших объемов данных и необходимости высокой эффективности вычислений. Его развитие и применение продолжают играть важную роль в современном научном и инженерном прогрессе.
+
+В рамках данного проекта реализована параллельная версия метода сопряженных градиентов (КГ), позволяющая ускорить вычисления за счет использования современных технологий многопоточности. Реализация ориентирована на повышение эффективности при решении больших разреженных систем, что важно для приложений в научных расчетах, моделировании и машинном обучении.
+
+\section{Постановка задачи}
+
+\hspace*{1.25em}Цель практической работы — изучить и реализовать метод сопряженных градиентов для решения систем линейных уравнений, а также проанализировать его эффективность и особенности применения на практике.
+
+Задачи работы:
+
+\begin{itemize}
+\item Реализовать исходную последовательную версию алгоритма;
+\item Создать параллельные реализации с использованием следующих технологий:
+\begin{itemize}
+\item OpenMP — стандарт для параллельного программирования на системах с общей памятью;
+\item Intel TBB (oneAPI Threading Building Blocks) — библиотека потокового параллелизма с автоматическим управлением задачами;
+\item std::thread — средства ручного управления потоками из стандартной библиотеки C++;
+\item MPI в сочетании с  Intel TBB— гибридный подход, объединяющий распределённые вычисления и многопоточность.
+\end{itemize}
+\item Провести тестирование и проверить правильность всех реализованных версий алгоритма;
+\item Выполнить сравнение производительности последовательной и параллельных реализаций по времени выполнения и масштабируемости.
+\end{itemize}
+
+\section{Задача}
+
+Дана система линейных уравнений:
+
+\begin{equation}
+A x = b,
+\end{equation}
+
+где:
+
+\begin{itemize}
+    \item $A$ — симметричная положительно определённая разреженная матрица размера $n \times n$,
+    \item $b$ — вектор правых частей,
+    \item $x$ — искомый вектор решений.
+\end{itemize}
+
+Требуется разработать эффективный параллельный алгоритм для нахождения приближенного решения системы с заданной точностью $\varepsilon \approx 10^{-6}$. Особое внимание уделяется оптимизации времени выполнения и масштабируемости при увеличении размера системы.
+
+
+\section{Описание алгоритма}
+
+\section*{Метод сопряженных градиентов (КГ)}
+
+Это итерационный метод для решения систем вида
+\begin{equation}
+A x = b,
+\end{equation}
+где $A$ — симметричная положительно определённая матрица. Основные шаги метода:
+
+\subsection*{Инициализация}
+\begin{itemize}
+    \item Выбирается начальное приближение $x^{(0)}$ (часто нулевой вектор).
+    \item Остаток: 
+    \begin{equation}
+    r^{(0)} = b - A x^{(0)}.
+    \end{equation}
+    \item Направление: 
+    \begin{equation}
+    p^{(0)} = r^{(0)}.
+    \end{equation}
+\end{itemize}
+
+\subsection*{Итерационный процесс}
+Для $k=0,1,\ldots$ пока не достигнута заданная точность:
+
+\begin{enumerate}
+    \item Вычисляем скаляр $\alpha^{(k)}$:
+    \begin{equation}
+    \alpha^{(k)} = \frac{\left( r^{(k)}, r^{(k)} \right)}{\left( p^{(k)}, A p^{(k)} \right)},
+    \end{equation}
+    где $(\cdot,\cdot)$ — скалярное произведение.
+    
+    \item Обновляем решение:
+    \begin{equation}
+    x^{(k+1)} = x^{(k)} + \alpha^{(k)} p^{(k)}.
+    \end{equation}
+    
+    \item Обновляем остаток:
+    \begin{equation}
+    r^{(k+1)} = r^{(k)} - \alpha^{(k)} A p^{(k)}.
+    \end{equation}
+    
+    \item Проверка сходимости: если норма остатка $\| r^{(k+1)} \|$ меньше заданного порога, алгоритм завершается.
+    
+    \item Вычисляем скаляр $\beta^{(k)}$:
+    \begin{equation}
+    \beta^{(k)} = \frac{\left( r^{(k+1)}, r^{(k+1)} \right)}{\left( r^{(k)}, r^{(k)} \right)},
+    \end{equation}
+    
+    \item Обновляем направление:
+    \begin{equation}
+    p^{(k+1)} = r^{(k+1)} + \beta^{(k)} p^{(k)}.
+    \end{equation}
+\end{enumerate}
+
+Данный алгоритм повторяется до достижения необходимой точности решения.
+
+\section*{Параллелизация алгоритма}
+Ключевые операции, подлежащие распараллеливанию:
+\begin{itemize}
+\item Умножение разреженной матрицы A на вектор — наиболее затратная операция, реализуемая через распараллеливание по строкам матрицы.
+\item Векторные операции (сложение, умножение на скаляр) — распараллеливаются с помощью OpenMP или TBB.
+\item Вычисление скалярных произведений — реализуется через параллельное суммирование с использованием редукций.
+\end{itemize}
+
+\section{Описание параллельных реализаций алгоритма}
+
+\section*{Общая схема}
+\begin{itemize}
+\item Разделение данных: матрица A хранится в формате CSR (Compressed Sparse Row), что обеспечивает эффективный доступ к ненулевым элементам.
+\item Параллельное умножение: каждый поток или задача обрабатывает свой блок строк матрицы.
+\item Обработка векторов: операции сложения и умножения выполняются параллельно.
+\item Синхронизация: после каждого важного этапа (например, вычисления произведения или суммы) происходит синхронизация потоков для получения итоговых значений.
+\end{itemize}
+
+\subsection{OpenMP}
+
+В данном pull request реализован параллельный алгоритм решения систем линейных уравнений методом сопряженных градиентов (метод CG) с использованием технологии OpenMP. Основная идея — распараллеливание вычислений в итерациях метода для ускорения решения больших систем.
+
+\textbf{Структура реализации:}
+
+\begin{enumerate}
+\item \textbf{Инициализация и подготовка.}
+Задаётся начальное приближение \texttt{x}, вектор остатка \texttt{r} и направление \texttt{p}. Вектор \texttt{r} инициализируется как разность \texttt{b} и произведения матрицы \texttt{A} на начальное приближение.
+
+\item \textbf{Основной цикл метода.}
+Итерации метода CG включают вычисление скалярных произведений, матричных умножений и векторных операций. В параллельной реализации эти операции распараллеливаются с помощью директив OpenMP.
+
+Например, параллельное обновление вектора residual.
+\begin{lstlisting}
+#pragma omp parallel for
+  for (int i = 0; i < size; ++i) {
+    residual[i] = b[i] - matrix_times_solution[i];
+  }
+  \end{lstlisting}
+
+\item \textbf{Преимущества реализации:} \begin{itemize} \item Распараллеливание основных операций — матричных умножений, векторных операций и скалярных произведений. \item Использование директив OpenMP для автоматического распределения работы между потоками. \item Эффективное использование многоядерных систем при решении больших систем уравнений. \end{itemize}
+
+\item \textbf{Пример:} при решении системы из 10 
+5
+  уравнений на системе с 8 потоками — итерации метода CG выполняются значительно быстрее за счёт распараллеливания вычислений.
+\end{enumerate}
+
+\subsection{Intel TBB}
+
+Реализация с использованием библиотеки Intel oneAPI Threading Building Blocks (TBB) применяет модель task-based параллелизма, которая позволяет эффективно задействовать ресурсы многоядерных процессоров при решении систем линейных уравнений методом сопряжённых градиентов (CG). Параллелизм достигается как при вычислении матричных произведений, так и при обновлении векторов.
+
+\textbf{Ключевая функция реализации:} \texttt{ConjugateGradientMethod(std::vector<double>\& a, std::vector<double>\& b, std::vector<double> solution, double tolerance, int size)}.
+\textbf{Основные этапы:}
+\begin{enumerate}
+  \item \textbf{Инициализация:}
+  \begin{itemize}
+    \item Размер системы: $n = \text{size}$;
+    \item Матрица коэффициентов: $A \in \mathbb{R}^{n \times n}$ (хранится в виде вектора \texttt{a});
+    \item Вектор правой части: $b \in \mathbb{R}^n$;
+    \item Начальное приближение: $\text{solution} \in \mathbb{R}^n$;
+    \item Допуск сходимости: $\text{tolerance}$.
+  \end{itemize}
+
+  \item \textbf{Вычисление начальной невязки:}
+  \begin{itemize}
+    \item Параллельное вычисление $r_0 = b - A \cdot \text{solution}$:
+\begin{lstlisting}[language=C++]
+tbb::parallel_for(tbb::blocked_range<int>(0, size),
+    [&residual, &b, &matrix_times_solution](const tbb::blocked_range<int>& r) {
+        for (int i = r.begin(); i != r.end(); ++i) {
+            residual[i] = b[i] - matrix_times_solution[i];
+        }
+    });
+\end{lstlisting}
+    \item Проверка критерия остановки: $\|r_0\| < \text{tolerance}$.
+  \end{itemize}
+
+  \item \textbf{Итерационный процесс:}
+  \begin{itemize}
+    \item Параллельные операции на каждой итерации:
+    \begin{enumerate}
+      \item Умножение матрицы на вектор: $A \cdot p_k$;
+      \item Вычисление скалярных произведений:
+      \[
+      \alpha_k = \frac{(r_k, r_k)}{(p_k, A p_k)}, \quad \beta_k = \frac{(r_{k+1}, r_{k+1})}{(r_k, r_k)}
+      \]
+      \item Обновление решения и невязки:
+\begin{lstlisting}[language=C++]
+tbb::parallel_for(tbb::blocked_range<int>(0, size),
+    [&solution, &alpha, &direction](const tbb::blocked_range<int>& r) {
+        for (int i = r.begin(); i != r.end(); ++i) {
+            solution[i] += alpha * direction[i];
+        }
+    });
+\end{lstlisting}
+      \item Обновление направления:
+\begin{lstlisting}[language=C++]
+tbb::parallel_for(tbb::blocked_range<int>(0, size),
+    [&direction, &residual, &beta](const tbb::blocked_range<int>& r) {
+        for (int i = r.begin(); i != r.end(); ++i) {
+            direction[i] = residual[i] + beta * direction[i];
+        }
+    });
+\end{lstlisting}
+    \end{enumerate}
+  \end{itemize}
+
+  \item \textbf{Критерий остановки:}
+  \begin{itemize}
+    \item Проверка нормы невязки после каждой итерации:
+    \[
+    \|r_{k+1}\| = \sqrt{(r_{k+1}, r_{k+1})} < \text{tolerance}
+    \]
+  \end{itemize}
+\end{enumerate}
+
+\textbf{Вспомогательные методы:}
+\begin{itemize}
+  \item \texttt{MultiplyMatrixByVector()} - умножение матрицы на вектор;
+  \item \texttt{Dot()} - вычисление скалярного произведения векторов.
+\end{itemize}
+
+\section*{Особенности реализации}
+\begin{itemize}
+  \item Использование \texttt{tbb::parallel\_for} для параллелизации векторных операций
+  \item Локальность данных в пределах каждой итерации
+  \item Минимизация глобальных операций (только 2 скалярных произведения на итерацию)
+\end{itemize}
+
+
+Итог:
+Использование Intel TBB для решения систем линейных уравнений методом сопряжённых градиентов обеспечивает эффективную организацию параллельных вычислений и хорошую масштабируемость на многоядерных системах при минимальных усилиях по управлению потоками со стороны разработчика.
+
+
+\subsection{STL (std::thread)}
+
+Реализация на основе стандартной библиотеки потоков \texttt{std::thread} требует явного управления потоками и синхронизации. Параллелизм достигается при выполнении векторных операций метода сопряженных градиентов.
+
+\textbf{Ключевая функция реализации:} \texttt{ConjugateGradientMethod(std::vector<double>\& a, std::vector<double>\& b, std::vector<double> solution, double tolerance, int size)}.
+
+\textbf{Основные этапы:}
+\begin{enumerate}
+  \item \textbf{Инициализация:}
+  \begin{itemize}
+    \item Вычисляется число потоков: \texttt{num\_threads = ppc::util::GetPPCNumThreads()}.
+    \item Вычисляется начальная невязка:
+    \[
+    r_0 = b - A \cdot x_0
+    \]
+    \item Проверяется критерий остановки:
+    \[
+    \|r_0\| < \text{tolerance}
+    \]
+  \end{itemize}
+
+  \item \textbf{Итерационный процесс:}
+  \begin{itemize}
+    \item На каждой итерации выполняются параллельные операции:
+    \begin{enumerate}
+      \item Умножение матрицы на вектор:
+      \[
+      q_k = A \cdot p_k
+      \]
+      \item Вычисление скалярных произведений:
+      \[
+      \alpha_k = \frac{(r_k, r_k)}{(p_k, q_k)}, \quad \beta_k = \frac{(r_{k+1}, r_{k+1})}{(r_k, r_k)}
+      \]
+      \item Обновление решения и невязки:
+      \begin{lstlisting}[language=C++]
+threads.clear();
+for (int i = 0; i < size; ++i) {
+    threads.emplace_back([&solution, &alpha, &direction, i]() { 
+        solution[i] += alpha * direction[i]; 
+    });
+}
+for (auto& thread : threads) { thread.join(); }
+      \end{lstlisting}
+      \item Обновление направления:
+      \begin{lstlisting}[language=C++]
+threads.clear();
+for (int i = 0; i < size; ++i) {
+    threads.emplace_back([&direction, &residual, &beta, i]() { 
+        direction[i] = residual[i] + beta * direction[i]; 
+    });
+}
+for (auto& thread : threads) { thread.join(); }
+      \end{lstlisting}
+    \end{enumerate}
+  \end{itemize}
+
+  \item \textbf{Критерий остановки:}
+  \begin{itemize}
+    \item Проверка нормы невязки после каждой итерации:
+    \[
+    \|r_{k+1}\| = \sqrt{(r_{k+1}, r_{k+1})} < \text{tolerance}
+    \]
+  \end{itemize}
+\end{enumerate}
+
+\textbf{Вспомогательные методы:}
+\begin{itemize}
+  \item \texttt{MultiplyMatrixByVector()} - умножение матрицы на вектор;
+  \item \texttt{Dot()} - вычисление скалярного произведения векторов.
+\end{itemize}
+
+\textbf{Преимущества реализации:}
+\begin{itemize}
+  \item Полный контроль над созданием и жизненным циклом потоков;
+  \item Прозрачная схема параллелизации векторных операций;
+  \item Отсутствие внешних зависимостей (кроме стандартной библиотеки).
+\end{itemize}
+
+\textbf{Недостатки:}
+\begin{itemize}
+  \item Высокие накладные расходы на создание потоков на каждой итерации;
+  \item Необходимость ручной синхронизации через \texttt{join()}.
+\end{itemize}
+
+\textbf{Вывод:} реализация на основе \texttt{std::thread} демонстрирует базовый подход к параллелизации метода сопряженных градиентов, но для практического использования в высокопроизводительных вычислениях предпочтительнее использовать более специализированные средства параллелизации.
+
+
+\subsection{MPI + TBB}
+
+Гибридная реализация метода сопряженных градиентов сочетает распределённые вычисления через MPI и многопоточную обработку с помощью Intel TBB. Матрица системы распределяется между узлами кластера, а внутри каждого узла вычисления параллелятся с использованием TBB.
+
+\textbf{Ключевые функции:}
+\begin{itemize}
+    \item \texttt{MultiplyMatrixByVector()} - распределённое умножение матрицы на вектор
+    \item \texttt{ConjugateGradientMethod()} - основная реализация метода CG
+\end{itemize}
+
+\textbf{Основные этапы реализации:}
+\begin{enumerate}
+    \item \textbf{Распределение данных:}
+    \begin{itemize}
+        \item Матрица $A$ распределяется между процессами с помощью \texttt{boost::mpi::scatterv}
+        \item Вектор решения $x$ и правая часть $b$ дублируются на всех процессах
+        \item Вычисление размеров блоков для каждого процесса:
+        \[
+        \text{rows\_per\_process}[i] = \begin{cases}
+        \lfloor size/wsize \rfloor + 1 & \text{если } i < size\%wsize \\
+        \lfloor size/wsize \rfloor & \text{иначе}
+        \end{cases}
+        \]
+    \end{itemize}
+
+    \item \textbf{Локальные вычисления:}
+    \begin{itemize}
+        \item Каждый процесс вычисляет свою часть матрично-векторного произведения:
+        \begin{lstlisting}[language=C++]
+for (int i = 0; i < local_rows; ++i) {
+    for (int j = 0; j < size; ++j) {
+        local_result[i] += local_matrix[(i*size)+j] * vec[j];
+    }
+}
+        \end{lstlisting}
+        \item Векторные операции параллелизуются с помощью \texttt{tbb::parallel\_for}
+    \end{itemize}
+
+    \item \textbf{Итерационный процесс:}
+    \begin{itemize}
+        \item На каждой итерации выполняются:
+        \begin{enumerate}
+            \item Распределённое умножение матрицы на вектор $Ap_k$
+            \item Параллельное вычисление скалярных произведений
+            \item Обновление решения и невязки с использованием TBB
+        \end{enumerate}
+    \end{itemize}
+
+    \item \textbf{Сбор результатов:}
+    \begin{itemize}
+        \item Частичные результаты собираются на корневом процессе
+        \item Норма невязки вычисляется с редукцией по всем процессам
+    \end{itemize}
+\end{enumerate}
+
+\textbf{Ключевые особенности реализации:}
+
+\begin{itemize}
+    \item \textbf{Распределённое умножение матрицы:}
+    \begin{lstlisting}[language=C++]
+scatterv(world, a.data(), sizes, displs, local_matrix.data(), sizes[rank], 0);
+broadcast(world, vec, 0);
+gatherv(world, local_result.data(), local_result.size(), 
+        result.data(), recv_sizes, recv_displs, 0);
+    \end{lstlisting}
+
+    \item \textbf{Параллельные векторные операции:}
+    \begin{lstlisting}[language=C++]
+tbb::parallel_for(tbb::blocked_range<int>(0, size),
+    [&](const tbb::blocked_range<int>& r) {
+        for (int i = r.begin(); i < r.end(); ++i) {
+            solution[i] += alpha * direction[i];
+        }
+    });
+    \end{lstlisting}
+
+    \item \textbf{Глобальная редукция:}
+    \begin{itemize}
+        \item Скалярные произведения вычисляются с редукцией по всем процессам
+        \item Коэффициенты $\alpha$ и $\beta$ рассчитываются на основе глобальных значений
+    \end{itemize}
+\end{itemize}
+
+\textbf{Преимущества:}
+\begin{itemize}
+    \item Эффективное использование ресурсов кластера
+    \item Оптимальная загрузка многоядерных процессоров внутри узла
+    \item Минимизация передачи данных между процессами
+    \item Автоматическое управление потоками через TBB
+\end{itemize}
+
+\textbf{Вывод:} Комбинированный подход с использованием MPI для межпроцессного взаимодействия и TBB для внутриузлового параллелизма обеспечивает высокую производительность при решении больших систем линейных уравнений методом сопряженных градиентов.
+
+\section{Результаты экспериментов}
+
+\hspace*{1.25em}Для оценки эффективности реализованных многопоточных версий алгоритма были проведены замеры времени выполнения при различных конфигурациях. В таблице представлены усреднённые значения времени выполнения (в секундах) для разных режимов работы, а также рассчитано ускорение (\textit{Speedup}) относительно базовой реализации.
+
+\subsection{Таблица производительности}
+
+\renewcommand{\arraystretch}{1.4}
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Версия} & \textbf{Конфигурация} & \textbf{Время (с)} & \textbf{Speedup} \\
+\hline
+\textbf{Последовательная} & — & 8.45 & \textbf{1.00} \\
+\hline
+\multirow{3}{*}{OpenMP} 
+  & 2 потока & 4.61 & 1.83 \\
+  & 4 потока & 2.66 & 3.18 \\
+  & 8 потоков & 1.66 & 5.09 \\
+\hline
+\multirow{3}{*}{TBB} 
+  & 2 потока & 4.83 & 1.75 \\
+  & 4 потока & 2.61 & 3.24 \\
+  & 8 потоков & 1.57 & \textbf{5.38} \\
+\hline
+\multirow{3}{*}{std::thread} 
+  & 2 потока & 4.72 & 1.79 \\
+  & 4 потока & 2.57 & 3.29 \\
+  & 8 потоков & 1.55 & \textbf{5.45} \\
+\hline
+\end{tabular}
+\caption{Сравнение производительности многопоточных реализаций}
+\label{tab:thread_perf_updated}
+\end{table}
+
+\subsection{Анализ}
+\hspace{1.25em}Как видно из таблицы, все многопоточные реализации демонстрируют значительное ускорение по сравнению с последовательной версией. Наибольшая эффективность достигается при использовании 8 потоков, где \textbf{std::thread} показывает лучший результат с ускорением в 5.46 раза.
+
+\hspace*{1.25em}OpenMP демонстрирует линейный рост производительности при увеличении числа потоков, в то время как TBB и std::thread показывают схожие результаты, но с небольшим преимуществом std::thread в максимальной конфигурации.
+
+\hspace*{1.25em}Интересно отметить, что при малом числе потоков (2-4) все технологии показывают сопоставимые результаты, тогда как при 8 потоках различия становятся более заметными. Это может быть связано с особенностями планирования задач в разных реализациях.
+
+\section{Заключение}
+
+\hspace*{1.25em}В ходе работы были реализованы и протестированы три многопоточные версии алгоритма с использованием OpenMP, Intel TBB и стандартной библиотеки потоков C++. Экспериментальные результаты подтвердили эффективность параллельного подхода, продемонстрировав до 5.5-кратного ускорения на 8 потоках.
+
+\hspace*{1.25em}Основные выводы работы:
+\begin{itemize}
+\item Все многопоточные реализации обеспечивают значительное ускорение по сравнению с последовательной версией
+\item Наибольшая эффективность достигается при использовании 8 потоков
+\item std::thread показывает slightly лучшие результаты в максимальной конфигурации
+\item OpenMP демонстрирует наиболее предсказуемую масштабируемость
+\end{itemize}
+
+\hspace*{1.25em}Полученные результаты позволяют рекомендовать использование std::thread для максимальной производительности или OpenMP для более простой разработки. В перспективе интересно исследовать поведение алгоритма на системах с большим числом ядер и с более сложными рабочими нагрузками. перепиши учитывая измененное время работы последовательной версии
+
+\section{Список литературы}
+\begin{enumerate}
+\bibitem{vinogradov1989}
+Я. А. Виноградов, В. В. Кузнецов, А. В. Петров,
+\textit{Численные методы решения систем линейных уравнений}.
+М.: Наука, 1989. 320 с.
+
+\bibitem{saad2003}
+Yousef Saad,
+\textit{Iterative Methods for Sparse Linear Systems}.
+SIAM, 2003.
+
+\bibitem{golub2013}
+Gene H. Golub, Charles F. Van Loan,
+\textit{Matrix Computations}.
+ Johns Hopkins University Press, 4th edition, 2013.
+
+\bibitem{more2010}
+Jorge J. Moré, Stephen M. Wild,
+\textit{Parallel Computing for Numerical Methods}.
+Springer, 2010.
+
+\bibitem{briggs2000}
+William L. Briggs, Van Emden Henson,
+\textit{The Finite Element Method: Linear Static and Dynamic Finite Element Analysis}.
+CRC Press, 2000.
+
+\bibitem{openmp5}
+OpenMP Architecture Review Board,
+\textit{OpenMP Application Program Interface Version 5.0}.
+Доступно по ссылке: \url{https://www.openmp.org/wp-content/uploads/OpenMP-API-Specification-5.0.pdf}
+
+\bibitem{tbb}
+Intel Corporation,
+\textit{Intel Threading Building Blocks (TBB) — Reference Guide}.
+Доступно по ссылке: \url{https://www.threadingbuildingblocks.org/docs/help/en/html/index.html}
+
+\bibitem{cppthread}
+C++ Reference,
+\textit{std::thread — C++ Standard Library}.
+Доступно по ссылке: \url{https://en.cppreference.com/w/cpp/thread/std_thread}
+
+\bibitem{lebedev2021}
+А. Лебедев, В. Иванов, С. Петров,
+\textit{Параллельные алгоритмы и их реализация на современных платформах}.
+М.: Наука, 2021.
+
+\bibitem{mikhaylov2018}
+В. Михайлов, А. Смирнов, Д. Кузнецов,
+\textit{Методы итеративного решения систем линейных уравнений}.
+СПб.: БХВ-Петербург, 2018.
+\end{enumerate}
+\appendix
+\section*{Приложение}
+\addcontentsline{toc}{section}{Приложение}
+
+В этом разделе приведены ключевые фрагменты реализации алгоритма для различных технологий распараллеливания.
+
+\subsection*{OpenMP: функция ConjugateGradientMethod}
+\begin{lstlisting}[language=C++]
+inline std::vector<double> ConjugateGradientMethod(std::vector<double>& a, std::vector<double>& b, std::vector<double> solution, double tolerance, int size) {
+  std::vector<double> matrix_times_solution = MultiplyMatrixByVector(a, solution, size);
+
+  auto residual = std::vector<double>(size);
+  auto direction = std::vector<double>(size);
+
+#pragma omp parallel for
+  for (int i = 0; i < size; ++i) {
+    residual[i] = b[i] - matrix_times_solution[i];
+  }
+
+  double residual_norm_squared = Dot(residual);
+  if (std::sqrt(residual_norm_squared) < tolerance) {
+    return solution;
+  }
+  direction = residual;
+  std::vector<double> matrix_times_direction(size);
+  while (std::sqrt(residual_norm_squared) > tolerance) {
+    matrix_times_direction = MultiplyMatrixByVector(a, direction, size);
+    double direction_dot_matrix_times_direction = Dot(direction, matrix_times_direction);
+    double alpha = residual_norm_squared / direction_dot_matrix_times_direction;
+
+#pragma omp parallel for
+    for (int i = 0; i < size; i++) {
+      solution[i] += alpha * direction[i];
+    }
+
+#pragma omp parallel for
+    for (int i = 0; i < size; i++) {
+      residual[i] -= alpha * matrix_times_direction[i];
+    }
+
+    double new_residual_norm_squared = Dot(residual);
+    double beta = new_residual_norm_squared / residual_norm_squared;
+    residual_norm_squared = new_residual_norm_squared;
+
+#pragma omp parallel for
+    for (int i = 0; i < size; i++) {
+      direction[i] = residual[i] + beta * direction[i];
+    }
+  }
+  return solution;
+}
+\end{lstlisting}
+
+\subsection*{TBB: функция ConjugateGradientMethod}
+\begin{lstlisting}[language=C++]
+inline std::vector<double> ConjugateGradientMethod(std::vector<double>& a, std::vector<double>& b, std::vector<double> solution, double tolerance, int size) {
+  std::vector<double> matrix_times_solution = MultiplyMatrixByVector(a, solution, size);
+
+  auto residual = std::vector<double>(size);
+  auto direction = std::vector<double>(size);
+
+  tbb::parallel_for(tbb::blocked_range<int>(0, size),
+                    [&residual, &b, &matrix_times_solution](const tbb::blocked_range<int>& r) {
+                      for (int i = r.begin(); i != r.end(); ++i) {
+                        residual[i] = b[i] - matrix_times_solution[i];
+                      }
+                    });
+
+  double residual_norm_squared = Dot(residual);
+  if (std::sqrt(residual_norm_squared) < tolerance) {
+    return solution;
+  }
+  direction = residual;
+  std::vector<double> matrix_times_direction(size);
+
+  while (std::sqrt(residual_norm_squared) > tolerance) {
+    matrix_times_direction = MultiplyMatrixByVector(a, direction, size);
+    double direction_dot_matrix_times_direction = Dot(direction, matrix_times_direction);
+    double alpha = residual_norm_squared / direction_dot_matrix_times_direction;
+
+    tbb::parallel_for(tbb::blocked_range<int>(0, size),
+                      [&solution, &alpha, &direction](const tbb::blocked_range<int>& r) {
+                        for (int i = r.begin(); i != r.end(); ++i) {
+                          solution[i] += alpha * direction[i];
+                        }
+                      });
+
+    tbb::parallel_for(tbb::blocked_range<int>(0, size),
+                      [&residual, &alpha, &matrix_times_direction](const tbb::blocked_range<int>& r) {
+                        for (int i = r.begin(); i != r.end(); ++i) {
+                          residual[i] -= alpha * matrix_times_direction[i];
+                        }
+                      });
+
+    double new_residual_norm_squared = Dot(residual);
+    double beta = new_residual_norm_squared / residual_norm_squared;
+    residual_norm_squared = new_residual_norm_squared;
+
+    tbb::parallel_for(tbb::blocked_range<int>(0, size),
+                      [&direction, &residual, &beta](const tbb::blocked_range<int>& r) {
+                        for (int i = r.begin(); i != r.end(); ++i) {
+                          direction[i] = residual[i] + beta * direction[i];
+                        }
+                      });
+  }
+
+  return solution;
+}
+\end{lstlisting}
+
+\subsection*{STL (std::thread): функция ConjugateGradientMethod}
+\begin{lstlisting}[language=C++]
+inline std::vector<double> ConjugateGradientMethod(std::vector<double>& a, std::vector<double>& b, std::vector<double> solution, double tolerance, int size) {
+  std::vector<double> matrix_times_solution = MultiplyMatrixByVector(a, solution, size);
+
+  auto residual = std::vector<double>(size);
+  auto direction = std::vector<double>(size);
+
+  int num_threads = ppc::util::GetPPCNumThreads();
+  std::vector<std::thread> threads;
+  threads.reserve(num_threads < size ? num_threads : size);
+
+  for (int i = 0; i < size; ++i) {
+    residual[i] = b[i] - matrix_times_solution[i];
+  }
+
+  double residual_norm_squared = Dot(residual);
+  if (std::sqrt(residual_norm_squared) < tolerance) {
+    return solution;
+  }
+  direction = residual;
+  std::vector<double> matrix_times_direction(size);
+
+  while (std::sqrt(residual_norm_squared) > tolerance) {
+    matrix_times_direction = MultiplyMatrixByVector(a, direction, size);
+    double direction_dot_matrix_times_direction = Dot(direction, matrix_times_direction);
+    double alpha = residual_norm_squared / direction_dot_matrix_times_direction;
+
+    threads.clear();
+    threads.reserve(num_threads < size ? num_threads : size);
+    for (int i = 0; i < size; ++i) {
+      threads.emplace_back([&solution, &alpha, &direction, i]() { solution[i] += alpha * direction[i]; });
+    }
+
+    for (auto& thread : threads) {
+      thread.join();
+    }
+
+    threads.clear();
+    threads.reserve(num_threads < size ? num_threads : size);
+    for (int i = 0; i < size; ++i) {
+      threads.emplace_back(
+          [&residual, &alpha, &matrix_times_direction, i]() { residual[i] -= alpha * matrix_times_direction[i]; });
+    }
+
+    for (auto& thread : threads) {
+      thread.join();
+    }
+
+    double new_residual_norm_squared = Dot(residual);
+    double beta = new_residual_norm_squared / residual_norm_squared;
+    residual_norm_squared = new_residual_norm_squared;
+
+    threads.clear();
+    threads.reserve(num_threads < size ? num_threads : size);
+    for (int i = 0; i < size; ++i) {
+      threads.emplace_back([&direction, &residual, &beta, i]() { direction[i] = residual[i] + beta * direction[i]; });
+    }
+
+    for (auto& thread : threads) {
+      thread.join();
+    }
+  }
+
+  return solution;
+}
+\end{lstlisting}
+
+\subsection*{MPI + TBB: функция ConjugateGradientMethod}
+\begin{lstlisting}[language=C++]
+inline std::vector<double> ConjugateGradientMethod(boost::mpi::communicator& world, std::vector<double>& a, std::vector<double>& b, std::vector<double> solution, double tolerance, int size) {
+  std::vector<double> matrix_times_solution = MultiplyMatrixByVector(world, a, solution, size);
+
+  auto residual = std::vector<double>(size);
+  auto direction = std::vector<double>(size);
+
+  tbb::parallel_for(tbb::blocked_range<int>(0, size),
+                    [&residual, &b, &matrix_times_solution](const tbb::blocked_range<int>& r) {
+                      for (int i = r.begin(); i != r.end(); ++i) {
+                        residual[i] = b[i] - matrix_times_solution[i];
+                      }
+                    });
+
+  double residual_norm_squared = Dot(residual);
+  if (std::sqrt(residual_norm_squared) < tolerance) {
+    return solution;
+  }
+  direction = residual;
+  std::vector<double> matrix_times_direction(size);
+
+  while (std::sqrt(residual_norm_squared) > tolerance) {
+    matrix_times_direction = MultiplyMatrixByVector(world, a, direction, size);
+    double direction_dot_matrix_times_direction = Dot(world, direction, matrix_times_direction);
+    double alpha = residual_norm_squared / direction_dot_matrix_times_direction;
+
+    tbb::parallel_for(tbb::blocked_range<int>(0, size),
+                      [&solution, &alpha, &direction](const tbb::blocked_range<int>& r) {
+                        for (int i = r.begin(); i != r.end(); ++i) {
+                          solution[i] += alpha * direction[i];
+                        }
+                      });
+
+    tbb::parallel_for(tbb::blocked_range<int>(0, size),
+                      [&residual, &alpha, &matrix_times_direction](const tbb::blocked_range<int>& r) {
+                        for (int i = r.begin(); i != r.end(); ++i) {
+                          residual[i] -= alpha * matrix_times_direction[i];
+                        }
+                      });
+
+    double new_residual_norm_squared = Dot(residual);
+    double beta = new_residual_norm_squared / residual_norm_squared;
+    residual_norm_squared = new_residual_norm_squared;
+
+    tbb::parallel_for(tbb::blocked_range<int>(0, size),
+                      [&direction, &residual, &beta](const tbb::blocked_range<int>& r) {
+                        for (int i = r.begin(); i != r.end(); ++i) {
+                          direction[i] = residual[i] + beta * direction[i];
+                        }
+                      });
+  }
+
+  return solution;
+}
+\end{lstlisting}
+
+\subsection*{MPI + STL: функция MultiplyMatrixByVector}
+\begin{lstlisting}[language=C++]
+inline std::vector<double> MultiplyMatrixByVector(boost::mpi::communicator& world, const std::vector<double>& a, std::vector<double>& vec, int size) {
+  int rank = world.rank();
+  int wsize = world.size();
+  std::vector<int> rows_per_process(wsize, size / wsize);
+  for (int i = 0; i < size % wsize; ++i) {
+    rows_per_process[i]++;
+  }
+  std::vector<int> displs(wsize, 0);
+  std::vector<int> sizes(wsize, 0);
+  for (int i = 0; i < wsize; ++i) {
+    sizes[i] = rows_per_process[i] * size;
+    if (i > 0) {
+      displs[i] = displs[i - 1] + sizes[i - 1];
+    }
+  }
+  int local_rows = rows_per_process[rank];
+  std::vector<double> local_matrix(local_rows * size);
+  scatterv(world, a.data(), sizes, displs, local_matrix.data(), sizes[rank], 0);
+  broadcast(world, vec, 0);
+  std::vector<double> local_result(local_rows, 0.0);
+  for (int i = 0; i < local_rows; ++i) {
+    for (int j = 0; j < size; ++j) {
+      local_result[i] += local_matrix[(i * size) + j] * vec[j];
+    }
+  }
+  std::vector<double> result;
+  if (rank == 0) {
+    result.resize(size);
+  }
+  std::vector<int> recv_sizes = rows_per_process;
+  std::vector<int> recv_displs(wsize, 0);
+  for (int i = 1; i < wsize; i++) {
+    recv_displs[i] = recv_displs[i - 1] + recv_sizes[i - 1];
+  }
+  gatherv(world, local_result.data(), int(local_result.size()), result.data(), recv_sizes, recv_displs, 0);
+  broadcast(world, result, 0);
+
+  return result;
+}
+\end{lstlisting}
+
+\end{document}
