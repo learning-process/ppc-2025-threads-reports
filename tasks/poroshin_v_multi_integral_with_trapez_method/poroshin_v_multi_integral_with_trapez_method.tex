@@ -1,0 +1,1128 @@
+\documentclass[12pt]{article}
+
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+
+\usepackage{amsmath,amssymb}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{hyperref}
+\geometry{left=2cm,right=2cm,top=2cm,bottom=2cm}
+
+\lstset{
+  basicstyle=\small\ttfamily,
+  breaklines=true,
+  tabsize=2,
+  language=C++,
+  numbers=left,
+  numberstyle=\tiny
+}
+
+\begin{document}
+
+\begin{titlepage}
+    \begin{center}
+        \large 
+        \textbf{ННГУ им. Лобачевского / ИИТММ / ПМИ}\\[0.5cm]
+
+        \vspace{4cm}
+        \textbf{\Large Отчёт по выполнению задания}\\
+        \textbf{\large «Параллельное вычисление многомерных интегралов с использованием многошаговой схемы (метод трапеций)»}\\[3cm]
+
+        \vspace{3cm}
+        \textbf{Выполнил:}\\
+        студент группы 3822Б1ПМоп3 \\
+        \textit{Порошин Владислав Сергеевич}\\[1cm]
+
+        \textbf{Преподаватель:}\\
+        \textit{Сысоев Александр Владимирович, доцент}\\[2cm]
+
+        \vfill
+        \textbf{Нижний Новгород, 2025 г.}
+    \end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Введение}
+Вычисление многомерных интегралов является фундаментальной задачей вычислительной математики, имеющей широчайшее применение в физике (квантовая механика, статистическая физика), технике (анализ напряжений, электродинамика), экономике (оценка финансовых рисков) и многих других областях.
+
+\section{Цель и задачи}
+\subsection*{Цель работы}
+Реализовать и сравнить несколько версий параллельного алгоритма вычислений многомерных интегралов с использованием многошаговой схемы (метод трапеций): SEQ, OpenMP, TBB, STL Threads, MPI+OMP.
+
+\subsection*{Задачи}
+\begin{itemize}
+  \item Реализовать последовательный вариант алгоритма
+  \item Реализовать четыре параллельных варианта
+  \item Сравнить производительность и масштабируемость
+  \item Сделать выводы о наиболее эффективном подходе
+\end{itemize}
+
+\section{Математическая формулировка алгоритма вычислений многомерных интегралов с использованием многошаговой схемы (метод трапеций)}
+Пусть требуется вычислить $d$-мерный интеграл:
+\[
+I = \int_{a_1}^{b_1} \int_{a_2}^{b_2} \cdots \int_{a_d}^{b_d} f(\mathbf{x})  dx_1 dx_2 \cdots dx_d
+\]
+где $\mathbf{x} = (x_1, x_2, \dots, x_d)$.
+
+\subsection*{Шаг 1: Разбиение области}
+Для каждого измерения $k = 1, 2, \dots, d$:
+\begin{itemize}
+    \item Задаём число разбиений $n_k \geq 1$
+    \item Вычисляем шаг интегрирования:
+    \[
+    h_k = \frac{b_k - a_k}{n_k}
+    \]
+    \item Формируем сетку узлов:
+    \[
+    x_k^{(i_k)} = a_k + i_k \cdot h_k, \quad i_k = 0, 1, \dots, n_k
+    \]
+\end{itemize}
+
+\subsection*{Шаг 2: Определение весовых коэффициентов}
+Для каждой координатной оси $k$ вводим весовую функцию:
+\[
+w_k(i_k) = 
+\begin{cases} 
+\frac{1}{2} & \text{если } i_k = 0 \text{ или } i_k = n_k \\
+1 & \text{иначе}
+\end{cases}
+\]
+
+\subsection*{Шаг 3: Многомерная аппроксимация}
+Интеграл аппроксимируется составной формулой трапеций:
+\[
+I \approx T_d(f) = \prod_{k=1}^{d} h_k \cdot \sum_{i_1=0}^{n_1} \sum_{i_2=0}^{n_2} \cdots \sum_{i_d=0}^{n_d} 
+\left[ \prod_{k=1}^{d} w_k(i_k) \right] f\left(x_1^{(i_1)}, x_2^{(i_2)}, \dots, x_d^{(i_d)}\right)
+\]
+
+\subsection*{Упрощённая запись}
+Обозначим:
+\begin{align*}
+\mathbf{i} &= (i_1, i_2, \dots, i_d), \\
+w(\mathbf{i}) &= \prod_{k=1}^{d} w_k(i_k), \\
+\mathbf{x}^{(i)} &= \left( x_1^{(i_1)}, x_2^{(i_2)}, \dots, x_d^{(i_d)} \right)
+\end{align*}
+Тогда формула принимает компактный вид:
+\[
+\boxed{
+T_d(f) = \left( \prod_{k=1}^{d} h_k \right) \cdot \sum_{\mathbf{i}} w(\mathbf{i})  f(\mathbf{x}^{(\mathbf{i})})
+}
+\]
+где сумма берётся по всем мультииндексам $\mathbf{i} \in [0, n_1] \times [0, n_2] \times \cdots \times [0, n_d]$.
+
+\section{Общие функции и структура реализации}
+Во всех версиях алгоритма реализован единый интерфейс, включающий в себя следующие методы и вспомогательные функции.
+
+\subsection*{PreProcessingImpl()}
+Подготавливает входные данные. Извлекает параметры интегрирования - количество разбиений и границы по каждой размерности. Инициализирует аккумулятор результата, сами данные приводит к формату, удобному для обработки.
+
+\subsection*{ValidationImpl()}
+Проверяет корректность входных данных. Основные критерии: размер массива разбиений совпадает с размерностью пространства, массив разбиений не пуст, выходной буфер рассчитан только на 1 элемент (скалярный результат).
+
+\subsection*{RunImpl()}
+Основная логика запуска алгоритма. Включает вызов функции \texttt{CountMultiIntegralTrapezMethodStl}.
+
+\subsection*{PostProcessingImpl()}
+Формирует выходное значение в формате, ожидаемом системой. Переписывает результат из внутренней переменной в буфер \texttt{task\_data->outputs[0][0]}.
+
+\subsection*{CalculateData()}
+Реализует подготовительный этап для составной формулы трапеций, определяет: расстояние между соседними узлами сетки (вычисляет шаг), веса, размерность задачи и объем вычислений (число узлов).
+
+\subsection*{CountMultiIntegralTrapezMethodStl()}
+Реализует основной алгоритм вычислений многомерных интегралов с использованием многошаговой схемы (метод трапеций). Описание принципа работы алгоритма приводилось выше.
+
+\section{Описание реализаций}
+
+\subsection{Последовательная реализация (SEQ)}
+\subsubsection*{Особенности}
+\begin{itemize}
+  \item Используется простая вышеописанная реализация.
+\end{itemize}
+
+\subsection{OpenMP реализация}
+\subsection*{Общая структура}
+Алгоритм использует распараллеливание с помощью директивы OpenMP для ускорения расчетов. Основные этапы:
+
+\begin{enumerate}
+    \item \textbf{Разделение работы:}
+    \begin{itemize}
+        \item Весь диапазон узлов сетки делится на равные блоки (chunks)
+        \item Каждый поток получает свой блок узлов для обработки
+        \item Используется статическое распределение: блоки назначаются потокам заранее
+    \end{itemize}
+    
+    \item \textbf{Вычисления в потоке:}
+    Каждый поток для своего блока узлов:
+    \begin{itemize}
+        \item Преобразует линейные индексы в многомерные координаты
+        \item Вычисляет значения функции в этих точках
+        \item Умножает на весовые коэффициенты
+        \item Суммирует результаты в локальную переменную \texttt{local\_integral}
+    \end{itemize}
+    
+    \item \textbf{Расчет локального объема:}
+    \begin{itemize}
+        \item Определяет долю обработанных точек: $\frac{\text{точек в блоке}}{\text{всего точек}}$
+        \item Вычисляет локальный объем: $\text{доля} \times \prod h_k$
+    \end{itemize}
+    
+    \item \textbf{Объединение результатов:}
+    \begin{itemize}
+        \item После завершения всех потоков выполняется редукция (суммирование):
+        \[
+        \text{integral} = \sum_{\text{потоки}} \text{local\_integral}
+        \]
+        \[
+        \text{volume} = \sum_{\text{потоки}} \text{local\_volume}
+        \]
+        \item Итоговый результат: $\text{res\_} = \text{integral} \times \text{volume}$
+    \end{itemize}
+\end{enumerate}
+
+\subsection*{Особенности}
+\begin{itemize}
+    \item Простая реализация многопоточности
+    \item Автоматическая балансировка нагрузки
+    \item Автоматическое управление распределением итераций
+    \item Статическое распределение минимизирует накладные расходы
+\end{itemize}
+
+\subsection{MPI + OMP реализация}
+\subsubsection*{Общая структура}
+Реализация использует гибридный подход:
+\begin{itemize}
+  \item \textbf{MPI} для распределения вычислений между узлами (распараллеливание по измерениям)
+  \item \textbf{OpenMP} для параллелизации внутри узла (распараллеливание по точкам сетки)
+  \item Метод трапеций для численного интегрирования в $N$-мерном пространстве
+\end{itemize}
+
+\subsubsection*{Функция \texttt{RunImpl} (MPI-уровень)}
+\begin{itemize}
+  \item \textbf{Назначение}: Организация распределённых вычислений
+  \item \textbf{Алгоритм}:
+  \begin{enumerate}
+    \item Корневой процесс (rank=0) определяет разбиение первой размерности
+    \item Распределение параметров (пределов, шагов) через \texttt{boost::mpi::broadcast}
+    \item Каждый процесс вычисляет локальный интеграл для своей подобласти
+    \item Редукция результатов на корневой процесс с помощью \texttt{boost::mpi::reduce}
+  \end{enumerate}
+  \item \textbf{Оптимизации}: Динамическое распределение нагрузки с учётом остатка
+\end{itemize}
+
+\subsubsection*{Функция \texttt{CountMultiIntegralTrapezMethodAll} (OpenMP-уровень)}
+\begin{itemize}
+  \item \textbf{Назначение}: Вычисление интеграла на локальной подобласти
+  \item \textbf{Алгоритм}:
+  \begin{enumerate}
+    \item Параллельное вычисление шагов интегрирования (\texttt{\#pragma omp parallel for})
+    \item Генерация весовых коэффициентов для правила трапеций
+    \item Параллельный обход $N$-мерной сетки с редукцией (\texttt{\#pragma omp parallel reduction})
+    \item Вычисление итогового значения через произведение частичных результатов
+  \end{enumerate}
+  \item \textbf{Оптимизации}:
+  \begin{itemize}
+    \item Линеаризация многомерного индекса
+    \item Статическое распределение нагрузки
+    \item Локальность данных для потоков
+  \end{itemize}
+\end{itemize}
+
+\subsubsection*{Особенности}
+\begin{itemize}
+  \item MPI-процессы работают на разных подобластях первой размерности
+  \item Внутри каждого MPI-процесса OpenMP параллелизует вычисления по сетке
+  \item Иерархия параллелизма максимизирует использование ресурсов
+\end{itemize}
+
+\subsection{TBB реализация}
+\subsubsection*{Общая структура}
+\begin{itemize}
+  \item \textbf{Расчёт шагов интегрирования}:
+  \begin{itemize}
+    \item Использование \texttt{tbb::parallel\_for} для параллельного вычисления шагов $h_i$ по всем измерениям
+    \item Каждый поток обрабатывает блок измерений из диапазона \texttt{blocked\_range}
+  \end{itemize}
+  
+  \item \textbf{Генерация весовых коэффициентов}:
+  \begin{itemize}
+    \item Параллельное создание векторов весов для правила трапеций через \texttt{tbb::parallel\_for}
+    \item Веса рассчитываются независимо для каждого измерения
+  \end{itemize}
+  
+  \item \textbf{Вычисление интегральной суммы}:
+  \begin{itemize}
+    \item Применение \texttt{tbb::parallel\_reduce} для обхода всех точек $N$-мерной сетки
+    \item Линеаризация многомерного индекса и расчёт вклада каждой точки
+    \item Редукция частичных сумм с операцией \texttt{std::plus<>}
+  \end{itemize}
+  
+  \item \textbf{Вычисление объёма ячейки}:
+  \begin{itemize}
+    \item Параллельное перемножение шагов интегрирования через \texttt{tbb::parallel\_reduce}
+    \item Редукция с операцией \texttt{std::multiplies<>}
+  \end{itemize}
+  
+  \item \textbf{Финальный результат}: $res = \text{integral} \times \text{volume}$
+\end{itemize}
+
+\subsubsection*{Особенности реализации}
+\begin{itemize}
+  \item Автоматическая балансировка нагрузки через work-stealing алгоритм TBB
+  \item Оптимальное использование кэша благодаря блокирующим диапазонам (\texttt{blocked\_range})
+  \item Минимизация накладных расходов за счёт комбинирования операций map и reduce
+  \item Типобезопасные операции редукции через стандартные функторы
+\end{itemize}
+
+\subsubsection*{Преимущества подхода}
+\begin{itemize}
+  \item Автоматическое распределение итераций между потоками
+  \item Эффективная обработка нерегулярных вычислительных нагрузок
+  \item Масштабируемость на произвольное число ядер
+  \item Упрощённое управление памятью по сравнению с ручной реализацией потоков
+\end{itemize}
+
+\subsection{STL threads реализация}
+\subsubsection*{Общая структура}
+\begin{itemize}
+  \item \textbf{Подготовка данных}:
+  \begin{itemize}
+    \item Последовательный расчёт шагов интегрирования $h_i$ и весовых коэффициентов
+    \item Вычисление общего количества точек сетки
+  \end{itemize}
+  
+  \item \textbf{Распределение работы}:
+  \begin{itemize}
+    \item Статическое разбиение точек сетки на блоки (chunks)
+    \item Создание пула потоков \texttt{std::thread} по числу ядер
+  \end{itemize}
+  
+  \item \textbf{Параллельное вычисление}:
+  \begin{itemize}
+    \item Каждый поток обрабатывает свой диапазон точек
+    \item Вычисление частичной интегральной суммы и доли объёма
+    \item Линеаризация многомерных индексов
+  \end{itemize}
+  
+  \item \textbf{Сбор результатов}:
+  \begin{itemize}
+    \item Синхронизация потоков через \texttt{thread.join()}
+    \item Суммирование частичных интегралов и объёмов
+    \item Итоговый расчёт: $res = \text{integral} \times \text{volume}$
+  \end{itemize}
+\end{itemize}
+
+\subsubsection*{Особенности реализации}
+\begin{itemize}
+  \item Ручное управление потоками через \texttt{std::thread}
+  \item Статическая балансировка нагрузки (равномерное распределение точек)
+  \item Явная синхронизация с использованием \texttt{join()}
+  \item Хранение результатов потоков в разделяемом векторе \texttt{thread\_results}
+\end{itemize}
+
+\subsubsection*{Преимущества}
+\begin{itemize}
+  \item Полный контроль над созданием и управлением потоками
+  \item Минимальные зависимости (только стандартная библиотека C++)
+  \item Прозрачная модель выполнения
+  \item Эффективность для детерминированных нагрузок
+\end{itemize}
+
+\section{Результаты экспериментов}
+\subsection*{Конфигурация системы}
+\begin{itemize}
+  \item CPU: Intel Core i5 13400F
+  \item RAM: 32 GB DDR5 4800 Hz
+  \item ОС: Windows 10 Pro
+  \item Потоки: 4
+  \item Процессы: 4
+\end{itemize}
+
+\subsection*{Тестовые параметры интегрирования}
+\begin{itemize}
+  \item \textbf{Интегрируемая функция}:
+  \[
+  f(x, y, z) = \sin(x) \cdot \tan(y) \cdot \ln(z)
+  \]
+  
+  \item \textbf{Пределы интегрирования}:
+  \begin{align*}
+  x & \in [0.8, 1.0] \\
+  y & \in [1.9, 2.0] \\
+  z & \in [2.9, 3.0]
+  \end{align*}
+  
+  \item \textbf{Числа разбиений по осям}:
+  \[
+  n_x = n_y = n_z = 220
+  \]
+  
+  \item \textbf{Общее количество точек}:
+  \[
+  N_{\text{total}} = 221 \times 221 \times 221 = 10793861
+  \]
+  \item \textbf{Метод проверки}:
+  \begin{itemize}
+    \item Использование макроса \texttt{ASSERT\_NEAR} из тестовых фреймворков
+    \item Сравнение вычисленного результата $I_{\text{calc}}$ с эталоном $I_{\text{ref}}$
+    \item Проверка в пределах заданной точности $\epsilon$
+  \end{itemize}
+\end{itemize}
+
+\subsection*{Производительность}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Реализация} & \textbf{Pipeline (ms)} & \textbf{Task (ms)} \\
+\hline
+SEQ       & 2956 & 2938 \\
+OMP       & 873 & 814 \\
+TBB       & 917 & 849 \\
+STL       & 950 & 912 \\
+MPI+OMP   & 307 & \textbf{292} \\
+\hline
+\end{tabular}
+
+\subsection*{Ускорение}
+\[
+S_{\text{OMP}} = \frac{2956}{873} \approx 3.38, \quad
+S_{\text{TBB}} = \frac{2956}{917} \approx 3.22, \quad
+S_{\text{STL}} = \frac{2956}{950} \approx 3.11, \quad
+S_{\text{MPI+OMP}} = \frac{2956}{292} \approx 10.12
+\]
+
+\section{Выводы}
+\begin{itemize}
+  \item MPI+OMP показала наилучшее ускорение благодаря двухуровневой параллелизации
+  \item STL Threads требует больше кода, но даёт контроль
+  \item TBB и OpenMP обеспечивают простоту и масштабируемость
+\end{itemize}
+
+\section*{Список литературы}
+\begin{enumerate}
+  \item OpenMP Architecture Review Board. OpenMP API Specification for Parallel Programming. \url{https://www.openmp.org/}
+  \item Intel. Threading Building Blocks. \url{https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html}
+  \item Boost C++ Libraries. Boost.MPI. \url{https://www.boost.org/doc/libs/release/doc/html/mpi.html}
+  \item В.П. Гергель. «Теория и практика параллельных вычислений». М.: Интернет-Университет, 2007.
+  \item Материалы лекций и лабораторных работ кафедры ВВСП, ННГУ им. Лобачевского
+\end{enumerate}
+
+\newpage
+\appendix
+\section*{Приложение: Исходные коды реализаций}
+\subsection*{SEQ}
+\begin{lstlisting}
+#pragma once
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "core/task/include/task.hpp"
+
+namespace poroshin_v_multi_integral_with_trapez_method_seq {
+
+class TestTaskSequential : public ppc::core::Task {
+ public:
+  explicit TestTaskSequential(std::shared_ptr<ppc::core::TaskData> &task_data,
+                              std::function<double(std::vector<double> &args)> func)
+      : Task(task_data), dim_(task_data->inputs_count[0]), func_(std::move(func)) {}
+  bool PreProcessingImpl() override;
+  bool ValidationImpl() override;
+  bool RunImpl() override;
+  bool PostProcessingImpl() override;
+
+ private:
+  void CountMultiIntegralTrapezMethodSeq();
+  std::vector<std::pair<double, double>> limits_;
+  size_t dim_;
+  std::function<double(std::vector<double> &args)> func_;
+  std::vector<int> n_;
+  double res_{};
+};
+
+}  // namespace poroshin_v_multi_integral_with_trapez_method_seq
+
+#include "seq/poroshin_v_multi_integral_with_trapez_method/include/ops_seq.hpp"
+
+#include <cstddef>
+#include <vector>
+
+void poroshin_v_multi_integral_with_trapez_method_seq::TestTaskSequential::CountMultiIntegralTrapezMethodSeq() {
+  int dimensions = static_cast<int>(limits_.size());
+  std::vector<double> h(dimensions);
+  for (int i = 0; i < dimensions; ++i) {
+    h[i] = (limits_[i].second - limits_[i].first) / n_[i];
+  }
+
+  double integral = 0.0;
+  std::vector<double> vars(dimensions);
+
+  std::vector<int> indices(dimensions, 0);
+  int flag = 1;
+  while (flag == 1) {
+    for (int i = 0; i < dimensions; ++i) {
+      vars[i] = limits_[i].first + indices[i] * h[i];
+    }
+
+    double weight = 1.0;
+    for (int i = 0; i < dimensions; ++i) {
+      weight *= (indices[i] == 0 || indices[i] == n_[i]) ? 0.5 : 1.0;
+    }
+    integral += func_(vars) * weight;
+
+    int dim = 0;
+    while (dim < dimensions) {
+      indices[dim]++;
+      if (indices[dim] <= n_[dim]) {
+        break;
+      }
+      indices[dim] = 0;
+      dim++;
+      if (dim == dimensions) {
+        flag = 0;
+        break;
+      }
+    }
+  }
+
+  double volume = 1.0;
+  for (int i = 0; i < dimensions; ++i) {
+    volume *= h[i];
+  }
+
+  res_ = integral * volume;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_seq::TestTaskSequential::PreProcessingImpl() {
+  n_.resize(dim_);
+  limits_.resize(dim_);
+  for (size_t i = 0; i < dim_; i++) {
+    n_[i] = reinterpret_cast<int *>(task_data->inputs[0])[i];
+    limits_[i].first = reinterpret_cast<double *>(task_data->inputs[1])[i];
+    limits_[i].second = reinterpret_cast<double *>(task_data->inputs[2])[i];
+  }
+  res_ = 0;
+  return true;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_seq::TestTaskSequential::ValidationImpl() {
+  return (task_data->inputs_count[0] > 0 && task_data->outputs_count[0] == 1 && task_data->inputs_count[0] == dim_);
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_seq::TestTaskSequential::RunImpl() {
+  CountMultiIntegralTrapezMethodSeq();
+  return true;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_seq::TestTaskSequential::PostProcessingImpl() {
+  reinterpret_cast<double *>(task_data->outputs[0])[0] = res_;
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{OpenMP}
+\begin{lstlisting}
+#pragma once
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "core/task/include/task.hpp"
+
+namespace poroshin_v_multi_integral_with_trapez_method_omp {
+
+class TestTaskOpenMP : public ppc::core::Task {
+ public:
+  explicit TestTaskOpenMP(std::shared_ptr<ppc::core::TaskData> &task_data,
+                          std::function<double(std::vector<double> &args)> func)
+      : Task(task_data), dim_(task_data->inputs_count[0]), func_(std::move(func)) {}
+  bool PreProcessingImpl() override;
+  bool ValidationImpl() override;
+  bool RunImpl() override;
+  bool PostProcessingImpl() override;
+
+ private:
+  void CountMultiIntegralTrapezMethodOmp();
+  std::vector<std::pair<double, double>> limits_;
+  size_t dim_;
+  std::function<double(std::vector<double> &args)> func_;
+  std::vector<int> n_;
+  double res_{};
+};
+
+}  // namespace poroshin_v_multi_integral_with_trapez_method_omp
+
+#include "omp/poroshin_v_multi_integral_with_trapez_method/include/ops_omp.hpp"
+
+#include <omp.h>
+
+#include <cmath>
+#include <cstddef>
+#include <functional>
+#include <vector>
+
+void poroshin_v_multi_integral_with_trapez_method_omp::TestTaskOpenMP::CountMultiIntegralTrapezMethodOmp() {
+  const int dimensions = static_cast<int>(limits_.size());
+  std::vector<double> h(dimensions);
+
+#pragma omp parallel for schedule(static)
+  for (int i = 0; i < dimensions; ++i) {
+    h[i] = (limits_[i].second - limits_[i].first) / n_[i];
+  }
+
+  std::vector<std::vector<double>> weights(dimensions);
+#pragma omp parallel for schedule(static)
+  for (int i = 0; i < dimensions; ++i) {
+    weights[i].resize(n_[i] + 1);
+    for (int j = 0; j <= n_[i]; ++j) {
+      weights[i][j] = (j == 0 || j == n_[i]) ? 0.5 : 1.0;
+    }
+  }
+
+  double integral = 0.0;
+
+#pragma omp parallel reduction(+ : integral)
+{
+    std::vector<double> vars(dimensions);
+    std::vector<int> indices(dimensions, 0);
+
+    int total_points = 1;
+    for (int n : n_) {
+      total_points *= (n + 1);
+    }
+
+#pragma omp for schedule(static)
+    for (int linear_idx = 0; linear_idx < total_points; ++linear_idx) {
+      int idx = linear_idx;
+      for (int dim = dimensions - 1; dim >= 0; --dim) {
+        indices[dim] = idx % (n_[dim] + 1);
+        idx /= (n_[dim] + 1);
+      }
+
+      double weight = 1.0;
+      for (int dim = 0; dim < dimensions; ++dim) {
+        vars[dim] = limits_[dim].first + indices[dim] * h[dim];
+        weight *= weights[dim][indices[dim]];
+      }
+
+      integral += func_(vars) * weight;
+    }
+  }
+
+  double volume = 1.0;
+#pragma omp parallel for reduction(* : volume)
+  for (int i = 0; i < dimensions; ++i) {
+    volume *= h[i];
+  }
+
+  res_ = integral * volume;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_omp::TestTaskOpenMP::PreProcessingImpl() {
+  n_.resize(dim_);
+  limits_.resize(dim_);
+  for (size_t i = 0; i < dim_; i++) {
+    n_[i] = reinterpret_cast<int *>(task_data->inputs[0])[i];
+    limits_[i].first = reinterpret_cast<double *>(task_data->inputs[1])[i];
+    limits_[i].second = reinterpret_cast<double *>(task_data->inputs[2])[i];
+  }
+  res_ = 0;
+  return true;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_omp::TestTaskOpenMP::ValidationImpl() {
+  return (task_data->inputs_count[0] > 0 && task_data->outputs_count[0] == 1 && task_data->inputs_count[0] == dim_);
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_omp::TestTaskOpenMP::RunImpl() {
+  CountMultiIntegralTrapezMethodOmp();
+  return true;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_omp::TestTaskOpenMP::PostProcessingImpl() {
+  reinterpret_cast<double *>(task_data->outputs[0])[0] = res_;
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{TBB}
+\begin{lstlisting}
+#pragma once
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "core/task/include/task.hpp"
+
+namespace poroshin_v_multi_integral_with_trapez_method_tbb {
+
+class TestTaskTBB : public ppc::core::Task {
+ public:
+  explicit TestTaskTBB(std::shared_ptr<ppc::core::TaskData> &task_data,
+                       std::function<double(std::vector<double> &args)> func)
+      : Task(task_data), dim_(task_data->inputs_count[0]), func_(std::move(func)) {}
+  bool PreProcessingImpl() override;
+  bool ValidationImpl() override;
+  bool RunImpl() override;
+  bool PostProcessingImpl() override;
+
+ private:
+  void CountMultiIntegralTrapezMethodTbb();
+  std::vector<std::pair<double, double>> limits_;
+  size_t dim_;
+  std::function<double(std::vector<double> &args)> func_;
+  std::vector<int> n_;
+  double res_{};
+};
+
+}  // namespace poroshin_v_multi_integral_with_trapez_method_tbb
+
+#include "tbb/poroshin_v_multi_integral_with_trapez_method/include/ops_tbb.hpp"
+
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/parallel_reduce.h>
+
+#include <cmath>
+#include <cstddef>
+#include <functional>
+#include <vector>
+
+void poroshin_v_multi_integral_with_trapez_method_tbb::TestTaskTBB::CountMultiIntegralTrapezMethodTbb() {
+  const int dimensions = static_cast<int>(limits_.size());
+  std::vector<double> h(dimensions);
+
+  tbb::parallel_for(tbb::blocked_range<int>(0, dimensions), [&](const tbb::blocked_range<int>& range) {
+    for (int i = range.begin(); i != range.end(); ++i) {
+      h[i] = (limits_[i].second - limits_[i].first) / n_[i];
+    }
+  });
+
+  std::vector<std::vector<double>> weights(dimensions);
+  tbb::parallel_for(tbb::blocked_range<int>(0, dimensions), [&](const tbb::blocked_range<int>& range) {
+    for (int i = range.begin(); i != range.end(); ++i) {
+      weights[i].resize(n_[i] + 1);
+      for (int j = 0; j <= n_[i]; ++j) {
+        weights[i][j] = (j == 0 || j == n_[i]) ? 0.5 : 1.0;
+      }
+    }
+  });
+
+  double integral = tbb::parallel_reduce(
+      tbb::blocked_range<int>(0,
+                              [&]() {
+                                int total_points = 1;
+                                for (int n : n_) {
+                                  total_points *= (n + 1);
+                                }
+                                return total_points;
+                              }()),
+      0.0,
+      [&](const tbb::blocked_range<int>& range, double local_integral) {
+        std::vector<double> vars(dimensions);
+        std::vector<int> indices(dimensions, 0);
+
+        for (int linear_idx = range.begin(); linear_idx != range.end(); ++linear_idx) {
+          int idx = linear_idx;
+          for (int dim = dimensions - 1; dim >= 0; --dim) {
+            indices[dim] = idx % (n_[dim] + 1);
+            idx /= (n_[dim] + 1);
+          }
+
+          double weight = 1.0;
+          for (int dim = 0; dim < dimensions; ++dim) {
+            vars[dim] = limits_[dim].first + indices[dim] * h[dim];
+            weight *= weights[dim][indices[dim]];
+          }
+
+          local_integral += func_(vars) * weight;
+        }
+        return local_integral;
+      },
+      std::plus<>());
+
+  double volume = tbb::parallel_reduce(
+      tbb::blocked_range<int>(0, dimensions), 1.0,
+      [&](const tbb::blocked_range<int>& range, double local_volume) {
+        for (int i = range.begin(); i != range.end(); ++i) {
+          local_volume *= h[i];
+        }
+        return local_volume;
+      },
+      std::multiplies<>());
+
+  res_ = integral * volume;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_tbb::TestTaskTBB::PreProcessingImpl() {
+  n_.resize(dim_);
+  limits_.resize(dim_);
+  for (size_t i = 0; i < dim_; i++) {
+    n_[i] = reinterpret_cast<int*>(task_data->inputs[0])[i];
+    limits_[i].first = reinterpret_cast<double*>(task_data->inputs[1])[i];
+    limits_[i].second = reinterpret_cast<double*>(task_data->inputs[2])[i];
+  }
+  res_ = 0;
+  return true;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_tbb::TestTaskTBB::ValidationImpl() {
+  return (task_data->inputs_count[0] > 0 && task_data->outputs_count[0] == 1 && task_data->inputs_count[0] == dim_);
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_tbb::TestTaskTBB::RunImpl() {
+  CountMultiIntegralTrapezMethodTbb();
+  return true;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_tbb::TestTaskTBB::PostProcessingImpl() {
+  reinterpret_cast<double*>(task_data->outputs[0])[0] = res_;
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{STL}
+\begin{lstlisting}
+#pragma once
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "core/task/include/task.hpp"
+
+namespace poroshin_v_multi_integral_with_trapez_method_stl {
+
+class TestTaskSTL : public ppc::core::Task {
+ public:
+  explicit TestTaskSTL(std::shared_ptr<ppc::core::TaskData>& task_data,
+                       std::function<double(std::vector<double>& args)> func)
+      : Task(task_data), dim_(task_data->inputs_count[0]), func_(std::move(func)) {}
+  bool PreProcessingImpl() override;
+  bool ValidationImpl() override;
+  bool RunImpl() override;
+  bool PostProcessingImpl() override;
+
+ private:
+  void CountMultiIntegralTrapezMethodStl();
+  void CalculateData(std::vector<double>& h, std::vector<std::vector<double>>& weights, int& total_points,
+                     const int& dimensions);
+  std::vector<std::pair<double, double>> limits_;
+  size_t dim_;
+  std::function<double(std::vector<double>& args)> func_;
+  std::vector<int> n_;
+  double res_{};
+};
+
+}  // namespace poroshin_v_multi_integral_with_trapez_method_stl
+
+#include "stl/poroshin_v_multi_integral_with_trapez_method/include/ops_stl.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <functional>
+#include <thread>
+#include <utility>
+#include <vector>
+
+#include "core/util/include/util.hpp"
+
+void poroshin_v_multi_integral_with_trapez_method_stl::TestTaskSTL::CalculateData(
+    std::vector<double>& h, std::vector<std::vector<double>>& weights, int& total_points, const int& dimensions) {
+  for (int i = 0; i < dimensions; ++i) {
+    h[i] = (limits_[i].second - limits_[i].first) / n_[i];
+
+    total_points *= (n_[i] + 1);
+
+    weights[i].resize(n_[i] + 1);
+    for (int j = 0; j <= n_[i]; ++j) {
+      weights[i][j] = (j == 0 || j == n_[i]) ? 0.5 : 1.0;
+    }
+  }
+}
+
+void poroshin_v_multi_integral_with_trapez_method_stl::TestTaskSTL::CountMultiIntegralTrapezMethodStl() {
+  const int dimensions = static_cast<int>(limits_.size());
+  const int num_threads = ppc::util::GetPPCNumThreads();
+  std::vector<double> h(dimensions);
+  std::vector<std::vector<double>> weights(dimensions);
+  int total_points = 1;
+  CalculateData(h, weights, total_points, dimensions);
+  std::vector<std::pair<double, double>> thread_results(num_threads, {0.0, 0.0});
+  std::vector<std::thread> threads;
+  threads.reserve(num_threads);
+
+  const int chunk_size = (total_points + num_threads - 1) / num_threads;
+
+  for (int i = 0; i < num_threads; ++i) {
+    int start = i * chunk_size;
+    int end = std::min(start + chunk_size, total_points);
+
+    if (start < end) {
+      threads.emplace_back([this, dimensions, start, end, &h, &weights, total_points, &thread_results, i]() {
+        double local_integral = 0.0;
+        std::vector<double> vars(dimensions);
+        std::vector<int> indices(dimensions, 0);
+
+        for (int linear_idx = start; linear_idx < end; ++linear_idx) {
+          int idx = linear_idx;
+          for (int dim = dimensions - 1; dim >= 0; --dim) {
+            indices[dim] = idx % (n_[dim] + 1);
+            idx /= (n_[dim] + 1);
+          }
+
+          double weight = 1.0;
+          for (int dim = 0; dim < dimensions; ++dim) {
+            vars[dim] = limits_[dim].first + indices[dim] * h[dim];
+            weight *= weights[dim][indices[dim]];
+          }
+
+          local_integral += func_(vars) * weight;
+        }
+
+        double chunk_fraction = static_cast<double>(end - start) / total_points;
+        double local_volume = chunk_fraction;
+        for (double hi : h) {
+          local_volume *= hi;
+        }
+
+        thread_results[i] = {local_integral, local_volume};
+      });
+    }
+  }
+
+  for (auto& thread : threads) {
+    thread.join();
+  }
+
+  double integral = 0.0;
+  double volume = 0.0;
+  for (const auto& result : thread_results) {
+    integral += result.first;
+    volume += result.second;
+  }
+
+  res_ = integral * volume;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_stl::TestTaskSTL::PreProcessingImpl() {
+  n_.resize(dim_);
+  limits_.resize(dim_);
+  for (size_t i = 0; i < dim_; i++) {
+    n_[i] = reinterpret_cast<int*>(task_data->inputs[0])[i];
+    limits_[i].first = reinterpret_cast<double*>(task_data->inputs[1])[i];
+    limits_[i].second = reinterpret_cast<double*>(task_data->inputs[2])[i];
+  }
+  res_ = 0;
+  return true;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_stl::TestTaskSTL::ValidationImpl() {
+  return (task_data->inputs_count[0] > 0 && task_data->outputs_count[0] == 1 && task_data->inputs_count[0] == dim_);
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_stl::TestTaskSTL::RunImpl() {
+  CountMultiIntegralTrapezMethodStl();
+  return true;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_stl::TestTaskSTL::PostProcessingImpl() {
+  reinterpret_cast<double*>(task_data->outputs[0])[0] = res_;
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{MPI + OMP}
+\begin{lstlisting}
+#pragma once
+
+#include <boost/mpi/collectives.hpp>
+#include <boost/mpi/communicator.hpp>
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "core/task/include/task.hpp"
+
+namespace poroshin_v_multi_integral_with_trapez_method_all {
+
+class TestTaskALL : public ppc::core::Task {
+ public:
+  explicit TestTaskALL(std::shared_ptr<ppc::core::TaskData> &task_data,
+                       std::function<double(std::vector<double> &args)> func)
+      : Task(std::move(task_data)), func_(std::move(func)) {}
+  bool PreProcessingImpl() override;
+  bool ValidationImpl() override;
+  bool RunImpl() override;
+  bool PostProcessingImpl() override;
+
+ private:
+  void CountMultiIntegralTrapezMethodAll(double &res);
+  std::vector<std::pair<double, double>> limits_;
+  size_t dim_{};
+  std::function<double(std::vector<double> &args)> func_;
+  std::vector<int> n_;
+  double res_{};
+  boost::mpi::communicator world_;
+};
+
+}  // namespace poroshin_v_multi_integral_with_trapez_method_all
+
+#include "all/poroshin_v_multi_integral_with_trapez_method/include/ops_all.hpp"
+
+#include <omp.h>
+
+#include <boost/serialization/utility.hpp>  // NOLINT(misc-include-cleaner)
+#include <cmath>
+#include <cstddef>
+#include <functional>
+#include <vector>
+
+#include "boost/mpi/collectives/broadcast.hpp"
+#include "boost/mpi/collectives/reduce.hpp"
+
+void poroshin_v_multi_integral_with_trapez_method_all::TestTaskALL::CountMultiIntegralTrapezMethodAll(double &res) {
+  const int dimensions = static_cast<int>(limits_.size());
+  std::vector<double> h(dimensions);
+
+#pragma omp parallel for schedule(static)
+  for (int i = 0; i < dimensions; ++i) {
+    h[i] = (limits_[i].second - limits_[i].first) / n_[i];
+  }
+
+  std::vector<std::vector<double>> weights(dimensions);
+#pragma omp parallel for schedule(static)
+  for (int i = 0; i < dimensions; ++i) {
+    weights[i].resize(n_[i] + 1);
+    for (int j = 0; j <= n_[i]; ++j) {
+      weights[i][j] = (j == 0 || j == n_[i]) ? 0.5 : 1.0;
+    }
+  }
+
+  double integral = 0.0;
+
+#pragma omp parallel reduction(+ : integral)
+  {
+    std::vector<double> vars(dimensions);
+    std::vector<int> indices(dimensions, 0);
+
+    int total_points = 1;
+    for (int n : n_) {
+      total_points *= (n + 1);
+    }
+
+#pragma omp for schedule(static)
+    for (int linear_idx = 0; linear_idx < total_points; ++linear_idx) {
+      int idx = linear_idx;
+      for (int dim = dimensions - 1; dim >= 0; --dim) {
+        indices[dim] = idx % (n_[dim] + 1);
+        idx /= (n_[dim] + 1);
+      }
+
+      double weight = 1.0;
+      for (int dim = 0; dim < dimensions; ++dim) {
+        vars[dim] = limits_[dim].first + indices[dim] * h[dim];
+        weight *= weights[dim][indices[dim]];
+      }
+
+      integral += func_(vars) * weight;
+    }
+  }
+
+  double volume = 1.0;
+#pragma omp parallel for reduction(* : volume)
+  for (int i = 0; i < dimensions; ++i) {
+    volume *= h[i];
+  }
+
+  res = integral * volume;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_all::TestTaskALL::PreProcessingImpl() {
+  if (world_.rank() == 0) {
+    dim_ = task_data->inputs_count[0];
+    n_.resize(dim_);
+    limits_.resize(dim_);
+    for (size_t i = 0; i < dim_; i++) {
+      n_[i] = reinterpret_cast<int *>(task_data->inputs[0])[i];
+      limits_[i].first = reinterpret_cast<double *>(task_data->inputs[1])[i];
+      limits_[i].second = reinterpret_cast<double *>(task_data->inputs[2])[i];
+    }
+    res_ = 0;
+  }
+  return true;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_all::TestTaskALL::ValidationImpl() {
+  if (world_.rank() == 0) {
+    return (task_data->inputs_count[0] > 0 && task_data->outputs_count[0] == 1);
+  }
+  return true;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_all::TestTaskALL::RunImpl() {
+  size_t len = 0;
+  double step = 0;
+  int delta = 0;
+  int last = 0;
+  double res = 0;
+  if (world_.rank() == 0) {
+    if ((n_[0] % world_.size()) == 0) {
+      delta = n_[0] / world_.size();
+      last = delta;
+    } else {
+      delta = n_[0] / world_.size();
+      last = delta + n_[0] % world_.size();
+    }
+    step = (limits_[0].second - limits_[0].first) / static_cast<double>(n_[0]);
+    len = dim_;
+  }
+  boost::mpi::broadcast(world_, step, 0);
+  boost::mpi::broadcast(world_, delta, 0);
+  boost::mpi::broadcast(world_, last, 0);
+  boost::mpi::broadcast(world_, len, 0);
+  if (world_.rank() != 0) {
+    limits_.resize(len);
+    n_.resize(len);
+  }
+  boost::mpi::broadcast(world_, limits_.data(), static_cast<int>(len), 0);
+  boost::mpi::broadcast(world_, n_.data(), static_cast<int>(len), 0);
+  if (world_.rank() == world_.size() - 1) {
+    n_[0] = last;
+    limits_[0].first += world_.rank() * step * delta;
+  } else {
+    n_[0] = delta;
+    limits_[0].first += world_.rank() * step * delta;
+    limits_[0].second = limits_[0].first + step * delta;
+  }
+  CountMultiIntegralTrapezMethodAll(res);
+  boost::mpi::reduce(world_, res, res_, std::plus<>(), 0);
+  return true;
+}
+
+bool poroshin_v_multi_integral_with_trapez_method_all::TestTaskALL::PostProcessingImpl() {
+  if (world_.rank() == 0) {
+    reinterpret_cast<double *>(task_data->outputs[0])[0] = res_;
+  }
+  return true;
+}
+\end{lstlisting}
+
+\end{document}
