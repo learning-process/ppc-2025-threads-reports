@@ -1,0 +1,700 @@
+\documentclass[12pt]{extarticle}
+\renewcommand{\normalsize}{\fontsize{14pt}{14pt}\selectfont}
+\usepackage[T2A]{fontenc} 
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{enumitem}
+\usepackage{geometry}
+\usepackage{multirow}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{xcolor} 
+\usepackage{listings}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{setspace}
+
+\onehalfspacing
+\geometry{a4paper, left=20mm, right=20mm, top=20mm, bottom=20mm}
+\setlength{\parindent}{1.25cm}
+\sloppy
+
+\hypersetup{
+    pdfencoding=auto,
+    hidelinks,
+    pdfstartview=FitH,
+    unicode=true,
+    linkcolor=black,
+    urlcolor=black,
+    pdftitle={Отчёт по проекту},
+    pdfauthor={Корнеева Екатерина},
+    pdfsubject={Умножение разреженных матриц. Элементы комплексного типа. Формат хранения матрицы – столбцовый (CCS).}
+}
+\lstset{
+  language=C++,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\itshape\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=5pt,
+  backgroundcolor=\color{gray!10},
+  showspaces=false,
+  showstringspaces=false,
+  breaklines=true,
+  frame=lines,
+  tabsize=2,
+  captionpos=b
+}
+
+\begin{document}
+\begin{titlepage}
+    \centering
+    \large
+    Министерство науки и высшего образования Российской Федерации\\
+    Федеральное государственное автономное образовательное учреждение высшего образования\\
+    \textbf{«Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского»}\\[0.25cm]
+    Институт информационных технологий, математики и механики\\
+    Направление подготовки: \textbf{«Программная инженерия»}\\[1cm]
+    
+    \vfill
+    
+    {\LARGE \textbf{ОТЧЁТ}}\\
+    {\Large по задаче}\\
+    {\LARGE \textbf{«Умножение разреженных матриц (элементы комплексного типа, CCS)»}}\\
+    {\Large \textbf{Вариант №7}}\\
+    
+    \vfill
+    
+    \hfill\parbox{0.4\textwidth}{
+        \textbf{Выполнил:} \\
+        студент группы 3822Б1ПР1 \\
+        \textbf{Корнеева Е.М.}
+    }\\[0.5cm]
+    
+    \hfill\parbox{0.4\textwidth}{
+        \textbf{Преподаватель:} \\
+        кандидат технических наук,\\
+        доцент \textbf{Сысоев А.В.}
+    }\\[0.5cm]
+    
+    \vfill
+    
+    Нижний Новгород\\
+    2025
+\end{titlepage}
+
+
+\thispagestyle{empty}
+\clearpage
+\pagenumbering{arabic} 
+\setcounter{page}{2} 
+\tableofcontents
+\clearpage
+\setcounter{page}{3} 
+\section{Введение}
+\hspace*{1.25cm}В современной вычислительной технике обработка крупномасштабных данных требует эффективных алгоритмов и оптимизированных структур хранения. Разреженные матрицы, в которых преобладают нулевые элементы, широко используются в научных расчётах, машинном обучении и компьютерной графике. Хранение таких матриц в «плотном» формате неэффективно по памяти и вычислительным ресурсам, поэтому применяются форматы, такие как CCS (Compressed Column Storage), сокращающие объём памяти в десятки раз, но требующие адаптации алгоритмов.
+
+Актуальность работы обусловлена необходимостью ускорения обработки данных при ограниченных ресурсах. Параллельные вычисления распределяют нагрузку между ядрами процессора или узлами кластера, но требуют минимизации накладных расходов и обеспечения балансировки нагрузки. Разработаны последовательная и параллельные версии алгоритма умножения разреженных матриц в формате CCS с комплексными числами на базе OpenMP, TBB, STL и MPI+STL. Цель — сравнить их производительность и определить оптимальные подходы для многопоточной обработки больших данных.
+
+\section{Постановка задачи}
+
+\hspace*{1.25cm}\textbf{Цель работы} — разработка и анализ алгоритмов умножения разреженных матриц в формате CCS с комплексными числами. \\[0.5cm]
+\hspace*{1.25cm}\textbf{Задачи:}
+\begin{itemize}
+    \item Реализовать последовательную версию алгоритма.
+    \item Создать параллельные версии с использованием технологий:
+    \begin{itemize}
+        \item OpenMP — для многопроцессорных систем с общей памятью;
+        \item Intel TBB — для потокового параллелизма с автоматическим управлением задачами;
+        \item std::thread — для ручного управления потоками в C++;
+        \item MPI + std::thread — для гибридных распределённых и многопоточных вычислений.
+    \end{itemize}
+    \item Проверить корректность реализаций на различных данных.
+    \item Сравнить производительность и масштабируемость версий.
+\end{itemize}
+
+Ожидаемый результат — выявление оптимальной стратегии параллельного умножения матриц и определение преимуществ и ограничений каждой технологии для обработки больших данных.
+
+
+\section{Описание алгоритма}
+
+\hspace*{1.25cm}Алгоритм умножения разреженных матриц в формате CCS предназначен для вычисления результирующей матрицы $C$ как произведения двух матриц $A$ и $B$. Для каждого элемента результирующей матрицы $C_{ij}$ выполняется вычисление по формуле:
+\[
+C_{ij} = \sum_{k} A_{ik} \cdot B_{kj},
+\]
+где $A$ — матрица размера $m \times n$, $B$ — матрица размера $n \times p$, а $C$ — результирующая матрица размера $m \times p$. Использование формата CCS обеспечивает компактное хранение и эффективную обработку ненулевых элементов матриц, минимизируя затраты памяти и ускоряя вычисления.
+
+\subsection{Структура данных}
+
+\hspace*{1.25cm}Матрица в формате CCS представлена структурой \texttt{SparseMatrixCCS}, которая включает следующие компоненты:
+\begin{itemize}
+    \item \texttt{values} — массив ненулевых элементов матрицы (тип \texttt{std::complex<double>}), упорядоченный по столбцам; \\[-0.9cm]
+    \item \texttt{row\_indices} — массив индексов строк, соответствующих каждому ненулевому элементу в массиве \texttt{values}; \\[-0.9cm]
+    \item \texttt{col\_offsets} — массив смещений, определяющий начальные и конечные позиции ненулевых элементов для каждого столбца в массивах \texttt{values} и \texttt{row\_indices}; длина массива равна количеству столбцов плюс один; \\[-0.9cm]
+    \item \texttt{rows} — число строк матрицы; \\[-0.9cm]
+    \item \texttt{cols} — число столбцов матрицы; \\[-0.9cm]
+    \item \texttt{nnz} — общее количество ненулевых элементов.
+\end{itemize}
+
+Пример структуры для матрицы $A = \begin{bmatrix} 1 & 0 & 4 \\ 0 & 2 & 0 \\ 0 & 0 & 3 \end{bmatrix}$:
+\begin{itemize}
+    \item \texttt{values = [1, 2, 4, 3]}, \\[-0.9cm]
+    \item \texttt{row\_indices = [0, 1, 0, 2]}, \\[-0.9cm]
+    \item \texttt{col\_offsets = [0, 1, 2, 4]}, \\[-0.9cm]
+    \item \texttt{rows = 3}, \texttt{cols = 3}, \texttt{nnz = 4}.
+\end{itemize}
+
+Такая организация данных обеспечивает компактное хранение и быстрый доступ к ненулевым элементам, что особенно важно для разреженных матриц.
+
+\subsection{Этапы выполнения}
+
+\hspace*{1.25cm}Алгоритм умножения матриц включает следующие ключевые шаги:
+
+\begin{enumerate}
+    \item \textbf{Инициализация.} 
+    Проверяется совместимость матриц $A$ и $B$: число столбцов матрицы $A$ должно совпадать с числом строк матрицы $B$. Создаётся результирующая матрица $C$ с размером $m \times p$, где $m$ — число строк $A$, а $p$ — число столбцов $B$.
+
+    \item \textbf{Формирование столбцов матрицы $C$.} 
+    Матрица $C$ заполняется по столбцам. Для каждого столбца $j$:
+    \begin{itemize}
+        \item Извлекается столбец $j$ матрицы $B$, содержащий только ненулевые элементы (благодаря формату CCS).
+        \item Для каждой строки $i$ вычисляется элемент $C_{ij}$.
+        \item Ненулевые значения $C_{ij}$ сохраняются вместе с соответствующими индексами строк.
+    \end{itemize}
+    После обработки столбца фиксируется количество ненулевых элементов в нём.
+
+      \item \textbf{Вычисление элемента $C_{ij}$.} 
+    Для получения значения $C_{ij}$ алгоритм:
+    \begin{itemize}
+        \item Перебирает индексы $k$ (от 0 до числа столбцов $A$).
+        \item Определяет ненулевые элементы $A_{ik}$ (из строки $i$ матрицы $A$) и $B_{kj}$ (из столбца $j$ матрицы $B$).
+        \item Выполняет умножение пар $A_{ik} \cdot B_{kj}$ и суммирует результаты, формируя значение $C_{ij}$.
+    \end{itemize}
+
+    \item \textbf{Сохранение результата.} 
+    После обработки всех столбцов матрица $C$ формируется в формате CCS, включая ненулевые элементы, индексы строк и смещения столбцов.
+\end{enumerate}
+
+\subsection{Пример}
+
+\hspace*{1.25cm}Рассмотрим умножение матриц $A$ и $B$ размера $2 \times 2$:
+
+\[
+A = \begin{bmatrix}
+1 & 0 \\
+0 & 2
+\end{bmatrix}, \quad
+B = \begin{bmatrix}
+3 & 0 \\
+0 & 4
+\end{bmatrix}
+\]
+
+Результирующая матрица $C = A \cdot B$:
+\[
+C = \begin{bmatrix}
+3 & 0 \\
+0 & 8
+\end{bmatrix}
+\]
+
+В формате CCS:
+\begin{itemize}
+    \item $A$: \texttt{values = [1, 2]},\texttt{row\_indices = [0, 1]},\texttt{col\_offsets = [0, 1, 2]}.
+    \item $B$: \texttt{values = [3, 4]},\texttt{row\_indices = [0, 1]},\texttt{col\_offsets = [0, 1, 2]}.
+\end{itemize}
+
+Процесс вычисления:
+\begin{itemize}
+    \item Для столбца $j=0$ матрицы $C$: $C_{00} = A_{00} \cdot B_{00} = 1 \cdot 3 = 3$, $C_{10} = A_{10} \cdot B_{00} = 0 \cdot 3 = 0$. Сохраняется $C_{00} = 3$.
+    \item Для столбца $j=1$ матрицы $C$: $C_{01} = A_{01} \cdot B_{11} = 0 \cdot 4 = 0$, $C_{11} = A_{11} \cdot B_{11} = 2 \cdot 4 = 8$. Сохраняется $C_{11} = 8$.
+    \item Итоговая матрица $C$ в формате CCS: \texttt{values = [3, 8]}, \texttt{row\_indices = [0, 1]}, \texttt{col\_offsets = [0, 1, 2]}.
+\end{itemize}
+
+Этот подход демонстрирует эффективность алгоритма для разреженных матриц, обеспечивая экономию памяти и высокую производительность вычислений.
+
+\section{Схема параллельного алгоритма}
+
+\hspace*{1.25cm}Схема параллельного алгоритма умножения разреженных матриц в формате CCS основана на разделении задачи вычисления столбцов результирующей матрицы $C$ ($m \times p$) между несколькими потоками или процессами. Параллелизация эффективна, так как вычисление каждого столбца $C_{*,j}$ происходит независимо от других, что позволяет избежать конфликтов при доступе к данным. Основные этапы параллелизации:
+
+\begin{enumerate}
+    \item \textbf{Инициализация.} Входные матрицы $A$ ($m \times n$) и $B$ ($n \times p$) проверяются на корректность. Создаётся структура результирующей матрицы $C$ в формате CCS с пустыми массивами для ненулевых элементов, индексов строк и смещений столбцов.
+
+    \item \textbf{Распределение задач.} Столбцы матрицы $C$ делятся между потоками (в многопоточных реализациях) или процессами (в распределённых). Например, если $p$ — число столбцов $C$, а доступно $N$ потоков/процессов, каждый обрабатывает примерно $p/N$ столбцов. Распределение может быть статическим (равномерным) или динамическим (с учётом нагрузки).
+
+    \item \textbf{Параллельная обработка.} Каждый поток или процесс вычисляет назначенные столбцы $C_{*,j}$, сохраняя ненулевые элементы и их индексы строк в локальных массивах. Вычисления используют только ненулевые элементы матриц $A$ и $B$, что минимизирует затраты памяти и времени.
+
+    \item \textbf{Сборка результата.} Локальные результаты от всех потоков или процессов объединяются в глобальные массивы \texttt{values}, \texttt{row\_indices} и \texttt{col\_offsets} матрицы $C$. В распределённых системах требуется синхронизация.
+
+\end{enumerate}
+
+Ключевое преимущество — независимость столбцов, что позволяет параллельно вычислять $C_{*,j}$ без необходимости синхронизации во время вычислений. Однако необходимо эффективное объединение результатов, особенно в распределённых системах, где обмен данными может быть затратным.
+
+\section{Программная реализация параллельных алгоритмов}
+\hspace*{1.25cm}Все параллельные версии алгоритма реализованы в классе \texttt{SparseMatrixMultComplexCCS}, каждая из которых размещена в отдельном пространстве имён для обеспечения их изоляции. В дальнейшем для краткости будет упоминаться только пространство имён, без указания названия класса.
+\subsection{OpenMP-версия}
+
+\hspace*{1.25cm}OpenMP-версия реализована с использованием модели общей памяти, что делает её простой и эффективной для многоядерных систем. Пространство имён: \texttt{korneeva\_e\_sparse\_matrix\_mult\_complex\_ccs\_omp}. \\[-0.2cm]
+
+Основные методы класса и их назначение:
+\begin{itemize}
+    \item \texttt{PreProcessingImpl()} — инициализирует указатели на входные матрицы \texttt{matrix1\_} и \texttt{matrix2\_} (типа \texttt{SparseMatrixCCS}) и создаёт пустую результирующую матрицу \texttt{result\_} с размерами \texttt{matrix1\_->rows} $\times$ \texttt{matrix2\_->cols}.
+    \item \texttt{ValidationImpl()} — проверяет корректность входных данных: наличие двух входных матриц, одной выходной, ненулевые указатели, совместимость размеров.
+    \item \texttt{RunImpl()} — выполняет основную задачу умножения матриц. Использует директиву \texttt{\#pragma omp parallel for} для распределения вычислений столбцов результирующей матрицы между потоками:
+
+    \begin{lstlisting}[caption={Параллельное вычисление столбцов в методе RunImpl},label={lst:openmp_run}]
+#pragma omp parallel for
+for (int j = 0; j < matrix2_->cols; j++) {
+    ComputeColumn(j, local_values[j], local_row_indices[j], temp_col_offsets);
+}
+    \end{lstlisting}
+Локальные результаты от каждого потока объединяются в глобальные массивы \texttt{values}, \texttt{row\_indices} и \texttt{col\_offsets}.
+    \item \texttt{PostProcessingImpl()} — сохраняет результирующую матрицу в выходной буфер задачи.
+   \item \texttt{ComputeColumn(col\_idx, values, row\_indices, col\_offsets)} — вычисляет ненулевые элементы столбца \texttt{col\_idx} результирующей матрицы, сохраняя их в переданные массивы. Вызывает \texttt{ComputeElement} для каждого элемента столбца.
+    \item \texttt{ComputeElement(row\_idx, col\_start2, col\_end2)} — вычисляет элемент $C_{row\_idx, col\_idx}$ как сумму произведений ненулевых элементов строки \texttt{row\_idx} матрицы \texttt{matrix1\_} и столбца \texttt{col\_idx} матрицы \texttt{matrix2\_}.
+    \item \texttt{ComputeContribution(row\_idx, k, col\_start1, col\_end1, col\_start2, col\_end2)} — вычисляет вклад в элемент  $C_{row\_idx, col\_idx}$ для фиксированного \texttt{k}, перемножая ненулевые элементы матриц \texttt{matrix1\_} и \texttt{matrix2\_}.
+\end{itemize}
+
+Основные особенности реализации:
+\begin{itemize}
+    \item Параллелизация осуществляется через директиву \texttt{\#pragma omp parallel for}, которая автоматически распределяет цикл по столбцам матрицы \texttt{matrix2\_} между потоками.
+    \item Каждый поток вычисляет свой набор столбцов $C_{*,j}$, сохраняя ненулевые элементы и индексы строк в локальных массивах \texttt{local\_values} и \texttt{local\_row\_indices}, чтобы избежать конфликтов при записи.
+    \item После завершения параллельного цикла локальные массивы объединяются в глобальные \texttt{values}, \texttt{row\_indices} и \texttt{col\_offsets} последовательно:
+    \begin{lstlisting}[caption={Объединение результатов в методе RunImpl},label={lst:openmp_merge}]
+for (int j = 0; j < matrix2_->cols; j++) {
+    final_values.insert(final_values.end(), local_values[j].begin(), local_values[j].end());
+    final_row_indices.insert(final_row_indices.end(), local_row_indices[j].begin(), local_row_indices[j].end());
+    temp_col_offsets[j + 1] = static_cast<int>(final_values.size());
+}
+    \end{lstlisting}
+    \item \textbf{Преимущества}: минимальные изменения по сравнению с последовательной версией, автоматическое управление потоками, низкие накладные расходы на синхронизацию.
+    \item \textbf{Недостатки}: ограничена одним узлом, масштабируемость зависит от числа ядер и равномерности нагрузки.
+\end{itemize}
+
+\textbf{Вывод:} OpenMP-версия оптимальна для систем с общей памятью, особенно для матриц небольшого и среднего размера с равномерной плотностью ненулевых элементов. Простота реализации и низкие накладные расходы на управление потоками делают её предпочтительной для задач, где не требуется сложная балансировка нагрузки, однако для очень больших матриц или неравномерной нагрузки могут быть более эффективны другие подходы.
+
+\subsection{TBB-версия}
+
+\hspace*{1.25cm}TBB-версия реализована с использованием библиотеки Intel Threading Building Blocks (TBB), что обеспечивает гибкую параллелизацию на системах с общей памятью. Пространство имён: \texttt{korneeva\_e\_sparse\_matrix\_mult\_complex\_ccs\_tbb}. \\[-0.2cm]
+
+Основные методы класса и их назначение:
+\begin{itemize}
+    \item \texttt{PreProcessingImpl()} — инициализирует указатели на входные матрицы и создаёт пустую результирующую матрицу (аналогично с OpenMP).
+    \item \texttt{ValidationImpl()} — проверяет корректность входных данных (аналогично с OpenMP).
+    \item \texttt{RunImpl()} — выполняет умножение матриц, распределяя вычисление столбцов результирующей матрицы между потоками с помощью \texttt{oneapi::tbb::parallel\_for}:
+    \begin{lstlisting}[caption={Параллельное вычисление столбцов в методе RunImpl},label={lst:tbb_run}]
+oneapi::tbb::parallel_for(
+    oneapi::tbb::blocked_range<int>(0, matrix2_->cols, std::max<size_t>(16, matrix2_->cols / 16)),
+    [&](const oneapi::tbb::blocked_range<int>& r) {
+        for (int j = r.begin(); j != r.end(); ++j) {
+            ComputeColumn(j, column_results[j]);
+        }
+    });
+    \end{lstlisting}
+    Локальные результаты собираются в глобальные массивы \texttt{values}, \texttt{row\_indices} и \texttt{col\_offsets}.
+    \item \texttt{PostProcessingImpl()} — сохраняет результирующую матрицу в выходной буфер задачи.
+    \item \texttt{ComputeColumn(col\_idx, column\_data)} — вычисляет ненулевые элементы столбца \texttt{col\_idx} результирующей матрицы, сохраняя их вместе с индексами строк в массив \texttt{column\_data}. Вызывает \texttt{ComputeElement} для каждого элемента столбца.
+    \item \texttt{ComputeElement(int row\_idx, int col\_start2, int col\_end2)} — вычисляет элемент $C_{row\_idx, col\_idx}$ (аналогично с OpenMP).
+    \item \texttt{ComputeContribution(row\_idx, k, col\_start1, col\_end1, col\_start2, col\_end2)} — вычисляет вклад в элемент  $C_{row\_idx, col\_idx}$  для фиксированного \texttt{k} (аналогично с OpenMP).
+\end{itemize}
+
+Основные особенности реализации:
+\begin{itemize}
+    \item Параллелизация осуществляется через \texttt{oneapi::tbb::parallel\_for}, которая разбивает столбцы матрицы \texttt{matrix2\_} на блоки с минимальным размером, зависящим от числа столбцов (например, не менее 16).
+    \item Каждый блок столбцов обрабатывается отдельным потоком, а результаты сохраняются в массиве \texttt{column\_results}, где каждый элемент содержит пары значений и индексов строк для соответствующего столбца.
+    \item После завершения параллельного цикла результаты собираются в глобальные массивы \texttt{values}, \texttt{row\_indices} и \texttt{col\_offsets} последовательно:
+    \begin{lstlisting}[caption={Объединение результатов в методе RunImpl},label={lst:tbb_merge}]
+int nnz = 0;
+for (int j = 0; j < matrix2_->cols; ++j) {
+    auto& col_data = column_results[j];
+    for (const auto& [value, row_idx] : col_data) {
+        temp_values.push_back(value);
+        temp_row_indices.push_back(row_idx);
+        nnz++;
+    }
+    temp_col_offsets[j + 1] = nnz;
+}
+    \end{lstlisting}
+    \item \textbf{Преимущества}: автоматическая балансировка нагрузки, высокая масштабируемость, эффективность при неравномерной плотности ненулевых элементов.
+    \item \textbf{Недостатки}: требует установки библиотеки TBB, сложнее в настройке по сравнению с OpenMP.
+\end{itemize}
+
+\textbf{Вывод:} TBB-версия оптимальна для систем с общей памятью и матриц любого размера, особенно с неравномерной плотностью ненулевых элементов, благодаря автоматической балансировке нагрузки. Её гибкость делает реализацию предпочтительной для задач с динамической нагрузкой.
+
+\subsection{STL-версия}
+
+\hspace*{1.25cm}STL-версия реализует умножение разреженных матриц в формате CCS с использованием стандартной библиотеки C++ (\texttt{std::thread}), что обеспечивает переносимость на системы с общей памятью. Реализация выполнена в классе \texttt{SparseMatrixMultComplexCCS}, который находится в пространстве имён \texttt{korneeva\_e\_sparse\_matrix\_mult\_complex\_ccs\_stl}, изолирующем STL-реализацию от других версий.
+
+Основные методы класса и их назначение:
+\begin{itemize}
+    \item \texttt{PreProcessingImpl()} — инициализирует указатели на входные матрицы и создаёт пустую результирующую матрицу.
+    \item \texttt{ValidationImpl()} — проверяет корректность входных данных.
+    \item \texttt{RunImpl()} — выполняет умножение матриц, распределяя вычисление столбцов результирующей матрицы между потоками с использованием \texttt{std::thread}:
+    \begin{lstlisting}[caption={Распределение столбцов между потоками в методе RunImpl},label={lst:stl_run}]
+int cols_per_thread = matrix2_->cols / num_threads;
+int remaining_cols = matrix2_->cols % num_threads;
+int start = 0;
+for (int i = 0; i < num_threads; ++i) {
+    int cols = cols_per_thread + (i < remaining_cols ? 1 : 0);
+    int end = start + cols;
+    threads.emplace_back(compute_range, start, end);
+    start = end;
+}
+    \end{lstlisting}
+    Локальные результаты потоков собираются в глобальные массивы \texttt{values}, \texttt{row\_indices} и \texttt{col\_offsets}.
+    \item \texttt{PostProcessingImpl()} — сохраняет результирующую матрицу \texttt{result\_} в выходной буфер задачи.
+    \item \texttt{ComputeColumn(col\_idx, column\_data)} — вычисляет ненулевые элементы столбца \texttt{col\_idx} результирующей матрицы, сохраняя их вместе с индексами строк в массив \texttt{column\_data}. Вызывает \texttt{ComputeElement} для каждого элемента столбца.
+    \item \texttt{ComputeElement(row\_idx, col\_start2, col\_end2)} —вычисляет элемент $C_{row\_idx, col\_idx}$ (см. в OpenMP).
+    \item \texttt{ComputeContribution(row\_idx, k, col\_start1, col\_end1, col\_start2, col\_end2)} —вычисляет вклад в элемент  $C_{row\_idx, col\_idx}$  для фиксированного \texttt{k} (см. в OpenMP).
+\end{itemize}
+
+Основные особенности реализации:
+\begin{itemize}
+    \item Параллелизация осуществляется через \texttt{std::thread}, где столбцы матрицы \texttt{matrix2\_} вручную делятся между потоками на основе числа доступных ядер (\texttt{ppc::util::GetPPCNumThreads}), как показано в листинге~\ref{lst:stl_run}.
+    \item Каждый поток вычисляет назначенный диапазон столбцов $C_{*,j}$, сохраняя результаты в массиве \texttt{column\_results}, где каждый элемент содержит пары значений и индексов строк для соответствующего столбца.
+    \item После завершения работы потоков результаты собираются в глобальные массивы \texttt{values}, \texttt{row\_indices} и \texttt{col\_offsets} последовательно:
+    \begin{lstlisting}[caption={Объединение результатов в методе RunImpl},label={lst:stl_merge}]
+int nnz = 0;
+for (int j = 0; j < matrix2_->cols; ++j) {
+    auto& col_data = column_results[j];
+    for (const auto& [value, row_idx] : col_data) {
+        temp_values.push_back(value);
+        temp_row_indices.push_back(row_idx);
+        nnz++;
+    }
+    temp_col_offsets[j + 1] = nnz;
+}
+    \end{lstlisting}
+    \item \textbf{Преимущества}: не требует внешних библиотек, высокая переносимость, простота реализации для базовых сценариев.
+    \item \textbf{Недостатки}: ручное управление потоками, отсутствие автоматической балансировки нагрузки, что снижает эффективность при неравномерной плотности ненулевых элементов.
+\end{itemize}
+
+\textbf{Вывод:} STL-версия подходит для систем с общей памятью, где недоступны специализированные библиотеки, такие как OpenMP или TBB, и для матриц небольшого размера с равномерной нагрузкой. Однако отсутствие автоматической балансировки нагрузки и ручное управление потоками делают её менее эффективной для больших матриц или задач с неравномерной плотностью ненулевых элементов, где предпочтительнее использовать TBB или OpenMP.
+
+\subsection{MPI+STL-версия}
+
+\hspace*{1.25cm}MPI+STL-версия комбинирует в себе распределённые вычисления с помощью MPI (Message Passing Interface) и многопоточность внутри узлов с использованием \texttt{std::thread}. Пространство имён: \texttt{korneeva\_e\_sparse\_matrix\_mult\_complex\_ccs\_all}. \\[-0.1cm]
+
+Основные методы класса и их назначение:
+\begin{itemize}
+    \item \texttt{PreProcessingImpl()} — инициализирует входные матрицы на процессе с рангом 0, создаёт пустую результирующую матрицу \texttt{result\_}. На других процессах создаются пустые матрицы для последующей рассылки данных.
+    \item \texttt{ValidationImpl()} — проверяет корректность входных данных на процессе с рангом 0).
+    \item \texttt{RunImpl()} — выполняет умножение матриц, рассылая входные матрицы с помощью \texttt{boost::mpi::broadcast}, распределяя столбцы между процессами, вычисляя их с использованием \texttt{std::thread}, и собирая результаты с помощью \texttt{boost::mpi::all\_gatherv}.
+    \item \texttt{PostProcessingImpl()} — сохраняет результирующую матрицу в выходной буфер задачи на процессе с рангом 0.
+    \item \texttt{ComputeColumn(col\_idx, column\_data)} — вычисляет ненулевые элементы столбца \texttt{col\_idx} результирующей матрицы, сохраняя их с индексами строк в \texttt{column\_data}. Вызывает \texttt{ComputeElement} для каждого элемента столбца.
+    \item \texttt{ComputeElement(int row\_idx, int col\_start2, int col\_end2)} — вычисляет элемент $C_{row\_idx, col\_idx}$ (см. в OpenMP).
+    \item \texttt{ComputeContribution(row\_idx, k, col\_start1, col\_end1, col\_start2, col\_end2)} — вычисляет вклад в элемент  $C_{row\_idx, col\_idx}$  для фиксированного \texttt{k} (см. в OpenMP).
+    \item \texttt{ProcessColumnRange(...)} — распределяет вычисление столбцов в диапазоне между потоками внутри процесса с использованием \texttt{std::thread}.
+    \item \texttt{CollectLocalResults(...)} — собирает локальные результаты вычислений в массивы \texttt{local\_values}, \texttt{local\_row\_indices} и \texttt{local\_col\_offsets}.
+    \item \texttt{GatherGlobalResults(...)} — собирает глобальные результаты от всех процессов с использованием \texttt{boost::mpi::all\_gatherv} и \texttt{boost::mpi::reduce}.
+\end{itemize}
+
+Основные особенности реализации:
+\begin{itemize}
+    \item Входные матрицы рассылаются от процесса с рангом 0 с помощью \texttt{boost::mpi::broadcast}:
+    \begin{lstlisting}[caption={Рассылка входных матриц в методе RunImpl},label={lst:mpi_broadcast}]
+boost::mpi::broadcast(world_, *matrix1_, 0);
+boost::mpi::broadcast(world_, *matrix2_, 0);
+    \end{lstlisting}
+    \item Столбцы матрицы \texttt{matrix2\_} распределяются между процессами с помощью вспомогательной функции \texttt{DistributeColumns}, которая определяет диапазон столбцов (\texttt{start\_col}, \texttt{end\_col}) для каждого процесса на основе его ранга и общего числа процессов:
+    \begin{lstlisting}[caption={Распределение столбцов между процессами},label={lst:mpi_distribute}]
+void DistributeColumns(int rank, int size, int total_cols, int& start_col, int& end_col) {
+    if (size <= 0) {
+        start_col = total_cols;
+        end_col = total_cols;
+        return;
+    }
+    int cols_per_process = total_cols / size;
+    int remaining_cols = total_cols % size;
+    start_col = (rank * cols_per_process) + std::min(rank, remaining_cols);
+    int extra_col = rank < remaining_cols ? 1 : 0;
+    end_col = start_col + cols_per_process + extra_col;
+    if (start_col >= total_cols || end_col > total_cols) {
+        start_col = total_cols;
+        end_col = total_cols;
+    }
+}
+    \end{lstlisting}
+    \item Внутри каждого процесса вычисления столбцов распараллеливаются с помощью \texttt{std::thread} в методе \texttt{ProcessColumnRange}:
+    \begin{lstlisting}[caption={Параллельная обработка столбцов внутри процесса},label={lst:mpi_stl_threads}]
+int cols_per_thread = (end_col - start_col) / num_threads;
+int remaining_thread_cols = (end_col - start_col) % num_threads;
+int thread_start = start_col;
+for (int i = 0; i < num_threads; ++i) {
+    int cols = cols_per_thread + (i < remaining_thread_cols ? 1 : 0);
+    int thread_end = thread_start + cols;
+    threads.emplace_back(compute_range, thread_start, thread_end);
+    thread_start = thread_end;
+}
+    \end{lstlisting}
+    \item Локальные результаты собираются на каждом процессе методом \texttt{CollectLocalResults}, а затем объединяются в глобальные массивы с помощью \texttt{boost::mpi::all\_gatherv}:
+    \begin{lstlisting}[caption={Сбор глобальных результатов в методе GatherGlobalResults},label={lst:mpi_gather}]
+boost::mpi::all_gatherv(world_, local_values, result_.values, all_nnz, displacements);
+boost::mpi::all_gatherv(world_, local_row_indices, result_.row_indices, all_nnz, displacements);
+    \end{lstlisting}
+    \item \textbf{Преимущества}: масштабируемость на кластерные системы, эффективное использование ресурсов узлов за счёт многопоточности, поддержка больших матриц.
+    \item \textbf{Недостатки}: сложность реализации, высокие накладные расходы на обмен данными между процессами, зависимость от библиотеки Boost.MPI.
+\end{itemize}
+
+\textbf{Вывод:} MPI+STL-версия оптимальна для кластерных систем и больших матриц, где требуется распределение задач между узлами и параллелизация внутри узлов. Комбинация MPI и STL обеспечивает высокую масштабируемость, но сложность реализации и накладные расходы на коммуникацию делают её менее подходящей для небольших матриц или систем с общей памятью, где предпочтительнее OpenMP или TBB.
+
+\newpage
+\section{Результаты экспериментов}
+
+\hspace*{1.25cm}Все реализации прошли тщательное функциональное тестирование на различных наборах данных. Тесты охватывали следующие случаи:
+\begin{itemize}
+  \item \textbf{Некорректные данные}: случаи с несовместимыми размерами матриц, отрицательными размерностями, пустыми входными данными; \\[-0.9cm]
+  \item \textbf{Специфические структуры матриц}: нулевые, единичные, диагональные, прямоугольные матрицы, а также векторно-матричное умножение; \\[-0.9cm]
+  \item \textbf{Сложные и случайные данные}: случайные разреженные матрицы различных размеров и плотности ненулевых элементов. 
+\end{itemize}
+
+Все тесты подтвердили корректность реализаций в разнообразных сценариях работы. Для оценки производительности алгоритма измерялось время выполнения в разных конфигурациях потоков и процессов. Таблица ниже показывает усреднённые времена (в секундах) для \texttt{PipelineRun} и \texttt{TaskRun}, а также ускорение относительно \texttt{TaskRun} последовательной версии.
+
+\subsection{Таблица производительности}
+
+\renewcommand{\arraystretch}{1.4}
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Версия} & \textbf{Конфигурация} & \textbf{PipelineRun (с)} & \textbf{TaskRun (с)} & \textbf{Ускорение} \\
+\hline
+\textbf{Последовательная} & — & 2.4343 & 2.4002 & \textbf{1.00} \\
+\hline
+\multirow{3}{*}{OpenMP} 
+  & 2 потока & 1.1830 & 1.1721 & 2.04 \\
+  & 3 потока & 0.9162 & 0.8995 & 2.67 \\
+  & 5 потоков & 0.6685 & 0.6559 & 3.66 \\
+\hline
+\multirow{3}{*}{TBB} 
+  & 2 потока & 1.2447 & 1.2015 & 2.00 \\
+  & 3 потока & 0.9004 & 0.8815 & 2.72 \\
+  & 5 потоков & 0.6622 & 0.6573 & 3.65 \\
+\hline
+\multirow{3}{*}{STL (std::thread)} 
+  & 2 потока & 1.2109 & 1.1574 & 2.07 \\
+  & 3 потока & 0.8995 & 0.8753 & 2.74 \\
+  & 5 потоков & 0.5999 & 0.5838 & 4.11 \\
+\hline
+\multirow{5}{*}{MPI + STL} 
+  & 2 + 2 & 0.7194 & 0.7146 & 3.36 \\
+  & 3 + 2 & 0.5745 & 0.5706 & 4.21 \\
+  & 3 + 3 & 0.5648 & 0.5496 & 4.37 \\
+  & 4 + 2 & 0.5035 & 0.4933 & 4.87 \\
+  & 4 + 4 & 0.4677 & 0.4526 & 5.30 \\
+\hline
+\end{tabular}
+\caption{Производительность различных реализаций}
+\label{tab:matrix_mult_perf}
+\end{table}
+
+\hspace*{1.25cm}Тесты проводились на системе с процессором Intel Core i3-12100F (4 ядра, 8 потоков, 3.30 ГГц), 16 ГБ ОЗУ. Матрицы тестировались по 5 раз, результаты усреднялись. Ускорение — отношение \texttt{TaskRun} последовательной версии к параллельной.
+
+\textbf{Анализ результатов:}  
+{\sloppy Накладные расходы (\texttt{PipelineRun} - \texttt{TaskRun}) минимальны (0.004–0.02 с) и одинаковы для всех реализаций. Все параллельные версии значительно быстрее последовательной, особенно MPI+STL (4+4) и STL (5 потоков). Hyper-Threading (используется при >4 потоках) добавляет 10–30\% производительности.}
+
+\begin{itemize}
+  \item \textbf{OpenMP и TBB}: Достигают схожего ускорения (~3.65 при 5 потоках). OpenMP чуть лучше при 2 потоках за счёт меньших затрат на запуск. Статическое распределение OpenMP и динамическое TBB равноценны для разреженных матриц.
+  \item \textbf{STL}: Лидирует среди реализаций с общей памятью (4.11 при 5 потоках) благодаря оптимизированному статическому распределению и Hyper-Threading.
+  \item \textbf{MPI + STL}: Лучшая производительность (5.30 при 4+4). Конфигурация 4+2 (4.87) оптимальна для 4 ядер, 3+2 (4.21) менее эффективна из-за возможного дисбаланса в \verb|DistributeColumns| или коммуникаций (\verb|boost::mpi::broadcast|, \verb|all_gatherv|).
+\end{itemize}
+ \hspace*{1.25em}\textbf{Выводы}: MPI+STL (4+4) — лидер благодаря гибридному подходу и Hyper-Threading, перекрывающему коммуникации. STL (5 потоков) лучшая для общей памяти. OpenMP и TBB уступают из-за меньшей оптимизации. Накладные расходы не влияют на сравнение.
+
+
+\newpage
+\section{Заключение}
+
+\hspace*{1.25em}В данной работе реализован и проанализирован алгоритм умножения разреженных матриц в формате CCS с комплексными элементами. Базовая последовательная реализация дополнена четырьмя параллельными версиями с использованием современных технологий: OpenMP, Intel TBB, стандартной библиотеки потоков C++ td::thread (STL) и гибридной модели MPI+STL.
+
+Каждая технология была выбрана для изучения её эффективности при параллельной обработке разреженных матриц. Решены задачи распределения столбцов между потоками и процессами, организации сбора результатов и проверки корректности. Эксперименты на больших данных позволили сравнить производительность реализаций.
+
+Наивысшее ускорение показала гибридная реализация MPI+STL в конфигурации 4+4 (4 процесса, 4 потока), обеспечив более чем 5-кратное ускорение (Speedup 5.30) относительно последовательной версии. Конфигурация 4+2 дала ускорение 4.87, тогда как 3+2 (4.21) менее эффективна из-за дисбаланса в DistributeColumns. Среди локальных реализаций лучшей оказалась STL с ускорением 4.11 при 5 потоках, за счёт оптимизированного распределения и Hyper-Threading. OpenMP и TBB показали стабильное, но меньшее ускорение (3.65).
+
+Таким образом, все поставленные цели работы достигнуты: \\[-0.9cm]
+\begin{itemize}
+  \item Разработан и протестирован алгоритм умножения разреженных матриц в формате CCS; \\[-0.9cm]
+  \item Реализованы параллельные версии с использованием OpenMP, TBB, STL и MPI+STL; \\[-0.9cm]
+  \item Проведён анализ производительности, включая накладные расходы; \\[-0.9cm]
+  \item Выявлены особенности технологий: масштабируемость MPI+STL, простота OpenMP, гибкость TBB, переносимость STL. \\[-0.9cm]
+\end{itemize}
+
+Результаты подтверждают высокую эффективность параллельных вычислений для разреженных матриц, особенно в гибридной модели. В перспективе возможна оптимизация распределения данных в MPI+STL и тестирование на плотных матрицах.
+
+\newpage
+\section{Список литературы}
+\begin{enumerate}
+    \item Saad Y. \textit{Iterative Methods for Sparse Linear Systems}. — 2nd ed. — SIAM, 2003. — 528 p. \url{https://epubs.siam.org/doi/book/10.1137/1.9780898718003}
+    \item Davis T.A. \textit{Direct Methods for Sparse Linear Systems}. — SIAM, 2006. — 217 p. \url{https://epubs.siam.org/doi/book/10.1137/1.9780898718881}
+    \item Duff I.S., Erisman A.M., Reid J.K. \textit{Direct Methods for Sparse Matrices}. — 2nd ed. — Oxford University Press, 2017. — 416 p. \url{https://doi.org/10.1093/acprof:oso/9780198508380.001.0001}
+    \item Сысоев А.В., Мееров И.Б., Сиднев А.А. \textit{Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks}. — Нижний Новгород: ННГУ, 2007. — 84 с.
+    \item Шилдт Г. \textit{Язык программирования C++. Полное руководство}. — М.: Вильямс, 2020. — 1200 с.
+    \item OpenMP Architecture Review Board. \textit{OpenMP Application Program Interface Version 5.1}. — 2020. \url{https://www.openmp.org}
+    \item Intel. \textit{oneAPI Threading Building Blocks Developer Guide}. — \url{https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html}
+    \item Gropp W., Lusk E., Skjellum A. \textit{Using MPI: Portable Parallel Programming with the Message Passing Interface}. — 3rd ed. — MIT Press, 2014. — 336 p. \url{https://mitpress.mit.edu/9780262527392/using-mpi/}
+    \item Pissanetzky S. \textit{Sparse Matrix Technology}. — Academic Press, 1984. — 336 p. \url{https://doi.org/10.1016/C2013-0-10717-8}
+\end{enumerate}
+\appendix
+\newpage
+\section*{Приложение}
+\addcontentsline{toc}{section}{Приложение}
+
+\hspace*{1.25cm}В этом разделе приведены ключевые фрагменты реализации алгоритма умножения разреженных матриц в формате CCS с комплексными элементами для различных технологий распараллеливания.
+
+\subsection*{OpenMP: функция RunImpl()}
+\begin{lstlisting}[language=C++]
+bool SparseMatrixMultComplexCCS::RunImpl() {
+  std::vector<std::vector<Complex>> local_values(matrix2_->cols);
+  std::vector<std::vector<int>> local_row_indices(matrix2_->cols);
+  std::vector<int> temp_col_offsets(matrix2_->cols + 1, 0);
+
+#pragma omp parallel for
+  for (int j = 0; j < matrix2_->cols; j++) {
+    ComputeColumn(j, local_values[j], local_row_indices[j], temp_col_offsets);
+  }
+
+  std::vector<Complex> final_values;
+  std::vector<int> final_row_indices;
+  temp_col_offsets[0] = 0;
+
+  for (int j = 0; j < matrix2_->cols; j++) {
+    final_values.insert(final_values.end(), local_values[j].begin(), local_values[j].end());
+    final_row_indices.insert(final_row_indices.end(), local_row_indices[j].begin(), local_row_indices[j].end());
+    temp_col_offsets[j + 1] = static_cast<int>(final_values.size());
+  }
+
+  result_.values = std::move(final_values);
+  result_.row_indices = std::move(final_row_indices);
+  result_.col_offsets = std::move(temp_col_offsets);
+  result_.nnz = static_cast<int>(result_.values.size());
+  return true;
+}
+\end{lstlisting}
+
+\subsection*{TBB: функция RunImpl()}
+\begin{lstlisting}[language=C++]
+bool SparseMatrixMultComplexCCS::RunImpl() {
+  std::vector<std::vector<std::pair<Complex, int>>> column_results(matrix2_->cols);
+
+  oneapi::tbb::parallel_for(
+      oneapi::tbb::blocked_range<int>(0, matrix2_->cols, std::max<size_t>(16, matrix2_->cols / 16)),
+      [&](const oneapi::tbb::blocked_range<int>& r) {
+        for (int j = r.begin(); j != r.end(); ++j) {
+          ComputeColumn(j, column_results[j]);
+        }
+      });
+
+  std::vector<Complex> temp_values;
+  std::vector<int> temp_row_indices;
+  std::vector<int> temp_col_offsets(matrix2_->cols + 1, 0);
+
+  int nnz = 0;
+  for (int j = 0; j < matrix2_->cols; ++j) {
+    auto& col_data = column_results[j];
+    for (const auto& [value, row_idx] : col_data) {
+      temp_values.push_back(value);
+      temp_row_indices.push_back(row_idx);
+      nnz++;
+    }
+    temp_col_offsets[j + 1] = nnz;
+  }
+  //...
+}
+\end{lstlisting}
+
+\subsection*{STL (std::thread): функция RunImpl()}
+\begin{lstlisting}[language=C++]
+bool SparseMatrixMultComplexCCS::RunImpl() {
+  std::vector<std::vector<std::pair<Complex, int>>> column_results(matrix2_->cols);
+  std::vector<int> col_indices(matrix2_->cols);
+  std::iota(col_indices.begin(), col_indices.end(), 0);
+
+  int num_threads = ppc::util::GetPPCNumThreads();
+  num_threads = std::max(1, num_threads);
+  std::vector<std::thread> threads;
+  threads.reserve(num_threads);
+
+  int cols_per_thread = matrix2_->cols / num_threads;
+  int remaining_cols = matrix2_->cols % num_threads;
+
+  auto compute_range = [&](int start, int end) {
+    for (int j = start; j < end; ++j) {
+      ComputeColumn(j, column_results[j]);
+    }
+  };
+
+  int start = 0;
+  for (int i = 0; i < num_threads; ++i) {
+    int cols = cols_per_thread + (i < remaining_cols ? 1 : 0);
+    int end = start + cols;
+    threads.emplace_back(compute_range, start, end);
+    start = end;
+  }
+
+  for (auto& thread : threads) {
+    thread.join();
+  }
+
+  std::vector<Complex> temp_values;
+  std::vector<int> temp_row_indices;
+  std::vector<int> temp_col_offsets(matrix2_->cols + 1, 0);
+
+  int nnz = 0;
+  for (int j = 0; j < matrix2_->cols; ++j) {
+    auto& col_data = column_results[j];
+    for (const auto& [value, row_idx] : col_data) {
+      temp_values.push_back(value);
+      temp_row_indices.push_back(row_idx);
+      nnz++;
+    }
+    temp_col_offsets[j + 1] = nnz;
+  }
+  //...
+}
+\end{lstlisting}
+
+\subsection*{MPI + STL: функция RunImpl()}
+\begin{lstlisting}[language=C++]
+bool SparseMatrixMultComplexCCS::RunImpl() {
+  int rank = world_.rank();
+  int size = world_.size();
+
+  boost::mpi::broadcast(world_, *matrix1_, 0);
+  boost::mpi::broadcast(world_, *matrix2_, 0);
+
+  result_ = SparseMatrixCCS(matrix1_->rows, matrix2_->cols, 0);
+
+  int total_cols = matrix2_->cols;
+  int start_col = 0;
+  int end_col = 0;
+  DistributeColumns(rank, size, total_cols, start_col, end_col);
+
+  std::vector<std::vector<std::pair<Complex, int>>> column_results(end_col - start_col);
+  std::vector<int> col_indices(end_col - start_col);
+  std::iota(col_indices.begin(), col_indices.end(), start_col);
+
+  if (end_col > start_col) {
+    ProcessColumnRange(start_col, end_col, column_results, col_indices);
+  }
+
+  std::vector<Complex> local_values;
+  std::vector<int> local_row_indices;
+  std::vector<int> local_col_offsets;
+  int local_nnz = 0;
+  CollectLocalResults(column_results, start_col, end_col, local_values, local_row_indices, local_col_offsets,
+                      local_nnz);
+
+  GatherGlobalResults(rank, size, total_cols, local_nnz, local_values, local_row_indices, column_results, start_col,
+                      end_col);
+
+  boost::mpi::broadcast(world_, result_, 0);
+
+  return true;
+}
+\end{lstlisting}
+\end{document}
